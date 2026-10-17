@@ -46,8 +46,8 @@ operations and reap processes before disposing dependencies or deleting outputs.
 
 ## Apply the four upstream sources selectively
 
-The source files are available in the local `skills-main.zip` and extracted
-`skills-main/plugins/dotnet-test/skills` reading copy. Their useful contributions:
+These upstream dotnet-test references inform the local guidance. Their useful
+contributions:
 
 - `code-testing/unit-test-generation.prompt.md`: discover conventions and the
   normal entrypoint, map behavior partitions and use proportionate native rows.

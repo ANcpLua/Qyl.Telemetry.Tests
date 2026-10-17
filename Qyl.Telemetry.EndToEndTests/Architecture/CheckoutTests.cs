@@ -5,8 +5,6 @@ using Qyl.Telemetry.SemanticConventions.Names;
 using OrdersApi = Orders.Api.EntryPoint;
 using PaymentsApi = Payments.Api.EntryPoint;
 
-[assembly: DoNotParallelize]
-
 namespace Qyl.Telemetry.EndToEndTests.Architecture;
 
 /// <summary>Checks a checkout whose services own independent stores.</summary>

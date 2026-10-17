@@ -9,7 +9,7 @@ This is repository-local guidance for
 [Qyl.Telemetry.Tests.slnx](../../../Qyl.Telemetry.Tests.slnx). Select the requested
 behavior and project before writing tests. The project boundaries have different
 inputs, resource owners and evidence; they do not become interchangeable because
-their current templates all use MSTest. Their combined scope is Qyl-owned
+they all use MSTest. Their combined scope is Qyl-owned
 instrumentation, conventions, capture, collection, storage and investigation.
 
 | Project | Intended boundary | Read when relevant |

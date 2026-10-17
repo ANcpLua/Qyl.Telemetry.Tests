@@ -22,7 +22,9 @@ The normal entrypoint executes the three suites through Microsoft.Testing.Platfo
 **2.5.1**, using **MSTest.Sdk 4.5.1**, net10.0 and the AllMicrosoft extension
 profile (including Microsoft.CodeCoverage). The shared project is a library via
 `IsTestApplication=false`. Package versions are centralized in
-`Directory.Packages.props`. TRX reports are written to `artifacts/results`.
+`Directory.Packages.props`; `NuGet.Config` selects the public feed explicitly.
+One `QylPlatformVersion` property selects both the Collector runtime and
+Orchestration package. TRX reports are written to `artifacts/results`.
 For a focused run, use the native MTP options:
 
 ```sh
