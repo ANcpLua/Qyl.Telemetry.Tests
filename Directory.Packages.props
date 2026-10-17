@@ -2,8 +2,8 @@
   <PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="JetBrains.Annotations" Version="2026.2.0" />
-    <PackageVersion Include="Qyl.Telemetry.SemanticConventions" Version="13.1.2" />
-    <PackageVersion Include="Qyl.Telemetry.Hosting" Version="28.1.0" />
+    <PackageVersion Include="Qyl.Telemetry.SemanticConventions" Version="13.2.0" />
+    <PackageVersion Include="Qyl.Telemetry.Hosting" Version="28.1.1" />
     <PackageVersion Include="Qyl.Orchestration" Version="15.0.3" />
     <PackageVersion Include="Qyl.Api.Contracts" Version="14.0.1" />
     <PackageVersion Include="Google.Api.CommonProtos" Version="2.17.0" />

@@ -7,7 +7,7 @@ stack; the receiver and prototype support now live in this shared library.
 ## Select the producer and observation boundary
 
 For an application using `Qyl.Telemetry.AutoInstrumentation`, use its supported
-public host setup. In the inspected Hosting 28.1.0 package, that is
+public host setup. In the inspected Hosting 28.1.1 package, that is
 `builder.AddQyl(options => ...)` in namespace `Qyl`, supplied by
 `Qyl.Telemetry.Hosting`. Recheck the resolved package before implementing.
 Configure `CollectorEndpoint`, `ServiceName` and any additional application
