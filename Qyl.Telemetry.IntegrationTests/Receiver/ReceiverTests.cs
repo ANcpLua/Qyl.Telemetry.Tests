@@ -1,0 +1,200 @@
+using System.Diagnostics;
+using System.IO.Compression;
+using System.Net;
+using System.Net.Http.Headers;
+using Google.Protobuf;
+using JetBrains.Annotations;
+using OpenTelemetry.Proto.Collector.Metrics.V1;
+using OpenTelemetry.Proto.Collector.Trace.V1;
+using OpenTelemetry.Proto.Metrics.V1;
+using OpenTelemetry.Proto.Trace.V1;
+using Qyl.Telemetry.SemanticConventions;
+
+namespace Qyl.Telemetry.IntegrationTests.Receiver;
+
+[TestClass]
+public sealed class ReceiverTests
+{
+    [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
+
+    [TestMethod]
+    [DataRow("traces")]
+    [DataRow("logs")]
+    [DataRow("metrics")]
+    public async Task Malformed_protobuf_returns_bad_request_and_records_the_error(string signal)
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        using var response = await PostAsync(receiver.Endpoint, [0x80], TestContext.CancellationToken, signal);
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
+        Assert.AreEqual(signal, receipt.Signal);
+        Assert.AreEqual(0L, receipt.Accepted);
+        Assert.IsFalse(string.IsNullOrEmpty(receipt.Error));
+        var original = Assert.ContainsSingle(receiver.Snapshot().Requests);
+        Assert.AreEqual(signal, original.Signal);
+        Assert.AreSequenceEqual(new byte[] { 0x80 }, original.Payload.ToArray());
+        var error = await TransportTests.ReadErrorAsync(response, TestContext.CancellationToken);
+        Assert.AreEqual((int)Google.Rpc.Code.InvalidArgument, error.Code);
+        Assert.AreEqual(receipt.Error, error.Message);
+    }
+
+    [TestMethod]
+    public async Task Partial_success_keeps_valid_spans_and_reports_the_exact_rejection()
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var request = new ExportTraceServiceRequest();
+        var scope = new ScopeSpans();
+        scope.Spans.Add(new Span
+        {
+            TraceId = ByteString.CopyFrom(Convert.FromHexString("11111111111111111111111111111111")),
+            SpanId = ByteString.CopyFrom(Convert.FromHexString("2222222222222222")), Name = "valid"
+        });
+        scope.Spans.Add(new Span { Name = "invalid" });
+        request.ResourceSpans.Add(new ResourceSpans { ScopeSpans = { scope } });
+        using var response = await PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var result =
+            ExportTraceServiceResponse.Parser.ParseFrom(
+                await response.Content.ReadAsByteArrayAsync(TestContext.CancellationToken));
+        Assert.AreEqual(1L, result.PartialSuccess.RejectedSpans);
+        Assert.Contains("16", result.PartialSuccess.ErrorMessage);
+        var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
+        Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
+        Assert.AreEqual("2222222222222222", span.SpanId);
+        Assert.AreEqual("valid", span.Name);
+        var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
+        Assert.AreEqual(1L, receipt.Accepted);
+        Assert.AreEqual(1L, receipt.Rejected);
+    }
+
+    [TestMethod]
+    public async Task Awaiting_missing_evidence_times_out_instead_of_passing_on_empty_capture()
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        await Assert.ThrowsExactlyAsync<TimeoutException>(() =>
+            receiver.AwaitAsync(s => s.Spans.Count > 0, TimeSpan.Zero, TestContext.CancellationToken));
+        Assert.IsEmpty(receiver.Snapshot().Spans);
+    }
+
+    [TestMethod]
+    public async Task Cancellation_interrupts_the_pending_condition()
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        using var cancellation = new CancellationTokenSource();
+        var pending = receiver.AwaitAsync(s => s.Spans.Count > 0, TimeSpan.FromSeconds(10), cancellation.Token);
+        await cancellation.CancelAsync();
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => pending);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task Precancelled_wait_does_not_evaluate_the_evidence_condition(bool ready)
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        var evaluated = false;
+        var failure = await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            receiver.AwaitAsync(_ => { evaluated = true; return ready; }, TimeSpan.FromSeconds(10), cancellation.Token));
+        Assert.AreEqual(cancellation.Token, failure.CancellationToken);
+        Assert.IsFalse(evaluated);
+    }
+
+    [TestMethod]
+    public async Task Disposal_wakes_a_pending_condition_and_is_repeatable()
+    {
+        var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var pending = receiver.AwaitAsync(s => s.Spans.Count > 0, TimeSpan.FromSeconds(10),
+            TestContext.CancellationToken);
+        await receiver.DisposeAsync();
+        await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => pending);
+        await receiver.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task Invalid_metric_batch_reports_rejected_data_points_instead_of_metric_count()
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var metric = MetricWireTests.Fixture("gauge");
+        metric.Gauge.DataPoints.Add(metric.Gauge.DataPoints[0].Clone());
+        metric.Gauge.DataPoints[0].Attributes.Add(metric.Gauge.DataPoints[0].Attributes[0].Clone());
+        var request = new ExportMetricsServiceRequest
+        {
+            ResourceMetrics =
+            {
+                new ResourceMetrics
+                    { ScopeMetrics = { new ScopeMetrics { Metrics = { metric } } } }
+            }
+        };
+        using var response = await PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken,
+            "metrics");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var result = ExportMetricsServiceResponse.Parser.ParseFrom(
+            await response.Content.ReadAsByteArrayAsync(TestContext.CancellationToken));
+        Assert.AreEqual(2L, result.PartialSuccess.RejectedDataPoints);
+        Assert.Contains("Duplicate OTLP attribute: point.", result.PartialSuccess.ErrorMessage);
+        Assert.IsEmpty(receiver.Snapshot().Metrics);
+        var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
+        Assert.AreEqual(0L, receipt.Accepted);
+        Assert.AreEqual(2L, receipt.Rejected);
+    }
+
+    [TestMethod]
+    public async Task Gzip_request_is_decoded_before_protobuf_processing()
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        using var output = new MemoryStream();
+        await using (var gzip = new GZipStream(output, CompressionLevel.SmallestSize, true))
+        {
+            await gzip.WriteAsync(Qyl.Telemetry.Tests.Evidence.OtlpEvidence.RichSpan().ToByteArray(), TestContext.CancellationToken);
+        }
+
+        var client = TelemetryLifecycle.Http;
+        using var content = new ByteArrayContent(output.ToArray());
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
+        content.Headers.ContentEncoding.Add("gzip");
+        using var response = await client.PostAsync(new Uri(receiver.Endpoint, "v1/traces"), content,
+            TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
+        Assert.AreEqual("rich.operation", span.Name);
+        Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
+        Assert.AreEqual(SpanKind.Consumer, span.Kind);
+        Assert.AreEqual(ActivityStatusCode.Error, span.Status);
+        Assert.AreEqual("rich-scope", span.Scope?.Name);
+        Assert.AreSequenceEqual(Qyl.Telemetry.Tests.Evidence.OtlpEvidence.RichSpan().ToByteArray(),
+            Assert.ContainsSingle(receiver.Snapshot().Requests).Payload.ToArray());
+    }
+
+    [TestMethod]
+    public async Task Original_export_retains_unknown_fields_and_snapshot_membership()
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var empty = receiver.Snapshot();
+        // Field 127, varint 1: valid unknown OTLP protobuf, absent from every decoded public record.
+        byte[] payload = [0xf8, 0x07, 0x01];
+        using var response = await PostAsync(receiver.Endpoint, payload, TestContext.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        var snapshot = receiver.Snapshot();
+        Assert.IsEmpty(empty.Requests);
+        Assert.IsEmpty(snapshot.Spans);
+        Assert.AreEqual(0L, Assert.ContainsSingle(snapshot.Receipts).Accepted);
+        var request = Assert.ContainsSingle(snapshot.Requests);
+        Assert.AreEqual("traces", request.Signal);
+        Assert.AreSequenceEqual(payload, request.Payload.ToArray());
+        using var second = await PostAsync(receiver.Endpoint, [], TestContext.CancellationToken);
+        second.EnsureSuccessStatusCode();
+        Assert.HasCount(1, snapshot.Requests);
+        Assert.HasCount(2, receiver.Snapshot().Requests);
+    }
+
+    internal static async Task<HttpResponseMessage> PostAsync(Uri endpoint, byte[] bytes,
+        CancellationToken cancellationToken, string signal = "traces")
+    {
+        var client = TelemetryLifecycle.Http;
+        using var content = new ByteArrayContent(bytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
+        return await client.PostAsync(new Uri(endpoint, "v1/" + signal), content, cancellationToken);
+    }
+}

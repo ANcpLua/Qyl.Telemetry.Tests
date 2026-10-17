@@ -1,0 +1,23 @@
+name: Telemetry tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Run unit, integration and application suites
+        run: ./build.sh
+      - name: Retain native test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telemetry-test-results
+          path: artifacts/results
+          if-no-files-found: warn

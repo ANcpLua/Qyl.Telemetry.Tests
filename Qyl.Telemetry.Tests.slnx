@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Qyl.Telemetry.EndToEndTests/Qyl.Telemetry.EndToEndTests.csproj" />
+  <Project Path="Qyl.Telemetry.IntegrationTests/Qyl.Telemetry.IntegrationTests.csproj" />
+  <Project Path="Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj" />
+  <Project Path="Qyl.Telemetry.UnitTests/Qyl.Telemetry.UnitTests.csproj" />
+</Solution>

@@ -1,0 +1,19 @@
+<Project Sdk="MSTest.Sdk">
+  <PropertyGroup><IsTestApplication>false</IsTestApplication></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Qyl.Telemetry.SemanticConventions" />
+    <PackageReference Include="Qyl.Telemetry.Hosting" />
+    <PackageReference Include="Qyl.Orchestration" />
+    <PackageReference Include="Qyl.Api.Contracts" />
+    <PackageReference Include="Google.Api.CommonProtos" />
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.AspNetCore.Server" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <Protobuf Include="Protos/**/*.proto" ProtoRoot="Protos" GrpcServices="None" Access="Internal" />
+    <InternalsVisibleTo Include="Qyl.Telemetry.UnitTests" />
+    <InternalsVisibleTo Include="Qyl.Telemetry.IntegrationTests" />
+    <InternalsVisibleTo Include="Qyl.Telemetry.EndToEndTests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,7 @@
+<Project>
+  <ItemGroup Condition="'$(UsesQylCollector)' == 'true'">
+    <PackageDownload Include="qyl.$(NETCoreSdkRuntimeIdentifier)" Version="[$(QylPlatformVersion)]" />
+    <Content Include="$(NuGetPackageRoot)qyl.$(NETCoreSdkRuntimeIdentifier)/$(QylPlatformVersion)/tools/net10.0/$(NETCoreSdkRuntimeIdentifier)/collector/**/*"
+             Link="qyl/collector/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

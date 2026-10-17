@@ -1,0 +1,9 @@
+<Project Sdk="MSTest.Sdk">
+  <PropertyGroup><UsesQylCollector>true</UsesQylCollector></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj" />
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="OpenTelemetry" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+</Project>

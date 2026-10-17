@@ -1,0 +1,5 @@
+<Project Sdk="MSTest.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj" />
+  </ItemGroup>
+</Project>
