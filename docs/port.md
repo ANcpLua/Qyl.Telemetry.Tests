@@ -3,7 +3,9 @@
 The receiver and reusable prototype support are absorbed into this repository.
 The four projects have no project or package reference back to
 `Qyl.Telemetry.Testing` or `mstest-architecture-prototype`. The original
-repositories remain intact. Public Qyl production packages retain their own
+repositories are retained as archived history. Existing published
+`Qyl.Telemetry.Testing` packages remain available; external package consumers
+have not automatically migrated to this source repository. Public Qyl production packages retain their own
 production implementations and release ownership.
 
 | Retained source responsibility | Destination |

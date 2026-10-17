@@ -1,5 +1,11 @@
 # Qyl telemetry tests
 
+Active successor to [Qyl.Telemetry.Testing](https://github.com/ANcpLua/Qyl.Telemetry.Testing)
+and [mstest-architecture-prototype](https://github.com/ANcpLua/mstest-architecture-prototype).
+Their reusable receiver and architecture code is maintained here. Existing
+`Qyl.Telemetry.Testing` NuGet releases remain available to pinned consumers;
+this repository's shared support project is not currently published as a replacement package.
+
 Four projects protect Qyl-owned telemetry behavior across instrumentation,
 conventions, capture, collection, storage and investigation.
 
