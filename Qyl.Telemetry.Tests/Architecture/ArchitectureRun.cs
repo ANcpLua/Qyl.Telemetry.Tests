@@ -3,8 +3,9 @@ using System.Runtime.ExceptionServices;
 namespace Qyl.Telemetry.Tests.Architecture;
 
 /// <summary>Owns one consuming assembly's lazily started telemetry and service processes.</summary>
-internal sealed class ArchitectureRun
+internal sealed class ArchitectureRun(CancellationToken cancellationToken)
 {
+    private readonly CancellationTokenSource _lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
     private readonly Dictionary<Type, Task<RunningSystem>> _systems = [];
     private bool _closed;
 
@@ -19,7 +20,7 @@ internal sealed class ArchitectureRun
             ObjectDisposedException.ThrowIf(_closed, this);
             if (!_systems.TryGetValue(testClass, out var startup))
             {
-                startup = RunningSystem.StartAsync(this, architecture, bricks, cancellationToken);
+                startup = RunningSystem.StartAsync(this, architecture, bricks, _lifetime.Token);
                 _systems.Add(testClass, startup);
             }
             return startup.WaitAsync(cancellationToken);
@@ -65,7 +66,15 @@ internal sealed class ArchitectureRun
     public async Task CloseAsync()
     {
         lock (_systems) { _closed = true; }
-        try { await StopAsync().ConfigureAwait(false); }
-        finally { await Recorder.DisposeAsync().ConfigureAwait(false); }
+        try
+        {
+            await _lifetime.CancelAsync().ConfigureAwait(false);
+            await StopAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            try { await Recorder.DisposeAsync().ConfigureAwait(false); }
+            finally { _lifetime.Dispose(); }
+        }
     }
 }

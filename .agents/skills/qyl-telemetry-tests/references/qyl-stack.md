@@ -1,9 +1,8 @@
 # Qyl public stack and signal boundaries
 
 Resolve actual producer, convention, receiver and Collector versions before
-implementation. The template projects currently declare no Qyl dependencies.
-The package/API examples below are a source-inspected checkpoint, not installed
-capability in this new repository.
+implementation. Central package pins and restored assets identify the current
+stack; the receiver and prototype support now live in this shared library.
 
 ## Select the producer and observation boundary
 
@@ -23,8 +22,8 @@ spans. Qyl's own implementation may legitimately use provider-owned
 also use that SDK directly; it establishes a different contract. Neither use
 implies CLR profiling or Native AOT compatibility.
 
-Observe concrete OTLP through `Qyl.Telemetry.Testing` where that is the intended
-boundary. Its receiver preserves raw payloads, typed values and field presence;
+Observe concrete OTLP through this repository's `Qyl.Telemetry.Tests` shared library
+where that is the intended boundary. Its receiver preserves raw payloads, typed values and field presence;
 it does not own Collector persistence policy. Collector integration tests use
 the actual Collector payload/conversion/storage types. Read-surface privacy is
 a separate boundary reached through the actual redactor or read API.

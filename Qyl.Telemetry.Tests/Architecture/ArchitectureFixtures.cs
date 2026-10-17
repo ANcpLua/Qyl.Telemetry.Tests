@@ -11,7 +11,7 @@ public static class ArchitectureFixtures
     public static void Initialize(TestContext context)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        context.Properties.Add(SessionKey, new ArchitectureRun());
+        context.Properties.Add(SessionKey, new ArchitectureRun(context.CancellationToken));
     }
 
     internal static ArchitectureRun GetRun(TestContext context) =>
