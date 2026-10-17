@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup Label="Qyl packages">
+    <QylPlatformVersion>15.0.4</QylPlatformVersion>
+    <QylTelemetryVersion>28.1.1</QylTelemetryVersion>
+    <QylSemanticConventionsVersion>13.2.0</QylSemanticConventionsVersion>
+    <QylApiContractsVersion>14.0.1</QylApiContractsVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Runtime and telemetry dependencies">
+    <DotNetRuntimeVersion>10.0.13</DotNetRuntimeVersion>
+    <OpenTelemetryVersion>1.20.0</OpenTelemetryVersion>
+    <GrpcVersion>2.84.0</GrpcVersion>
+    <GoogleProtobufVersion>3.36.2</GoogleProtobufVersion>
+    <GoogleApiCommonProtosVersion>2.17.0</GoogleApiCommonProtosVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Tooling">
+    <JetBrainsAnnotationsVersion>2026.2.0</JetBrainsAnnotationsVersion>
+  </PropertyGroup>
+</Project>
