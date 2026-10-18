@@ -47,11 +47,13 @@ application scenarios have explicit sequential ownership.
 
 ## Delivery evidence
 
-The initial port passes **278 cases** through the solution entrypoint. It includes
+The v16 package baseline passes **278 cases** through the solution entrypoint
+(verified 2026-10-18). It includes
 real exporter/receiver transport and application-to-Collector persistence.
 The retained Collector fixture currently launches the packaged **managed**
 `qyl.collector.dll`; investigation assertions use the Collector's REST API.
 This is managed execution against pinned public packages.
+The v16-specific selected-header/metadata regression scenarios remain follow-up work.
 
 Candidate-package restore, execution of a published Native AOT Collector binary,
 and MCP protocol investigation remain subsequent delivery work. MTP execution,
