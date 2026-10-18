@@ -1,0 +1,4 @@
+interface:
+  display_name: "Qyl telemetry end-to-end tests"
+  short_description: "Connect Qyl application outcomes to investigation"
+  default_prompt: "Use $qyl-telemetry-end-to-end to implement the requested application-to-investigation scenario."

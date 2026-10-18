@@ -1,6 +1,0 @@
-interface:
-  display_name: "Qyl test project boundaries"
-  short_description: "Choose the correct Qyl test scope and evidence"
-  default_prompt: "Use $qyl-telemetry-tests to place and verify these tests in the correct project."
-policy:
-  allow_implicit_invocation: true

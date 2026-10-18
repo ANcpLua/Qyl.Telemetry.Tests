@@ -36,3 +36,24 @@ artifact scenarios, recording package/feed identity, executable RID/hash and
 actual investigation interface. Collector retention and read-time redaction must
 be verified against the corresponding Collector/MCP artifact, not inferred from
 successful receiver capture.
+
+## Production contract owners
+
+Resolve the revision matching the selected packages before using these sources.
+
+- [Qyl.Telemetry.SemanticConventions](https://github.com/ANcpLua/Qyl.Telemetry.SemanticConventions):
+  registry vocabulary, typed signals and entities, generated definitions,
+  deprecation mappings, persistence policy and analyzers.
+- [Qyl.Telemetry.AutoInstrumentation](https://github.com/ANcpLua/Qyl.Telemetry.AutoInstrumentation):
+  hosting and registration, native sources, interceptors/listeners, capture,
+  signal export, package/generator compatibility and integration-specific NativeAOT behavior.
+- [qyl](https://github.com/ANcpLua/qyl): Collector ingestion, storage, migrations,
+  retention, metric fidelity, sessions, authorization, project isolation,
+  investigation, streams, writable resources, orchestration and Qyl.Api.Sdk.
+- [qyl-api-schema](https://github.com/ANcpLua/qyl-api-schema): public request,
+  response, error, pagination and stream contracts, generated schemas and models,
+  validators and contract revision.
+
+Production-local generator, analyzer, storage-internal and schema-emitter cases
+remain with their production owner. This solution owns reusable testing support
+and the contracts connecting the selected products.

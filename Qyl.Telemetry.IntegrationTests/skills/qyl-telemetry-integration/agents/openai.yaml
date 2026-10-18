@@ -1,0 +1,4 @@
+interface:
+  display_name: "Qyl telemetry integration tests"
+  short_description: "Exercise selected real Qyl component boundaries"
+  default_prompt: "Use $qyl-telemetry-integration to implement the requested component scenario."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Qyl telemetry unit tests"
+  short_description: "Test deterministic Qyl interpretation and policy"
+  default_prompt: "Use $qyl-telemetry-unit to implement the requested deterministic behavior."

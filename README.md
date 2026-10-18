@@ -59,3 +59,10 @@ Candidate-package restore, execution of a published Native AOT Collector binary,
 and MCP protocol investigation remain subsequent delivery work. MTP execution,
 AOT publishing and MCP invocation are separate evidence boundaries. See
 [the ownership map](docs/port.md) for retained and deferred source responsibilities.
+
+## Agent guidance
+
+Start with [AGENTS.md](AGENTS.md). Each project owns its skill under skills/;
+the root .agents/skills folders link to those sources for discovery. Reusable
+policy design lives in the support skill's optional
+[telemetry catalogue](Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md).

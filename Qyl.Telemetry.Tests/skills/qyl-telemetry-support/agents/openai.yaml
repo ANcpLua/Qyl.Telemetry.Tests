@@ -1,0 +1,4 @@
+interface:
+  display_name: "Qyl telemetry support"
+  short_description: "Build reusable Qyl telemetry testing support"
+  default_prompt: "Use $qyl-telemetry-support to implement the requested reusable telemetry support."
