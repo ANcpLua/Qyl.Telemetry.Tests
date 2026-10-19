@@ -1,0 +1,50 @@
+{
+  "$comment": "The one place the eval binds qyl's tool and argument names. Cases name tools by the logical names on the left; the runner maps them to the server's names on the right. Bound to qyl 17.0.3; rebind here after the coordinator's \"tools final\" (T2 merges list_failures into triage, get_metric_series into list_metrics and query_metric, list_saved_queries into run_saved_query, create/update_saved_query into save_query, create/update_annotation into annotate; sort_by becomes order_by, compare_to becomes baseline, run_id becomes ci_run_id).",
+  "bound_to": "qyl 17.0.3",
+  "server": "qyl",
+  "tools": {
+    "triage": "triage",
+    "list_failures": "list_failures",
+    "get_failure_context": "get_failure_context",
+    "verify_fix": "verify_fix",
+    "compare_groups": "compare_groups",
+    "compare_traces": "compare_traces",
+    "discover_attributes": "discover_attributes",
+    "aggregate_telemetry": "aggregate_telemetry",
+    "query_metric": "query_metric",
+    "get_metric_series": "get_metric_series",
+    "list_metrics": "list_metrics",
+    "list_releases": "list_releases",
+    "get_trace": "get_trace",
+    "list_traces": "list_traces",
+    "search_logs": "search_logs",
+    "list_sessions": "list_sessions",
+    "get_agent_run": "get_agent_run",
+    "get_service_map": "get_service_map",
+    "check_telemetry_health": "check_telemetry_health",
+    "get_mcp_stats": "get_mcp_stats",
+    "ci_log": "ci_log",
+    "create_annotation": "create_annotation",
+    "update_annotation": "update_annotation",
+    "create_saved_query": "create_saved_query",
+    "update_saved_query": "update_saved_query",
+    "list_saved_queries": "list_saved_queries",
+    "run_saved_query": "run_saved_query",
+    "update_failure_status": "update_failure_status",
+    "delete_record": "delete_record"
+  },
+  "arguments": {
+    "lookback_minutes": "lookback_minutes",
+    "order_by": "order_by",
+    "baseline": "baseline",
+    "ci_run_id": "run_id"
+  },
+  "write_tools": [
+    "create_annotation",
+    "update_annotation",
+    "create_saved_query",
+    "update_saved_query",
+    "update_failure_status",
+    "delete_record"
+  ]
+}

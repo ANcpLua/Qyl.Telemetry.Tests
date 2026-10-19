@@ -1,0 +1,11 @@
+{
+  "$comment": "An A/B variant: the installed qyl plugin with exactly one line of one file changed. replay.py copies the plugin, applies every replacement (each must match once), and loads the copy with --plugin-dir. Compare the two runs with compare.py.",
+  "name": "triage-window-line",
+  "replacements": [
+    {
+      "file": "skills/qyl-investigate/SKILL.md",
+      "replace": "1. Make **one** call before anything else: `triage` with no arguments. It",
+      "with": "1. Make **one** call before anything else: `triage` with `lookback_minutes` covering the question's period (1440 for a day). It"
+    }
+  ]
+}

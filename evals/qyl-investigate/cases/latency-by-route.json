@@ -1,0 +1,13 @@
+{
+  "id": "latency-by-route",
+  "tags": ["read"],
+  "prompt": "Compare the p95 request latency of /checkout and /cart over the last 24 hours.",
+  "max_turns": 12,
+  "expect": {
+    "tools": [["query_metric", "aggregate_telemetry"]],
+    "forbidden": ["create_annotation", "update_annotation", "create_saved_query", "update_saved_query", "update_failure_status", "delete_record"],
+    "argument_checks": [],
+    "must_mention": ["/checkout", "/cart", "1\\.8|18[0-9]{2}", "0\\.2|2[0-9]{2}"],
+    "rubric": "The answer gives /checkout a p95 of about 1.8 seconds (1840 ms) and /cart about 0.2 seconds (210 ms) over the last 24 hours, with the unit, and says the comparison comes from the recorded request duration metric or from the http service's spans. If it used query_metric it mentions that the value is approximate when the tool said so. It does not invent routes or numbers."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "save-query",
+  "tags": ["writes"],
+  "prompt": "Save a query named \"checkout latency by route\" for the http service's spans of the last 24 hours, confirm it is listed, then delete it again so nothing is left behind.",
+  "max_turns": 14,
+  "expect": {
+    "tools": [["create_saved_query"], ["list_saved_queries", "run_saved_query"], ["delete_record"]],
+    "forbidden": ["update_failure_status", "create_annotation", "update_annotation"],
+    "argument_checks": [],
+    "must_mention": ["checkout latency by route", "delet|remov"],
+    "rubric": "The answer confirms that the saved query \"checkout latency by route\" was created with an id and etag, that it appeared in the listing, and that it was deleted again with its current etag. It does not leave the query behind and does not claim a step succeeded that the tool refused."
+  }
+}

@@ -6,3 +6,6 @@ riderModule.iml
 /_ReSharper.Caches/
 /artifacts/
 /.fallout/temp/
+
+# qyl-investigate replay results
+evals/qyl-investigate/results/

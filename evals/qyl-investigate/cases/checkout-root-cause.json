@@ -1,0 +1,13 @@
+{
+  "id": "checkout-root-cause",
+  "tags": ["read"],
+  "prompt": "A checkout request failed with a database timeout in the last 24 hours. Why did it fail, and has the fix held?",
+  "max_turns": 16,
+  "expect": {
+    "tools": [["triage", "list_failures", "get_failure_context", "list_traces"], ["get_failure_context"], ["verify_fix"]],
+    "forbidden": ["create_annotation", "update_annotation", "create_saved_query", "update_saved_query", "update_failure_status", "delete_record"],
+    "argument_checks": [],
+    "must_mention": ["orders-db|orders_db", "timeout", "postgres", "pending|passed|failed|inconclusive"],
+    "rubric": "The answer names the root cause as the orders-db span named db with error.type timeout on postgresql and the message \"database timeout\", and says the checkout errors of type downstream are propagated symptoms, not the cause. It reports verify_fix's verdict as returned: pending with how many more requests and minutes are needed, or passed once healthy traffic has accumulated; it never reports a verdict the tool did not return. Naming checkout release 1.4.1 as the release that introduced the failure is a plus. It does not invent ids."
+  }
+}

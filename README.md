@@ -9,6 +9,7 @@ Test support and suites for Qyl telemetry.
 | `Qyl.Telemetry.UnitTests` | Deterministic decoding, registry validation, evidence, assertion and policy tests. |
 | `Qyl.Telemetry.IntegrationTests` | Real OTLP transports, `AddQyl()` registration, receiver, Collector lifecycle and storage. |
 | `Qyl.Telemetry.EndToEndTests` | Instrumented application to Collector, REST and MCP; published-package and NativeAOT delivery. |
+| `evals/qyl-investigate` | Replays of the connector reviewer prompts through Claude Code against mcp.qyl.at, scored for tools chosen, findings named, tokens and cost; `eng/evals/replay.py` and `compare.py`. |
 
 ## Run
 

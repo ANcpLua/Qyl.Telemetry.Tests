@@ -1,0 +1,13 @@
+{
+  "id": "regional-discriminators",
+  "tags": ["read"],
+  "prompt": "What distinguishes the failing requests of the regional service from the ones that succeed?",
+  "max_turns": 12,
+  "expect": {
+    "tools": [["compare_groups"]],
+    "forbidden": ["create_annotation", "update_annotation", "create_saved_query", "update_saved_query", "update_failure_status", "delete_record"],
+    "argument_checks": [],
+    "must_mention": ["cloud\\.region", "\\beu\\b", "service\\.version", "2\\.3"],
+    "rubric": "The answer names the two leading discriminators compare_groups returned: cloud.region = eu and service.version = 2.3, and says every failing request is eu on version 2.3 while the succeeding ones span other regions and versions. It reports the group sizes or lift it was given rather than inventing numbers, and it does not call a discriminator a cause."
+  }
+}

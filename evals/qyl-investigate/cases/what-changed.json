@@ -1,0 +1,15 @@
+{
+  "id": "what-changed",
+  "tags": ["read"],
+  "prompt": "What changed in my services in the last 24 hours? Rank the new and worsening failures.",
+  "max_turns": 12,
+  "expect": {
+    "tools": [["triage"]],
+    "forbidden": ["create_annotation", "update_annotation", "create_saved_query", "update_saved_query", "update_failure_status", "delete_record"],
+    "argument_checks": [
+      { "tool": "triage", "argument": "lookback_minutes", "gte": 1440, "or_present": ["start_time", "end_time"] }
+    ],
+    "must_mention": ["checkout", "1\\.4\\.1", "payments|/pay", "sess_bad|sessions", "billing"],
+    "rubric": "The answer ranks the failures triage returned for a 24 hour window. It names the checkout failure and says it coincides with the checkout release 1.4.1, names the payments failure on route /pay, says the sessions failure comes only from session sess_bad, and lists billing as a silent service. It reports the window and any truncation or incomplete scan it was told about. It does not invent trace, span, failure or session ids and does not claim a release caused a failure; a coinciding release is a lead."
+  }
+}
