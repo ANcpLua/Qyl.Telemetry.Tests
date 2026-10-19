@@ -5,11 +5,13 @@ using Qyl.Api.Contracts.OTel.Metrics;
 
 namespace Qyl.Telemetry.EndToEndTests;
 
-[TestClass]
+[TracePerTest]
 [DoNotParallelize]
 public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFixture(context)
 {
     [TestMethod]
+    [NoErrorTelemetry]
+    [ExportsCleanly]
     public async Task Application_event_and_stored_log_retain_the_server_span_and_resource()
     {
         var evidence = await SendRequestAsync();
@@ -34,6 +36,8 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     }
 
     [TestMethod]
+    [NoErrorTelemetry]
+    [ExportsCleanly]
     public async Task Application_counter_is_attributed_by_resource_and_survives_storage()
     {
         var start = DateTimeOffset.UtcNow.AddSeconds(-1);
@@ -63,6 +67,8 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     }
 
     [TestMethod]
+    [NoErrorTelemetry]
+    [ExportsCleanly]
     [DataRow(NativeMetric.ServerDuration)]
     [DataRow(NativeMetric.CpuTime)]
     [DataRow(NativeMetric.WorkingSet)]
@@ -107,15 +113,6 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
         Assert.Contains(item => item.Name == "exception" && item.Attributes.TryGetValue("exception.message", out var message)
             && Equals(message, ProbeSignals.FailureMessage), server.Events,
             $"Observed events: {string.Join("; ", server.Events.Select(item => item.Name + ":" + string.Join(", ", item.Attributes.Select(pair => pair.Key + "=" + pair.Value))))}; error.type={server.GetString("error.type")}");
-        var stored = await Application.Telemetry.Collector.Client.WaitForTraceAsync(evidence.TraceId,
-            trace => trace.GetProperty("spans").EnumerateArray().Any(span =>
-                span.GetProperty("span_id").GetString() == server.SpanId), Context.CancellationToken);
-        var span = Assert.ContainsSingle(stored.GetProperty("spans").EnumerateArray().Where(span =>
-            span.GetProperty("span_id").GetString() == server.SpanId));
-        Assert.AreEqual(2, span.GetProperty("status").GetProperty("code").GetInt32());
-        var events = await Application.Telemetry.Collector.Client.SpanEventsAsync(evidence.TraceId, Context.CancellationToken);
-        Assert.Contains(item => item is { Name: "exception", Attributes: { } attributes } && attributes.Any(attribute =>
-            attribute is { Key: "exception.message", Value: AttributeValue.StringValue { Value: ProbeSignals.FailureMessage } }), events);
     }
 
     public enum NativeMetric { ServerDuration, CpuTime, WorkingSet }

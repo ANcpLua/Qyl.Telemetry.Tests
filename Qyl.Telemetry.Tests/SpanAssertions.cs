@@ -24,17 +24,6 @@ public static class SpanAssertions
 
         public static void HasParentContext(SpanRecord child, ActivityContext parent) =>
             RequireParent(child, parent.TraceId.ToHexString(), parent.SpanId.ToHexString());
-
-        public static void HasUniqueSpanIdentities(IEnumerable<SpanRecord> spans)
-        {
-            var identities = new HashSet<(string Trace, string Span)>();
-            foreach (var span in spans)
-            {
-                RequireIdentity(span.TraceId, span.SpanId);
-                Assert.IsTrue(identities.Add((span.TraceId, span.SpanId)),
-                    $"'{span.Name}' repeats trace/span identity {span.TraceId}/{span.SpanId}.");
-            }
-        }
     }
 
     private static void RequireParent(SpanRecord child, string trace, string parent)

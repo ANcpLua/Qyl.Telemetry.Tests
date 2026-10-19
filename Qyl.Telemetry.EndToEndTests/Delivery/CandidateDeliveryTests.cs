@@ -9,7 +9,7 @@ using SpanKind = Qyl.Telemetry.SemanticConventions.SpanKind;
 
 namespace Qyl.Telemetry.EndToEndTests.Delivery;
 
-[TestClass]
+[TracePerTest]
 public sealed class CandidateDeliveryTests(TestContext context)
 {
     private const string TraceTool = "get_trace";
@@ -22,6 +22,9 @@ public sealed class CandidateDeliveryTests(TestContext context)
         _delivery = await new DeliveryArtifacts(context).PrepareAsync();
 
     [TestMethod]
+    [ConnectedTrace]
+    [NoDuplicateSpans]
+    [PreservedByCollector]
     [DataRow(ExecutableFormat.ManagedAssembly)]
     [DataRow(ExecutableFormat.NativeAot)]
     [Timeout(180_000, CooperativeCancellation = true)]
@@ -57,7 +60,6 @@ public sealed class CandidateDeliveryTests(TestContext context)
         Assert.AreEqual(SpanKind.Client, client.Kind);
         Assert.HasParentContext(server, client);
         Assert.HasParentContext(client, root.Context);
-        Assert.HasUniqueSpanIdentities(trace.Spans);
         Assert.AreSequenceEqual([ProbeSignals.RequestId], server.GetStrings(CapturedKey)!);
         _ = await application.Telemetry.Collector.Client.WaitForTraceAsync(traceId,
             stored => stored.GetProperty("spans").EnumerateArray().Any(span => span.GetProperty("span_id").GetString() == server.SpanId),

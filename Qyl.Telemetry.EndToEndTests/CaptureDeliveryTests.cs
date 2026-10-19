@@ -6,6 +6,10 @@ using SpanKind = Qyl.Telemetry.SemanticConventions.SpanKind;
 
 namespace Qyl.Telemetry.EndToEndTests;
 
+[ConnectedTrace]
+[NoDuplicateSpans]
+[ConformsToSemanticConventions]
+[PreservedByCollector]
 public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDisposable
 {
     protected const string ProbeService = "telemetry-probe";
@@ -68,15 +72,7 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
         Assert.AreEqual(TelemetryPipeline.TestProcess, client.Service);
         Assert.HasParentContext(server, client);
         Assert.HasParentContext(client, root.Context);
-        Assert.HasUniqueSpanIdentities(evidence.Spans);
         return evidence;
-    }
-
-    protected static void RequireStoredArray(JsonElement attributes, string key, string[] expected)
-    {
-        var values = attributes.Deserialize<Qyl.Api.Contracts.Common.Attribute[]>();
-        Assert.IsNotNull(values);
-        Assert.That.HasCapturedValues(values, key, expected);
     }
 
     public async ValueTask DisposeAsync()
@@ -86,8 +82,10 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
     }
 }
 
-[TestClass]
+[TracePerTest]
 [DoNotParallelize]
+[NoErrorTelemetry]
+[ExportsCleanly]
 public sealed class SelectedHeaderDeliveryTests(TestContext context) : CaptureDeliveryFixture(context)
 {
     private const string CaptureRequestSetting = "OTEL_DOTNET_AUTO_TRACES_ASPNETCORE_INSTRUMENTATION_CAPTURE_REQUEST_HEADERS";
@@ -99,6 +97,7 @@ public sealed class SelectedHeaderDeliveryTests(TestContext context) : CaptureDe
     };
 
     [TestMethod]
+    [CapturesExactly(RequestIdAttribute, UnderscoreAttribute, AuthorizationAttribute, ResponseIdAttribute)]
     public async Task Selected_arrays_keep_names_values_and_order_through_capture_and_storage()
     {
         var evidence = await SendRequestAsync();
@@ -108,30 +107,16 @@ public sealed class SelectedHeaderDeliveryTests(TestContext context) : CaptureDe
         Assert.AreSequenceEqual(UnderscoreValues, server.GetStrings(UnderscoreAttribute)!);
         Assert.AreSequenceEqual(AuthorizationValues, server.GetStrings(AuthorizationAttribute)!);
         Assert.AreSequenceEqual(ResponseValues, server.GetStrings(ResponseIdAttribute)!);
-
-        var stored = await Application.Telemetry.Collector.Client.WaitForTraceAsync(evidence.TraceId,
-            trace => trace.GetProperty("spans").EnumerateArray().Any(span =>
-                span.GetProperty("span_id").GetString() == server.SpanId), Context.CancellationToken);
-        var span = Assert.ContainsSingle(stored.GetProperty("spans").EnumerateArray().Where(span =>
-            span.GetProperty("span_id").GetString() == server.SpanId));
-        var attributes = span.GetProperty("attributes");
-        RequireStoredArray(attributes, RequestIdAttribute, CapturedRequestValues);
-        RequireStoredArray(attributes, UnderscoreAttribute, UnderscoreValues);
-        RequireStoredArray(attributes, AuthorizationAttribute, AuthorizationValues);
-        RequireStoredArray(attributes, ResponseIdAttribute, ResponseValues);
     }
 }
 
-[TestClass]
+[TracePerTest]
 [DoNotParallelize]
+[NoErrorTelemetry]
+[ExportsCleanly]
 public sealed class UnconfiguredHeaderDeliveryTests(TestContext context) : CaptureDeliveryFixture(context)
 {
     [TestMethod]
-    public async Task Unconfigured_capture_emits_no_request_or_response_header_attributes()
-    {
-        var evidence = await SendRequestAsync();
-        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
-        Assert.DoesNotContain(key => key.StartsWith(HttpAttributes.RequestHeader + ".", StringComparison.Ordinal)
-            || key.StartsWith(HttpAttributes.ResponseHeader + ".", StringComparison.Ordinal), server.Attributes.Keys);
-    }
+    [CapturesExactly]
+    public async Task Unconfigured_capture_emits_no_request_or_response_header_attributes() => _ = await SendRequestAsync();
 }

@@ -11,7 +11,7 @@ conventions, capture, collection, storage and investigation.
 
 | Project | Responsibility |
 | --- | --- |
-| `Qyl.Telemetry.Tests` | Shared library: canonical OTLP receiver, raw and typed evidence, trace graphs, assertions and isolated Collector/application fixtures. |
+| `Qyl.Telemetry.Tests` | Shared library: canonical OTLP receiver, raw and typed evidence, trace graphs, assertions, telemetry policies and isolated Collector/application fixtures. |
 | `Qyl.Telemetry.Tests.Capture` | NativeAOT-compatible raw Activity snapshots, exact CLR-array assertions and versioned JSON evidence, without an MSTest or Collector dependency. |
 | `Qyl.Telemetry.UnitTests` | Deterministic protocol interpretation, registry validation, graph selection and query diagnostics with explicit inputs. |
 | `Qyl.Telemetry.IntegrationTests` | Real HTTP/gRPC and SDK export into the receiver, public `AddQyl()` registration, Collector lifecycle, persistence and pipeline isolation. |
@@ -78,17 +78,18 @@ Published executable hashes, runtime identifiers, package identities and command
 logs are retained under `artifacts/delivery`; individual observations accompany
 the test results. No candidate package is published to a registry.
 
-Selected capture cases verify field identity and array fidelity through storage;
-native runner probes verify failures, data rows and source locations. See
+Telemetry policies verify trace connectivity, duplicate instrumentation, capture
+selection, conventions, clean exports and Collector storage fidelity; native
+runner probes verify failures, data rows, source locations and policy verdicts. See
 [ownership](docs/port.md) and [implemented APIs](docs/extension-api.md).
 
 ## Agent guidance
 
 Start with [AGENTS.md](AGENTS.md). Each project owns its skill under skills/;
-the root .agents/skills folders link to those sources for discovery. Reusable
-policy design lives in the support skill's optional
-[telemetry catalogue](Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md).
+the root .agents/skills folders link to those sources for discovery. Declared
+[telemetry policies](Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md)
+are documented beside the support skill.
 
 [Build infrastructure](docs/build-infrastructure/README.md) describes MSBuild,
 central packages and verification mechanics. [Implemented extension APIs](docs/extension-api.md)
-distinguishes implemented fixtures and native composition from policy proposals.
+maps fixtures, assertions, policies and native composition to their sources.

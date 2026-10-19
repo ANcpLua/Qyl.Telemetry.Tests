@@ -6,6 +6,8 @@ using Qyl.Api.Contracts.Common.Pagination;
 using StoredLogRecord = Qyl.Api.Contracts.OTel.Logs.LogRecord;
 using Qyl.Api.Contracts.OTel.Metrics;
 using Qyl.Api.Contracts.OTel.Traces;
+using StoredSpan = Qyl.Api.Contracts.OTel.Traces.Span;
+using StoredTrace = Qyl.Api.Contracts.OTel.Traces.Trace;
 
 namespace Qyl.Telemetry.Tests.Collector;
 
@@ -33,6 +35,25 @@ public sealed class CollectorClient(HttpClient client)
         CancellationToken cancellationToken = default) =>
         WaitUntilAsync(token => QueryMetricAsync(name, start, end, aggregation, token), until,
             $"metric '{name}'", cancellationToken);
+
+    /// <summary>Polls until every expected span is stored or the deadline passes, returning the last stored spans.</summary>
+    internal async Task<IReadOnlyList<StoredSpan>> AwaitStoredSpansAsync(string traceId, IReadOnlySet<string> spanIds,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<StoredSpan> stored = [];
+        try
+        {
+            _ = await WaitUntilAsync(async token => stored =
+                    (await ReadAsync<StoredTrace>($"api/v1/traces/{Uri.EscapeDataString(traceId)}", token).ConfigureAwait(false)).Spans,
+                spans => spanIds.All(id => spans.Any(span => span.SpanId == id)), $"trace '{traceId}'", cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // The policy reports each captured span the Collector did not store.
+        }
+        return stored;
+    }
 
     private static async Task<T> WaitUntilAsync<T>(Func<CancellationToken, Task<T>> read, Func<T, bool> until,
         string operation, CancellationToken cancellationToken)

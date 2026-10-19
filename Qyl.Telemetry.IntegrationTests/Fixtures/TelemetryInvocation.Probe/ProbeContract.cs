@@ -22,3 +22,17 @@ internal static class ProbeContract
 
     private static string SourcePath([CallerFilePath] string path = "") => path;
 }
+
+[JetBrains.Annotations.UsedImplicitly(JetBrains.Annotations.ImplicitUseTargetFlags.WithMembers)]
+internal static class PolicyContract
+{
+    internal const string FirstRow = "first.row";
+    internal const string SecondRow = "second.row";
+    internal const string Operation = "GET /probe";
+    internal const string OriginalMessage = "probe original policy failure";
+    internal const string SatisfiedMethod = "SatisfiedPoliciesKeepEachRowPassing";
+    internal const string WrappedMethod = "WrappedOperationFails";
+    internal const string MissingMethod = "MissingEvidenceFails";
+    internal const string OriginalMethod = "OriginalFailureIsKept";
+    internal const string UnverifiedMethod = "PlainTestClassRejectsPolicies";
+}

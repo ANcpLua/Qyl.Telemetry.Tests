@@ -30,5 +30,6 @@ Complete the producer operation and required flush before asserting absence.
 Keep configuration, identities, receipts and observations in relevant failure
 diagnostics. Use the affected boundary cases for executable changes.
 
-Use implemented shared policies that apply to the scenario. Move repeated
+Declare the [telemetry policies](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md)
+the scenario promises on a `[TracePerTest]` class. Move repeated
 interpretation or execution into [shared support](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/SKILL.md).

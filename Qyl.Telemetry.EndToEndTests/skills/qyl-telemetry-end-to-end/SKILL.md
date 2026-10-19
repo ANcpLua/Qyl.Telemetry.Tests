@@ -31,5 +31,6 @@ Share immutable publication under fixture ownership. Isolate mutable scenario
 state and child-process workspaces. Bound readiness and terminal observation,
 join children before cleanup and retain relevant failure evidence.
 
-Use implemented shared policies that apply to the scenario. Move repeated
+Declare the [telemetry policies](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md)
+the scenario promises on a `[TracePerTest]` class. Move repeated
 interpretation or execution into [shared support](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/SKILL.md).

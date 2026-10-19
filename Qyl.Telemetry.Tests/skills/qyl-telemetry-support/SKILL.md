@@ -35,7 +35,5 @@ Keep optional diagnostics distinct from required evidence.
 Place deterministic support decisions in UnitTests and real transport or
 process behavior in IntegrationTests.
 
-When designing or changing a reusable telemetry policy, read only the relevant
-section of [Telemetry policies](references/telemetry-policies.md).
-Proposed names require implementation before use. Select obligations from the
-scenario and its evidence.
+When declaring, adding or reviewing a telemetry policy, read
+[Telemetry policies](references/telemetry-policies.md).

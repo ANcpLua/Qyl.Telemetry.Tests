@@ -26,6 +26,6 @@ Keep each case focused on one behavior. Use native MSTest rows for independently
 reportable inputs. Await asynchronous work and join it before disposing resources.
 Use the focused project entrypoint for executable changes.
 
-Use implemented shared policies that apply to the case. When repeated
-expectations need shared interpretation or execution, use
+Prove each telemetry policy here with an exact violation and an accepted case.
+When repeated expectations need shared interpretation or execution, use
 [shared support](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/SKILL.md).

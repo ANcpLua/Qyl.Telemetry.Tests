@@ -29,6 +29,7 @@ public sealed class IsolationTests
     }
 
     [TestMethod]
+    [ConformsToSemanticConventions]
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
@@ -73,9 +74,6 @@ public sealed class IsolationTests
         Assert.AreEqual(row, observed.GetInt64("test.row"));
         Assert.IsFalse(observed.GetBoolean("checkout.accepted"));
         Assert.AreSequenceEqual(["first", "second"], observed.GetStrings("checkout.labels")!);
-        var report = RegistryConformance.Check(capture.Capture);
-        Assert.IsTrue(report.IsConformant, string.Join(Environment.NewLine, report.Issues));
-        Assert.Contains("test.row", report.CustomAttributes);
     }
 
     [TestMethod]

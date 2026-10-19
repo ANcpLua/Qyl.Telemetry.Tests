@@ -44,15 +44,6 @@ public sealed class SpanAssertionTests
         Assert.ThrowsExactly<AssertFailedException>(() => Assert.HasParentContext(changed, parent));
     }
 
-    [TestMethod]
-    public void Duplicate_export_identity_fails_even_when_both_records_are_individually_valid()
-    {
-        var span = NativeSpan();
-        Assert.HasUniqueSpanIdentities([span]);
-        var error = Assert.ThrowsExactly<AssertFailedException>(() => Assert.HasUniqueSpanIdentities([span, span]));
-        Assert.Contains(Trace + "/" + Child, error.Message);
-    }
-
     private static SpanRecord NativeSpan() => new(Trace, Child, Operation)
     {
         ParentSpanId = Parent,

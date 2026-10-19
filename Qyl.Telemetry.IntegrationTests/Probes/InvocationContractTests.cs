@@ -14,15 +14,7 @@ public sealed class InvocationContractTests(TestContext context)
     [Timeout(60_000, CooperativeCancellation = true)]
     public async Task Original_executor_rows_failures_and_inconclusive_results_survive_the_trace_scope()
     {
-        var directory = context.TestTempDirectory;
-        Assert.IsNotNull(directory);
-        var result = await RunAsync("--report-trx", "--results-directory", directory);
-        Assert.AreEqual(2, result.ExitCode, result.Error);
-        var path = Assert.ContainsSingle(Directory.GetFiles(directory, "*.trx"));
-        context.AddResultFile(path);
-        var report = XDocument.Load(path);
-        XNamespace ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
-        var results = report.Descendants(ns + "UnitTestResult").ToArray();
+        var results = await RunReportedAsync("ClassName=Qyl.Telemetry.IntegrationTests.Probes.ProbeCases");
         Assert.HasCount(5, results);
         Assert.HasCount(5, results.Select(item => (string?)item.Attribute("testId")).Distinct());
         var passed = results.Where(item => (string?)item.Attribute("outcome") == "Passed").ToArray();
@@ -53,6 +45,37 @@ public sealed class InvocationContractTests(TestContext context)
 
     [TestMethod]
     [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task Declared_policies_fail_violations_and_missing_evidence_but_keep_original_outcomes()
+    {
+        var results = await RunReportedAsync("FullyQualifiedName~PolicyCases");
+        Assert.HasCount(6, results);
+        Assert.HasCount(2, Of(PolicyContract.SatisfiedMethod).Where(item => (string?)item.Attribute("outcome") == "Passed"));
+        var wrapped = RequireFailure(PolicyContract.WrappedMethod, "Telemetry policy violated (1):",
+            $"[NoDuplicateSpans] '{PolicyContract.Operation}' (Server, policy-probe, policy-", "repeats its parent");
+        var evidence = Assert.ContainsSingle(wrapped.Descendants(Trx + "ResultFile"));
+        Assert.EndsWith("telemetry-evidence.txt", (string?)evidence.Attribute("path"));
+        _ = RequireFailure(PolicyContract.MissingMethod, "Telemetry policy violated (2):",
+            "[ConnectedTrace] No trace was published.", "[ExportsCleanly] No trace was published.");
+        var original = RequireFailure(PolicyContract.OriginalMethod, PolicyContract.OriginalMessage);
+        Assert.DoesNotContain("Telemetry policy violated", original.Value);
+        _ = RequireFailure(PolicyContract.UnverifiedMethod, "Qyl.Telemetry.IntegrationTests.Probes.UnverifiedPolicyCases "
+            + "declares [ConnectedTrace], but only a [TracePerTest] class verifies telemetry policies.");
+        return;
+
+        IEnumerable<XElement> Of(string method) => results.Where(item =>
+            ((string?)item.Attribute("testName"))!.Contains(method, StringComparison.Ordinal));
+
+        XElement RequireFailure(string method, params string[] messages)
+        {
+            var item = Assert.ContainsSingle(Of(method));
+            Assert.AreEqual("Failed", (string?)item.Attribute("outcome"));
+            foreach (var message in messages) Assert.Contains(message, item.Value);
+            return item;
+        }
+    }
+
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
     public async Task Discovery_reports_the_original_method_source_for_each_data_row()
     {
         var result = await RunAsync("--list-tests", "json");
@@ -71,6 +94,19 @@ public sealed class InvocationContractTests(TestContext context)
             Assert.AreEqual(expectedLine, location.GetProperty("lineStart").GetInt32());
             Assert.AreEqual(expectedLine, location.GetProperty("lineEnd").GetInt32());
         }
+    }
+
+    private static readonly XNamespace Trx = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
+
+    private async Task<XElement[]> RunReportedAsync(string filter)
+    {
+        var directory = context.TestTempDirectory;
+        Assert.IsNotNull(directory);
+        var result = await RunAsync("--report-trx", "--results-directory", directory, "--filter", filter);
+        Assert.AreEqual(2, result.ExitCode, result.Error);
+        var path = Assert.ContainsSingle(Directory.GetFiles(directory, "*.trx"));
+        context.AddResultFile(path);
+        return [.. XDocument.Load(path).Descendants(Trx + "UnitTestResult")];
     }
 
     private async Task<(int ExitCode, string Output, string Error)> RunAsync(params string[] arguments)

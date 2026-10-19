@@ -1,204 +1,73 @@
-# Telemetry policy catalogue
+# Telemetry policies
 
-Use this reference when designing or changing reusable telemetry support.
-Each entry marked proposed is a design option, not an available API or a
-requirement for every test. Select the obligation first, then the evidence and
-the smallest suitable native MSTest mechanism.
+A telemetry policy is a passive attribute on a test method or class. After a
+passing test, `[TracePerTest]` verifies each declared policy against the traces
+the test published. A violation turns the result into a failure listing every
+violation with its span, a span-tree outline and an attached
+`telemetry-evidence.txt`. A failed, inconclusive or ignored test keeps its own
+outcome.
 
-## Contents
+## Declaring
 
-- [Selection and composition](#selection-and-composition)
-- [Capture and signal semantics](#capture-and-signal-semantics)
-- [Ingestion and persistence](#ingestion-and-persistence)
-- [Investigation](#investigation)
-- [Delivery and lifecycle](#delivery-and-lifecycle)
-- [Data providers](#data-providers)
+1. Put `[TracePerTest]` on the class in place of `[TestClass]` and import
+   `Qyl.Telemetry.Tests.Policies`; a plain test class that declares a policy
+   fails as soon as it publishes evidence.
+2. Publish evidence inside the test: `TelemetryCapture.TraceAsync` publishes its
+   trace, and `TelemetryPipeline` publishes every root it began when it stops.
+   A declared policy without a published trace fails.
+3. Declare the obligations the scenario promises. Class declarations apply to
+   every test, including inherited ones; a method declaration replaces the class
+   declaration of the same policy.
+4. Keep scenario values in the test: expected header values, metric points and
+   specific parentage (`Assert.HasSingleNativeSpan`, `Assert.HasParentContext`,
+   `Assert.That.HasCapturedValues`).
 
-## Selection and composition
+## Policies
 
-Existing building blocks: `TracePerTestAttribute` supplies invocation identity;
-`TelemetryCapture.TraceAsync` and `TelemetryPipeline` collect real evidence;
-`Assert.That.HasCapturedValues` verifies stored string-array fidelity;
-`RegistryConformance.Check` evaluates registry definitions. Prefer these concrete
-APIs before implementing a proposed attribute. The Collector/application fixtures
-use per-invocation native TestContext ownership and retain failure evidence.
+| Policy | Proves | Scope |
+| --- | --- | --- |
+| `[ConnectedTrace]` | Every span's parent is a captured span of its trace or the test root; no second root. | Test traces |
+| `[NoDuplicateSpans]` | No span identity is exported twice; no client, server, producer or consumer span wraps its own operation; no second scope mirrors a concurrent operation. | Test traces |
+| `[CapturesExactly(fields)]` | The captured HTTP header and RPC metadata attributes equal `fields`; none lost, none added. No arguments: nothing captured. | Test traces |
+| `[ConformsToSemanticConventions]` | Registered attributes have their value types, registered metrics their units, and nothing deprecated appears unless `AllowDeprecated`. | Whole captures |
+| `[PreservedByCollector]` | The Collector stores each captured span with its name, parent, kind, status, times, scope, events, and span and resource attributes that `RegistryPolicy.IsPersisted` keeps, with typed values. Denied keys stay out; only copies of the span's resource attributes may be added. Exception text compares exactly. | Test traces, `TelemetryPipeline` only |
+| `[NoErrorTelemetry]` | No test span has error status or an exception event, and no captured log reaches Error severity. | Test traces; logs across whole captures |
+| `[ExportsCleanly]` | Every export was fully accepted: no rejected record, export error or receiver warning. | Whole captures |
 
-Keep expected application values, producer selection and observation windows
-in the consuming scenario. Reuse published registry and API definitions while
-deriving expected outcomes independently of the implementation under test.
+Test traces are the published traces; whole captures also contain fixture
+traffic such as health probes and runtime metrics.
 
-A conformance decision requires relevant, attributable evidence. Distinguish a
-violated obligation from insufficient evidence; neither can produce a passing
-conformance result. Require only the fields and signals promised by that scenario.
+## Built-in guarantees
 
-Use an assertion extension for a repeated expectation, native data mechanisms
-for repeated inputs and execution composition for an invocation-wide obligation.
-Passive policy attributes share one executor; they do not each rerun the test.
-Inspect the resolved MSTest APIs and the existing
-[TracePerTestAttribute](../../../TelemetryCapture.cs).
-[CollectorClient](../../../Collector/CollectorClient.cs) is the investigation reader;
-[TelemetryPipeline](../../../Collector/TelemetryPipeline.cs) owns capture and delivery.
+- A Collector that became ready must exit with code 0 within 10 seconds of
+  SIGTERM; `CollectorFixture` disposal fails otherwise (not on Windows).
+- `TelemetryPipeline` fails on rejected records and incomplete deliveries for
+  every test, with or without policies.
 
-When implementing an entry, replace its proposed status and empty implementation
-with links to the actual declaration and its consuming executor or assertion.
-Read those sources before reuse; a stale catalogue is not API authority.
+## Adding a policy
 
-## Capture and signal semantics
+Add one sealed `*Attribute` in `Qyl.Telemetry.Tests/Policies/` deriving from
+`TelemetryPolicyAttribute`. Implement `Violations` as complete sentences that
+name the span through `Describe` and state the observed value. Prove it in
+`Qyl.Telemetry.UnitTests/Policies` with an exact violation and an accepted
+case, and in `PolicyCases` when it changes runner behavior. Add a policy when
+its obligation holds for any scenario that declares it; a check that needs a
+scenario's expected values stays an assertion in that scenario.
 
-### RequiresTelemetryEvidence
+## Rejected proposals
 
-Status: proposed. Implementation: none.
-- Applies when: a scenario needs a declared set of signals and terminal observations.
-- Evidence: selected producers, resource/scope identities, required signals and a bounded completion condition.
-- Decision: require attributable, complete observations before evaluating dependent policies. Empty or incomplete required capture is insufficient evidence.
+These obligations need scenario-specific expectations or belong to another
+owner; propose them again only with a scenario-independent rule.
 
-### ConformsToSemanticConventions
-
-Status: proposed. Implementation: none.
-- Applies when: selected telemetry definitions promise semantic conformance.
-- Evidence: the resolved registry revision, selected definitions and applicable requirements, with actual typed values and units.
-- Decision: reject violations of those requirements while permitting legitimate application-defined names. Do not infer conformance from an empty selection.
-
-### PreservesNativeSpanOwnership
-
-Status: proposed. Implementation: none.
-- Applies when: Qyl augments a native instrumentation source.
-- Evidence: expected source, operation, span kind, identities and relevant relationships, with a completed observation window.
-- Decision: require the original native span without replacement or duplicate instrumentation. A total span count alone does not establish ownership.
-
-### PreservesTraceContext
-
-Status: proposed. Implementation: none.
-- Applies when: an operation crosses a declared propagation boundary.
-- Evidence: expected parent/child and link relationships, producer identities and boundary observations.
-- Decision: require the selected relationships and identify broken propagation or incorrect parentage. Select session propagation separately when it is part of the contract.
-
-### HonorsCaptureSelection
-
-Status: proposed. Implementation: none.
-- Applies when: producer configuration selects HTTP headers or gRPC metadata.
-- Evidence: selected and unselected fields, actual values, multiplicity, punctuation, normalized names and relevant metadata phases.
-- Decision: retain the selected fields according to the resolved producer contract and expose accidental overcapture or loss. Binary metadata follows its documented representation.
-
-### PreservesOtlpValues
-
-Status: proposed. Implementation: none.
-- Applies when: a named boundary promises typed OTLP fidelity.
-- Evidence: independent expected integers, doubles, arrays, bytes, timestamps, resources, scopes, events or links, and observations on the relevant sides.
-- Decision: preserve the selected types, values and field presence. Judge documented normalization separately from a promise of exact preservation.
-
-### PreservesMetricSemantics
-
-Status: proposed. Implementation: none.
-- Applies when: a scenario promises metric identity, point fidelity or documented aggregation.
-- Evidence: explicit producer, resource/scope and series identity, measurement window, correlation method, and the applicable point types, units and temporality.
-- Decision: establish exact original-point fidelity separately from documented aggregation or approximation. Select histograms, summaries and exemplars only when relevant; a trace ID alone does not identify an aggregate metric.
-
-## Ingestion and persistence
-
-### HonorsOtlpRejectionContract
-
-Status: proposed. Implementation: none.
-- Applies when: an ingestion batch contains rejected records or exceeds a declared limit.
-- Evidence: controlled valid and invalid records, the actual acknowledgment, rejected-record counts and subsequent observations of accepted records.
-- Decision: match the resolved rejection contract and preserve accepted records. Transport success alone cannot establish complete ingestion.
-
-### AppliesAttributePersistencePolicy
-
-Status: proposed. Implementation: none.
-- Applies when: the Collector retains, denies or normalizes attributes.
-- Evidence: the policy for the selected Collector artifact, submitted attributes, persisted observations and actual readback.
-- Decision: require allowed retention and documented normalization, and reject prohibited retention or unintended loss. Respect valid selected captured-field families when that policy preserves them; credential-like names are not a universal denial rule.
-
-### SanitizesExceptionEvidence
-
-Status: proposed. Implementation: none.
-- Applies when: the selected artifact promises sanitization of exception fields.
-- Evidence: policy-selected exception fields, independent redaction expectations, useful text to preserve, size bounds and failure representation.
-- Decision: apply the bounded sanitizer's actual promise while preserving useful evidence. Do not broaden this into a blanket NoSensitiveData or universal PII-removal claim.
-
-### IsolatesProjectData
-
-Status: proposed. Implementation: none.
-- Applies when: ingestion, reads or scoped handles are partitioned by project identity.
-- Evidence: distinct project identities, deliberately overlapping telemetry identifiers and operations through the actual scoped entrypoints.
-- Decision: each project can access its own permitted data without exposing or mutating another project's data.
-
-### PreservesTelemetryAcrossRestart
-
-Status: proposed. Implementation: none.
-- Applies when: the Collector promises durable retained telemetry across reopening.
-- Evidence: controlled persisted records, store identity, actual shutdown/restart and readback before and after reopening.
-- Decision: preserve the expected durable evidence according to retention policy. Observations made only before restart do not establish durability.
-
-## Investigation
-
-### ConformsToApiContract
-
-Status: proposed. Implementation: none.
-- Applies when: a running product exposes a selected public API operation.
-- Evidence: the resolved contract revision and actual response, error, pagination or stream shapes through the selected interface.
-- Decision: require the applicable public contract. Generated models alone do not establish the behavior of the running endpoint.
-
-### PreservesQueryPagination
-
-Status: proposed. Implementation: none.
-- Applies when: an investigation spans multiple pages.
-- Evidence: a controlled expected dataset, filters, time window, continuation tokens and all selected pages.
-- Decision: preserve documented continuation semantics and ordering, with no missing or duplicated expected results. Preserve filters and windows across page requests.
-
-### ReportsInvestigationCoverage
-
-Status: proposed. Implementation: none.
-- Applies when: an investigation describes the completeness of its observations.
-- Evidence: known input coverage, matched evidence, contextual ancestors, truncation and known or unknown counts.
-- Decision: report partial observations and unknown counts accurately. Require evidence for any completeness claim.
-
-### EnforcesOptimisticConcurrency
-
-Status: proposed. Implementation: none.
-- Applies when: writable investigation resources require concurrency preconditions.
-- Evidence: controlled resource revisions, missing/stale/current preconditions and actual write responses and resulting state.
-- Decision: enforce the selected precondition contract and prevent silent overwrites of annotations, saved queries or failure state.
-
-## Delivery and lifecycle
-
-### CompletesGracefulShutdown
-
-Status: proposed. Implementation: none.
-- Applies when: shutdown promises final exports and release of owned resources.
-- Evidence: required terminal exports, dependency ownership, process handles and a bounded shutdown deadline.
-- Decision: finish required exports, stop dependencies in the needed order and join child processes within the deadline. Preserve shutdown failures alongside an earlier scenario failure.
-
-### UsesCandidatePackages
-
-Status: proposed. Implementation: none.
-- Applies when: delivery evidence must exercise designated candidate packages.
-- Evidence: the candidate manifest and actual resolved package IDs, versions, sources and content hashes.
-- Decision: match the designated candidates without silent substitution by project references or public releases. A cache hit is acceptable only when its contents and provenance satisfy the selected manifest.
-
-### RunsPublishedNativeArtifact
-
-Status: proposed. Implementation: none.
-- Applies when: a scenario claims execution of a designated published NativeAOT artifact.
-- Evidence: artifact role, path, RID and hash, with the actual launched executable and observed behavior.
-- Decision: require execution of that artifact. Publish success or managed execution cannot establish native behavior. Select application and Collector roles explicitly.
-
-## Data providers
-
-### OtlpTransportData
-
-Status: proposed. Implementation: none.
-- Applies when: several scenarios reuse the same named OTLP transport profiles.
-- Inputs: immutable transport and endpoint-configuration descriptions using the supported protocol options.
-- Behavior: enumerate independent named cases through native MSTest data mechanisms. Acquire receivers and other mutable resources during invocation.
-
-### CapturedFieldData
-
-Status: proposed. Implementation: none.
-- Applies when: repeated scenarios share captured-field input profiles.
-- Inputs: immutable selection, name, value multiplicity, binary representation and phase descriptions relevant to the contract.
-- Behavior: enumerate meaningful named cases without changing adversarial values or acquiring invocation resources.
-
-Use DataRow or DynamicData for ordinary cases. Add a custom provider when its
-repeated domain inputs justify a reusable data contract.
+- Owned by qyl's own tests: exception sanitization, project isolation,
+  durability across restart, API contract shapes, query pagination,
+  investigation coverage, optimistic concurrency.
+- Already enforced: `RequiresTelemetryEvidence` (every policy fails without
+  evidence), `HonorsOtlpRejectionContract` (`ExportsCleanly`, `TelemetryPipeline`),
+  `CompletesGracefulShutdown` (`CollectorFixture`), `UsesCandidatePackages` and
+  `RunsPublishedNativeArtifact` (`DeliveryArtifacts` verifies restored packages
+  and executable hashes).
+- Covered by assertions: `PreservesMetricSemantics` (units through
+  `ConformsToSemanticConventions`; point values are scenario expectations).
+- Covered by native data: `OtlpTransportData` and `CapturedFieldData`
+  (`[DataRow(OtlpTransport.Grpc)]` and scenario constants).

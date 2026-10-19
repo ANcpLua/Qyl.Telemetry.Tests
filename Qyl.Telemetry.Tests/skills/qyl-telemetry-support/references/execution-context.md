@@ -37,7 +37,6 @@ describes immutable cases; invocation fixtures own mutable resources. A row's
 cancellation must not cancel shared publication or prevent required teardown.
 
 Conformance requires attributable observations. Insufficient evidence cannot
-pass. Metric attribution needs producer, resource/series identity, measurement
-window and applicable correlation; a trace ID alone does not identify an
-aggregate metric. These obligations are developed conditionally in the
-[policy catalogue](telemetry-policies.md).
+pass; [telemetry policies](telemetry-policies.md) enforce this. Metric
+attribution needs producer, resource/series identity, measurement window and
+applicable correlation; a trace ID alone does not identify an aggregate metric.

@@ -15,6 +15,7 @@ public sealed class CollectorFixture : IAsyncDisposable
     private readonly Task<string> _output;
     private readonly Task<string> _error;
     private bool _disposed;
+    private bool _ready;
 
     private CollectorFixture(Process process, Uri address, string directory)
     {
@@ -101,6 +102,7 @@ public sealed class CollectorFixture : IAsyncDisposable
                 {
                     using var response = await collector._client.GetAsync("health", token).ConfigureAwait(false);
                     _ = response.EnsureSuccessStatusCode();
+                    collector._ready = true;
                     return collector;
                 }
                 catch (HttpRequestException)
@@ -120,10 +122,12 @@ public sealed class CollectorFixture : IAsyncDisposable
 
         _disposed = true;
         var forced = false;
+        var signalled = false;
         try
         {
             if (!_process.HasExited)
             {
+                signalled = true;
                 if (!OperatingSystem.IsWindows())
                 {
                     using var signal = Process.Start(new ProcessStartInfo("/bin/kill")
@@ -148,8 +152,14 @@ public sealed class CollectorFixture : IAsyncDisposable
             }
             await File.WriteAllTextAsync(Path.Combine(DataDirectory, "shutdown.json"),
                 JsonSerializer.Serialize(new { _process.ExitCode, Forced = forced })).ConfigureAwait(false);
-            await File.WriteAllTextAsync(Path.Combine(DataDirectory, "collector.log"),
+            var log = Path.Combine(DataDirectory, "collector.log");
+            await File.WriteAllTextAsync(log,
                 await _output.ConfigureAwait(false) + await _error.ConfigureAwait(false)).ConfigureAwait(false);
+            // A Collector that became ready must finish its final writes and exit cleanly once signalled.
+            if (_ready && signalled && !OperatingSystem.IsWindows() && (forced || _process.ExitCode != 0))
+                throw new InvalidOperationException(forced
+                    ? $"The Collector ignored SIGTERM for 10 seconds and was killed. See {log}."
+                    : $"The Collector exited with code {_process.ExitCode} after SIGTERM. See {log}.");
         }
         finally
         {

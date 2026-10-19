@@ -8,6 +8,8 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Qyl.Telemetry.SemanticConventions;
 using Qyl.Telemetry.SemanticConventions.Names;
+using Qyl.Telemetry.Tests.Policies;
+using StoredSpan = Qyl.Api.Contracts.OTel.Traces.Span;
 
 namespace Qyl.Telemetry.Tests.Collector;
 
@@ -16,8 +18,10 @@ namespace Qyl.Telemetry.Tests.Collector;
 public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? collectorExecutable = null) : IAsyncDisposable
 {
     public const string TestProcess = "test";
+    private const string AmbientProperty = "qyl.test.ambient";
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly ConcurrentQueue<string> _evidence = new();
+    private readonly ConcurrentQueue<(string TraceId, string SpanId)> _roots = new();
     private readonly JsonSerializerOptions _evidenceJson = new()
     {
         WriteIndented = true,
@@ -134,6 +138,9 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
             try
             {
                 _lastCapture = capture.Snapshot();
+                var stored = collector is not null && TelemetryInvocation.Requires<PreservedByCollectorAttribute>()
+                    ? await ReadBackAsync(collector.Client).ConfigureAwait(false)
+                    : null;
                 if (collector is not null)
                 {
                     var path = Path.Combine(collector.DataDirectory, "capture.json");
@@ -157,6 +164,13 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
                         .Select(source => $"{source.Value,5}  {source.Key}");
                     await File.WriteAllLinesAsync(sourcesPath, sources, CancellationToken.None).ConfigureAwait(false);
                     _evidence.Enqueue(sourcesPath);
+                }
+                while (_roots.TryDequeue(out var root))
+                {
+                    TelemetryInvocation.Publish(new PublishedTrace(new TraceEvidence(root.TraceId, _lastCapture), root.SpanId)
+                    {
+                        Stored = stored?[root.TraceId]
+                    });
                 }
             }
             catch (Exception error) { errors.Add(error); }
@@ -189,11 +203,33 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
             throw new InvalidOperationException("The span recorder is not listening.");
         }
 
+        // Start() adopts an ambient activity as parent when the context names no parent span, even across traces.
+        var ambient = Activity.Current;
+        Activity.Current = null;
         var root = Spans.Source.StartActivity(TelemetryActivity.Name, ActivityKind.Internal,
-            new ActivityContext(ActivityTraceId.CreateRandom(), default, ActivityTraceFlags.Recorded))
-            ?? throw new InvalidOperationException("The span recorder is not listening.");
+            new ActivityContext(ActivityTraceId.CreateRandom(), default, ActivityTraceFlags.Recorded));
+        if (root is null)
+        {
+            Activity.Current = ambient;
+            throw new InvalidOperationException("The span recorder is not listening.");
+        }
+
         _ = root.SetTag("test.name", testName);
+        root.SetCustomProperty(AmbientProperty, ambient);
+        _roots.Enqueue((root.TraceId.ToHexString(), root.SpanId.ToHexString()));
         return root;
+    }
+
+    private async Task<Dictionary<string, IReadOnlyList<StoredSpan>>> ReadBackAsync(CollectorClient client)
+    {
+        var stored = new Dictionary<string, IReadOnlyList<StoredSpan>>(StringComparer.Ordinal);
+        foreach (var traceId in _roots.Select(root => root.TraceId).Distinct(StringComparer.Ordinal))
+        {
+            var spanIds = _lastCapture.Spans.Where(span => span.TraceId == traceId).Select(span => span.SpanId)
+                .ToHashSet(StringComparer.Ordinal);
+            stored[traceId] = await client.AwaitStoredSpansAsync(traceId, spanIds, CancellationToken.None).ConfigureAwait(false);
+        }
+        return stored;
     }
 
     public IReadOnlyList<SpanRecord> SpansOf(string traceId) =>
@@ -229,9 +265,12 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
         }
     }
 
+    /// <summary>Stops a root from <see cref="Begin" />, restores the caller's ambient activity and flushes.</summary>
     public void End(Activity root)
     {
+        ArgumentNullException.ThrowIfNull(root);
         root.Stop();
+        Activity.Current = root.GetCustomProperty(AmbientProperty) as Activity;
         Flush();
     }
 }

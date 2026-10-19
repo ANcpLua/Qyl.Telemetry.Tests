@@ -1,16 +1,15 @@
 # Telemetry testing APIs
 
-The supported APIs are implemented in this repository. Policy ideas in the
-[optional catalogue](../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md)
-remain proposals unless linked to an implementation.
+The supported APIs are implemented in this repository.
 
 | Capability | Implementation |
 | --- | --- |
-| Independent native MSTest trace for each invocation and data row | [TracePerTestAttribute](../Qyl.Telemetry.Tests/TelemetryCapture.cs) |
+| Independent native MSTest trace for each invocation and data row | [TracePerTestAttribute](../Qyl.Telemetry.Tests/TracePerTestAttribute.cs) |
+| Telemetry obligations verified after a passing test | [Telemetry policies](../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md), [Policies](../Qyl.Telemetry.Tests/Policies) |
 | Capture one operation with an owned OTLP receiver | [TelemetryCapture.TraceAsync and CaptureContext](../Qyl.Telemetry.Tests/TelemetryCapture.cs) |
 | Typed evidence, trace selection, parentage, calls and store identities | [TraceEvidence](../Qyl.Telemetry.Tests/TraceEvidence.cs) |
 | Exact captured arrays, including duplicates and empty strings | [Assert.That.HasCapturedValues](../Qyl.Telemetry.Tests/CapturedAttributeAssertions.cs) |
-| One native span, preserved parent context and unique exported identities | [SpanAssertions](../Qyl.Telemetry.Tests/SpanAssertions.cs) |
+| One native span and preserved parent context | [SpanAssertions](../Qyl.Telemetry.Tests/SpanAssertions.cs) |
 | Raw CLR array, parent/trace identity and disposal checks in native applications | [CapturedActivityAssertions](../Qyl.Telemetry.Tests.Capture/CapturedActivityAssertions.cs) |
 | Detached Activity snapshots and source-filtered export | [ActivitySnapshot](../Qyl.Telemetry.Tests.Capture/ActivitySnapshot.cs), [ActivitySnapshotExporter](../Qyl.Telemetry.Tests.Capture/ActivitySnapshotExporter.cs) |
 | Versioned HTTP/gRPC fixture JSON | [ActivityCaptureReport](../Qyl.Telemetry.Tests.Capture/ActivityCaptureReport.cs) |
@@ -23,16 +22,18 @@ remain proposals unless linked to an implementation.
 
 `TracePerTestAttribute` composes with the original method attribute through
 MSTest's `GetTestMethodAttribute(TestMethodAttribute)` hook. It creates one
-native `Activity` around the invocation and awaits the original executor once.
-Data expansion, failures, inconclusive outcomes and discovery stay with MSTest.
-No global initialization hook or copied TestContext property is needed.
+native `Activity` around the invocation, awaits the original executor once, then
+verifies the declared telemetry policies against the traces published during
+the invocation. Data expansion, failures, inconclusive outcomes and discovery
+stay with MSTest. No global initialization hook or copied TestContext property
+is needed.
 `TelemetryPipeline` borrows the invocation TestContext for its workspace and
 automatically attaches retained evidence during disposal. Consumer classes keep
 their native initialization and cleanup hooks.
 
 [InvocationContractTests](../Qyl.Telemetry.IntegrationTests/Probes/InvocationContractTests.cs)
 executes the real child runner and checks row identities, original executors,
-assertion/exception results and source navigation. MSBuild deploys the child
+assertion/exception results, source navigation and policy verdicts. MSBuild deploys the child
 payload through `GetTargetPath`; the parent does not load the child assembly to
 inspect its metadata. These are managed runner checks, not a NativeAOT claim.
 
@@ -49,6 +50,7 @@ inspect its metadata. These are managed runner checks, not a NativeAOT claim.
 | SpanRecorder | TelemetryPipeline |
 | CaptureAssert | CapturedActivityAssertions |
 | NativeCaptureReport | ActivityCaptureReport |
+| Assert.HasUniqueSpanIdentities | [NoDuplicateSpans] |
 
 `QylTestHooks` was removed: the current Activity carries native trace context.
 The separate architecture demonstration and its profiles have moved to

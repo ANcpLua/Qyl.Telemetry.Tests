@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
+using Qyl.Telemetry.Tests.Policies;
 
 namespace Qyl.Telemetry.Tests;
 
@@ -24,7 +24,9 @@ public static class TelemetryCapture
         var snapshot = await receiver
             .AwaitAsync(s => until(capture.Read(s)), timeout ?? TimeSpan.FromSeconds(10), cancellationToken)
             .ConfigureAwait(false);
-        return capture.Read(snapshot);
+        var evidence = capture.Read(snapshot);
+        TelemetryInvocation.Publish(new PublishedTrace(evidence, root.SpanId.ToHexString()));
+        return evidence;
     }
 }
 
@@ -70,29 +72,4 @@ internal static class TelemetryActivity
 
     internal static Activity Start() => new Activity(Name).SetIdFormat(ActivityIdFormat.W3C)
         .SetParentId(ActivityTraceId.CreateRandom(), default, ActivityTraceFlags.Recorded).Start();
-}
-
-[PublicAPI]
-[AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class TracePerTestAttribute : TestClassAttribute
-{
-    public const string ActivityName = "qyl.test";
-
-    public override TestMethodAttribute GetTestMethodAttribute(TestMethodAttribute testMethodAttribute)
-    {
-        ArgumentNullException.ThrowIfNull(testMethodAttribute);
-        return new TracePerTestMethodAttribute(testMethodAttribute);
-    }
-}
-
-internal sealed class TracePerTestMethodAttribute(
-    TestMethodAttribute inner,
-    [CallerFilePath] string file = "",
-    [CallerLineNumber] int line = -1) : TestMethodAttribute(file, line)
-{
-    public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
-    {
-        using var root = TelemetryActivity.Start();
-        return await inner.ExecuteAsync(testMethod).ConfigureAwait(false);
-    }
 }
