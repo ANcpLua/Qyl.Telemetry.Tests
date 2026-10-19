@@ -13,6 +13,7 @@ internal sealed record SourceInput(string Repository, string Commit);
 [JetBrains.Annotations.UsedImplicitly]
 internal sealed record McpInput(string Name, string Version, string Integrity);
 internal sealed record DeliveryInputs(SourceInput Collector, McpInput Mcp);
+[JetBrains.Annotations.UsedImplicitly(JetBrains.Annotations.ImplicitUseTargetFlags.WithMembers)]
 internal sealed record RestoredPackage(string Id, string Version, string Sha512);
 internal sealed record PreparedDelivery(DeliveryInputs Inputs, PublishedExecutable ManagedApplication,
     PublishedExecutable NativeApplication, PublishedExecutable NativeCollector, PublishedExecutable SemanticProbe,
@@ -164,9 +165,9 @@ internal sealed class DeliveryArtifacts(TestContext context)
         context.WriteLine($"{label}: {logPath}");
         var start = new ProcessStartInfo(command)
         {
-            WorkingDirectory = directory, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true
+            WorkingDirectory = directory, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
+            Environment = { ["DOTNET_PROCESSOR_COUNT"] = "4" }
         };
-        start.Environment["DOTNET_PROCESSOR_COUNT"] = "4";
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {command}.");
         var stdout = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
