@@ -5,9 +5,16 @@ The original receiver implementation came from `Qyl.Telemetry.Testing`;
 its published 3.0.3 package remains unchanged for existing external consumers.
 This solution uses project references to its shared library.
 
+`Qyl.Telemetry.Tests.Capture` is the small, non-packable NativeAOT component used
+by the shared library and AutoInstrumentation's HTTP/gRPC fixture applications.
+AutoInstrumentation pins this repository as a Git submodule and references that
+project directly; it does not depend on a sibling checkout or an unpublished
+NuGet version. Workloads and their expected fields remain in AutoInstrumentation.
+
 | Responsibility | Owner |
 | --- | --- |
 | OTLP receiver, raw requests, typed records, trace selection, registry checks | Qyl.Telemetry.Tests |
+| Raw Activity snapshots, CLR-array checks, trace identity and native JSON reports | Qyl.Telemetry.Tests.Capture |
 | Pure interpretation, field presence, precision and assertion diagnostics | Qyl.Telemetry.UnitTests |
 | Exporters, transports, Collector processes, storage and native runner composition | Qyl.Telemetry.IntegrationTests |
 | Published Qyl application-to-Collector delivery | Qyl.Telemetry.EndToEndTests |

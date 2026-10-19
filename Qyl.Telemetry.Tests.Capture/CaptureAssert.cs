@@ -1,0 +1,92 @@
+using System.Collections;
+using System.Diagnostics;
+using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+
+namespace Qyl.Telemetry.Tests.Capture;
+
+/// <summary>Producer invariants usable inside a NativeAOT child without a test runner.</summary>
+[JetBrains.Annotations.PublicAPI]
+public static class CaptureAssert
+{
+    public static void Require(bool condition, string message)
+    {
+        if (!condition) throw new InvalidOperationException(message);
+    }
+
+    public static void NativeAot() =>
+        Require(!RuntimeFeature.IsDynamicCodeSupported, "The capture fixture must execute as NativeAOT.");
+
+    public static string[] StringValues(IReadOnlyDictionary<string, object?> attributes, string key)
+    {
+        ArgumentNullException.ThrowIfNull(attributes);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        var present = attributes.TryGetValue(key, out var value);
+        return present && value is string[] values
+            ? values
+            : throw new InvalidOperationException($"Captured attribute '{key}': expected CLR string[]; actual {(present ? Describe(value) : "<missing>")}.");
+    }
+
+    public static void Values(IReadOnlyDictionary<string, object?> attributes, string key, params string[] expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var actual = StringValues(attributes, key);
+        Require(actual.SequenceEqual(expected, StringComparer.Ordinal),
+            $"Captured attribute '{key}': expected string[] {FormatValues(expected)}; actual {Describe(actual)}.");
+    }
+
+    public static void Parent(ActivitySnapshot span, ActivityContext parent)
+    {
+        Require(parent.TraceId != default && parent.SpanId != default, "The expected parent must have trace and span IDs.");
+        Require(span.Trace == parent.TraceId,
+            $"'{span.Operation}' trace changed: expected {parent.TraceId}, actual {span.Trace}.");
+        Require(span.Parent == parent.SpanId,
+            $"'{span.Operation}' parent changed: expected {parent.SpanId}, actual {span.Parent}.");
+        Require(span.Span != default && span.Span != parent.SpanId,
+            $"'{span.Operation}' must have its own nonzero span ID; actual {span.Span}.");
+    }
+
+    public static void UniqueSpans(IEnumerable<ActivitySnapshot> spans)
+    {
+        var identities = new HashSet<(ActivityTraceId, ActivitySpanId)>();
+        foreach (var span in spans)
+            Require(span.Trace != default && span.Span != default && identities.Add((span.Trace, span.Span)),
+                $"'{span.Operation}' has a zero or duplicate trace/span identity: {span.Trace}/{span.Span}.");
+    }
+
+    public static bool IsCapturedField(string key) =>
+        key.StartsWith("http.request.header.", StringComparison.Ordinal) ||
+        key.StartsWith("http.response.header.", StringComparison.Ordinal) ||
+        key.StartsWith("rpc.request.metadata.", StringComparison.Ordinal) ||
+        key.StartsWith("rpc.response.metadata.", StringComparison.Ordinal);
+
+    public static void AfterDisposal(IReadOnlyList<ActivitySnapshot> spans, string source)
+    {
+        Require(spans.Count(span => span.Source == source) == 1,
+            $"Expected one native '{source}' span after provider disposal.");
+        foreach (var span in spans)
+            Require(!span.Tags.Keys.Any(IsCapturedField),
+                $"Capture subscription outlived its provider: '{span.Source}'/'{span.Operation}'.");
+        UniqueSpans(spans);
+    }
+
+    private static string Describe(object? value) => value switch
+    {
+        null => "null",
+        string text => $"String: {FormatValue(text)}",
+        IEnumerable values => $"{value.GetType().Name}: {FormatValues(values)}",
+        _ => $"{value.GetType().Name}: {FormatValue(value)}"
+    };
+
+    private static string FormatValues(IEnumerable values) =>
+        $"[{string.Join(", ", values.Cast<object?>().Select(FormatValue))}]";
+
+    private static string FormatValue(object? value) => value switch
+    {
+        null => "null",
+        string text => $"\"{JsonEncodedText.Encode(text)}\"",
+        IFormattable formatted => formatted.ToString(null, CultureInfo.InvariantCulture),
+        _ => value.ToString() ?? "null"
+    };
+}

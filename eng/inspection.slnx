@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="../Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj" />
+  <Project Path="../Qyl.Telemetry.Tests.Capture/Qyl.Telemetry.Tests.Capture.csproj" />
   <Project Path="../Qyl.Telemetry.UnitTests/Qyl.Telemetry.UnitTests.csproj" />
   <Project Path="../Qyl.Telemetry.IntegrationTests/Qyl.Telemetry.IntegrationTests.csproj" />
   <Project Path="../Qyl.Telemetry.EndToEndTests/Qyl.Telemetry.EndToEndTests.csproj" />

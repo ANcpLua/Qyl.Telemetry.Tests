@@ -6,12 +6,13 @@ Existing releases of that package are unchanged; this shared support project
 is not currently published as its replacement.
 The separate architecture demonstration lives in [architecture-template-fixtures](https://github.com/ANcpLua/architecture-template-fixtures).
 
-Four projects protect Qyl-owned telemetry behavior across instrumentation,
+Five projects protect Qyl-owned telemetry behavior across instrumentation,
 conventions, capture, collection, storage and investigation.
 
 | Project | Responsibility |
 | --- | --- |
 | `Qyl.Telemetry.Tests` | Shared library: canonical OTLP receiver, raw and typed evidence, trace graphs, assertions and isolated Collector/application fixtures. |
+| `Qyl.Telemetry.Tests.Capture` | NativeAOT-compatible raw Activity snapshots, exact CLR-array assertions and versioned JSON evidence, without an MSTest or Collector dependency. |
 | `Qyl.Telemetry.UnitTests` | Deterministic protocol interpretation, registry validation, graph selection and query diagnostics with explicit inputs. |
 | `Qyl.Telemetry.IntegrationTests` | Real HTTP/gRPC and SDK export into the receiver, public `AddQyl()` registration, Collector lifecycle, persistence and pipeline isolation. |
 | `Qyl.Telemetry.EndToEndTests` | Instrumented Qyl application-to-Collector delivery, selected capture and stored evidence. |

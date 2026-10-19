@@ -1,3 +1,3 @@
 # Qyl.Telemetry.Tests
 
-Four projects: shared support in Qyl.Telemetry.Tests; executable unit, integration and end-to-end suites in their named projects. Project-owned guidance lives in each project's skills/ directory, discovered through .agents/skills symlinks. README.md documents commands and delivery evidence; docs/port.md maps ownership. Version.props and global.json select the stack. Consumer assemblies own lifecycle registration.
+Shared support: Qyl.Telemetry.Tests; AOT-safe raw capture: Qyl.Telemetry.Tests.Capture. Unit, integration and end-to-end suites own execution. Consumer assemblies register lifecycle hooks. Project skills live under skills/ and .agents/skills. README.md documents commands; docs/port.md maps ownership. Version.props and global.json select the stack.

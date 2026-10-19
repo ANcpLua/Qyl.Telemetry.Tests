@@ -7,7 +7,9 @@ description: Build or review reusable support in Qyl.Telemetry.Tests, including 
 
 Resolve package APIs or delivery assumptions through the
 [execution context](references/execution-context.md) when relevant.
-Target Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj.
+Target Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj. Raw Activity evidence shared
+with NativeAOT applications belongs in Qyl.Telemetry.Tests.Capture, which has no
+MSTest or Collector dependency and is referenced by the full support library.
 
 Own the canonical receiver, raw and typed captures, export receipts, graphs,
 resource and scope identities, conformance decisions, assertions and lifecycle

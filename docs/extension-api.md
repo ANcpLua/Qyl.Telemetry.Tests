@@ -10,6 +10,9 @@ remain proposals unless linked to an implementation.
 | Capture one operation with an owned OTLP receiver | [TelemetryCapture.TraceAsync and CaptureContext](../Qyl.Telemetry.Tests/TelemetryCapture.cs) |
 | Typed evidence, trace selection, parentage, calls and store identities | [TraceEvidence](../Qyl.Telemetry.Tests/TraceEvidence.cs) |
 | Exact captured arrays, including duplicates and empty strings | [Assert.That.HasCapturedValues](../Qyl.Telemetry.Tests/CapturedAttributeAssertions.cs) |
+| Raw CLR array, parent/trace identity and disposal checks in native applications | [CaptureAssert](../Qyl.Telemetry.Tests.Capture/CaptureAssert.cs) |
+| Detached Activity snapshots and source-filtered export | [ActivitySnapshot](../Qyl.Telemetry.Tests.Capture/ActivitySnapshot.cs), [ActivitySnapshotExporter](../Qyl.Telemetry.Tests.Capture/ActivitySnapshotExporter.cs) |
+| Versioned HTTP/gRPC fixture JSON | [NativeCaptureReport](../Qyl.Telemetry.Tests.Capture/NativeCaptureReport.cs) |
 | Protocol and registry conformance | [OtlpReceiver](../Qyl.Telemetry.Tests/OtlpReceiver.cs), [RegistryConformance](../Qyl.Telemetry.Tests/RegistryConformance.cs) |
 | Isolated published Collector process and cleanup | [CollectorFixture](../Qyl.Telemetry.Tests/Collector/CollectorFixture.cs) |
 | Collector ingestion and investigation | [CollectorClient](../Qyl.Telemetry.Tests/Collector/CollectorClient.cs) |
