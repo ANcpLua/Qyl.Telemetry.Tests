@@ -4,6 +4,8 @@ using OpenTelemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Qyl.Telemetry.SemanticConventions.Attributes.Http;
+using Qyl.Telemetry.SemanticConventions.Attributes.Service;
 using SpanKind = Qyl.Telemetry.SemanticConventions.SpanKind;
 
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
@@ -24,7 +26,7 @@ public sealed class WireSchemaTests
 #pragma warning disable QYL0006 // Deliberately misleading attribute must not replace the actual resource schema URL.
         var resource = ResourceBuilder.CreateEmpty().AddAttributes(
             new Dictionary<string, object>
-                { ["service.name"] = "schema-producer", ["telemetry.schema_url"] = "https://attribute.invalid/" },
+                { [ServiceAttributes.Name] = "schema-producer", ["telemetry.schema_url"] = "https://attribute.invalid/" },
             schemaUrl);
 #pragma warning restore QYL0006
         var endpoint = new Uri(receiver.Endpoint, "v1/traces");
@@ -37,7 +39,7 @@ public sealed class WireSchemaTests
                 options.ExportProcessorType = ExportProcessorType.Simple;
             }).Build();
         using var activity = source.CreateActivity("wire.operation", ActivityKind.Server)!.Start();
-        activity.SetStatus(ActivityStatusCode.Ok).SetTag("http.request.method", "POST");
+        activity.SetStatus(ActivityStatusCode.Ok).SetTag(HttpAttributes.RequestMethod, "POST");
         var traceId = activity.TraceId.ToHexString();
         activity.Stop();
         var capture = await receiver.AwaitAsync(s => s.Spans.Count == 1, TimeSpan.FromSeconds(10),

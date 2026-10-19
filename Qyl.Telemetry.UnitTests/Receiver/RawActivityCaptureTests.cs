@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Qyl.Telemetry.SemanticConventions.Attributes.Url;
+using Qyl.Telemetry.SemanticConventions.Incubating.Attributes.Grpc;
 using Qyl.Telemetry.Tests.Capture;
 
 namespace Qyl.Telemetry.UnitTests.Receiver;
@@ -13,7 +15,7 @@ public sealed class RawActivityCaptureTests
     public void Snapshot_owns_the_original_array_and_operation_path()
     {
         string[] values = ["first", "first", "", "comma,kept"];
-        using var activity = new Activity("http").SetTag("url.full", "https://example.invalid/ok?ignored=true")
+        using var activity = new Activity("http").SetTag(UrlAttributes.Full, "https://example.invalid/ok?ignored=true")
             .SetTag(Key, values).Start();
         var snapshot = ActivitySnapshot.Capture(activity);
         values[0] = "mutated";
@@ -85,9 +87,9 @@ public sealed class RawActivityCaptureTests
         string[] httpValues = ["", "a,b"];
         string[] grpcValues = ["AAH/"];
         using var http = new Activity("http").SetIdFormat(ActivityIdFormat.W3C)
-            .SetTag("url.full", "https://example.invalid/ok")
+            .SetTag(UrlAttributes.Full, "https://example.invalid/ok")
             .SetTag(Key, httpValues).Start();
-        using var grpc = new Activity("grpc").SetTag("grpc.method", "/capture.Service/Unary")
+        using var grpc = new Activity("grpc").SetTag(GrpcAttributes.Method, "/capture.Service/Unary")
             .SetTag("rpc.response.metadata.trace-bin", grpcValues).Start();
         var httpSnapshot = ActivitySnapshot.Capture(http);
         var grpcSnapshot = ActivitySnapshot.Capture(grpc);

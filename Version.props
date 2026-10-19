@@ -1,8 +1,8 @@
 <Project>
   <PropertyGroup Label="Qyl packages">
-    <QylPlatformVersion>16.0.0</QylPlatformVersion>
-    <QylTelemetryVersion>28.2.0</QylTelemetryVersion>
-    <QylSemanticConventionsVersion>14.0.0</QylSemanticConventionsVersion>
+    <QylPlatformVersion>16.0.1</QylPlatformVersion>
+    <QylTelemetryVersion>28.2.3</QylTelemetryVersion>
+    <QylSemanticConventionsVersion>15.0.2</QylSemanticConventionsVersion>
     <QylApiContractsVersion>14.0.1</QylApiContractsVersion>
   </PropertyGroup>
   <PropertyGroup Label="Runtime and telemetry dependencies">

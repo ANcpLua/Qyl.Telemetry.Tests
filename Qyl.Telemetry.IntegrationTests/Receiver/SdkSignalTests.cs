@@ -8,6 +8,8 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Qyl.Telemetry.SemanticConventions.Attributes.Http;
+using Qyl.Telemetry.SemanticConventions.Attributes.Service;
 using SpanKind = Qyl.Telemetry.SemanticConventions.SpanKind;
 
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
@@ -29,7 +31,7 @@ public sealed class SdkSignalTests
         var result = await TelemetryCapture.TraceAsync(test =>
             {
                 var resource = ResourceBuilder.CreateEmpty().AddAttributes(new Dictionary<string, object>
-                        { ["service.name"] = "sdk-service", [test.Partition.ResourceAttribute] = test.Partition.Value },
+                        { [ServiceAttributes.Name] = "sdk-service", [test.Partition.ResourceAttribute] = test.Partition.Value },
                     "https://opentelemetry.io/schemas/1.44.0");
                 using var source = new ActivitySource(sourceName, "2.0.1");
                 using var traces = Sdk.CreateTracerProviderBuilder().AddSource(sourceName).SetResourceBuilder(resource)
@@ -62,7 +64,7 @@ public sealed class SdkSignalTests
                     });
                 }));
                 using var activity = source.CreateActivity("sdk.operation", ActivityKind.Server)!.Start();
-                activity.SetStatus(ActivityStatusCode.Ok).SetTag("http.request.method", "POST");
+                activity.SetStatus(ActivityStatusCode.Ok).SetTag(HttpAttributes.RequestMethod, "POST");
                 OrderCreated(logs.CreateLogger(sourceName), 41, null);
                 meter.CreateCounter<long>("orders.created", "{order}", "Created orders").Add(7);
                 Assert.IsTrue(metrics.ForceFlush());
