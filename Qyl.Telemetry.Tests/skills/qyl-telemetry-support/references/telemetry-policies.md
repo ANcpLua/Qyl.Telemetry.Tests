@@ -46,28 +46,7 @@ traffic such as health probes and runtime metrics.
 
 ## Adding a policy
 
-Add one sealed `*Attribute` in `Qyl.Telemetry.Tests/Policies/` deriving from
-`TelemetryPolicyAttribute`. Implement `Violations` as complete sentences that
-name the span through `Describe` and state the observed value. Prove it in
-`Qyl.Telemetry.UnitTests/Policies` with an exact violation and an accepted
-case, and in `PolicyCases` when it changes runner behavior. Add a policy when
-its obligation holds for any scenario that declares it; a check that needs a
-scenario's expected values stays an assertion in that scenario.
-
-## Rejected proposals
-
-These obligations need scenario-specific expectations or belong to another
-owner; propose them again only with a scenario-independent rule.
-
-- Owned by qyl's own tests: exception sanitization, project isolation,
-  durability across restart, API contract shapes, query pagination,
-  investigation coverage, optimistic concurrency.
-- Already enforced: `RequiresTelemetryEvidence` (every policy fails without
-  evidence), `HonorsOtlpRejectionContract` (`ExportsCleanly`, `TelemetryPipeline`),
-  `CompletesGracefulShutdown` (`CollectorFixture`), `UsesCandidatePackages`
-  (delivery restores published packages only) and `RunsPublishedNativeArtifact`
-  (`DeliveryArtifacts` verifies executable hashes).
-- Covered by assertions: `PreservesMetricSemantics` (units through
-  `ConformsToSemanticConventions`; point values are scenario expectations).
-- Covered by native data: `OtlpTransportData` and `CapturedFieldData`
-  (`[DataRow(OtlpTransport.Grpc)]` and scenario constants).
+Add a sealed `*Attribute` deriving from `TelemetryPolicyAttribute` in
+`Qyl.Telemetry.Tests/Policies/`. `Violations` returns complete sentences naming
+the span through `Describe`. Cover it in `Qyl.Telemetry.UnitTests/Policies` and,
+when runner behavior changes, in `PolicyCases`.

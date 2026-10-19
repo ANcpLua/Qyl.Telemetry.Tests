@@ -1,35 +1,11 @@
 ---
 name: qyl-telemetry-end-to-end
-description: Write or review complete application-to-investigation scenarios in Qyl.Telemetry.EndToEndTests, including instrumented Qyl workloads, published-package delivery, NativeAOT artifacts and explicit REST or MCP paths.
+description: Write tests in Qyl.Telemetry.EndToEndTests that drive an instrumented application into the Collector and read it back through REST or MCP.
 ---
 
-# Application to investigation
+# End-to-end tests
 
-Resolve package identities and execution assumptions through the
-[execution context](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/execution-context.md) when relevant.
-Target Qyl.Telemetry.EndToEndTests/Qyl.Telemetry.EndToEndTests.csproj.
-
-Connect an observable application outcome to required telemetry and the actual
-Collector investigation result. Keep workloads under Applications/ and scenario
-expectations beside their delivery tests. Select the signals, producers and terminal
-observations required by that scenario.
-
-Determine the requested execution mode before choosing fixtures. Delivery
-restores the published packages pinned in Version.props. For NativeAOT delivery, execute the designated published native applications
-and Collector artifacts. Record the package identities and artifact roles,
-RIDs and hashes actually exercised.
-
-Exercise REST and MCP through explicit transport paths. Reach the final
-assertion through the promised investigation interface. Managed execution,
-successful publication and backend calls establish their own narrower claims.
-
-Require Collector readback for storage claims. Native span ownership requires
-source, operation and parentage evidence; a span count alone is insufficient.
-
-Share immutable publication under fixture ownership. Isolate mutable scenario
-state and child-process workspaces. Bound readiness and terminal observation,
-join children before cleanup and retain relevant failure evidence.
-
-Declare the [telemetry policies](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md)
-the scenario promises on a `[TracePerTest]` class. Move repeated
-interpretation or execution into [shared support](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/SKILL.md).
+- `Applications/TelemetryProbe` is the instrumented workload; `CaptureDeliveryFixture` starts it with a `TelemetryPipeline` and the packaged managed Collector.
+- `Delivery/DeliveryTests` publishes managed and NativeAOT probes against the packages pinned in `Version.props`, builds a native Collector from the qyl commit in `Delivery/inputs.json` and calls the npm MCP server pinned there. Artifacts and logs are cached under `artifacts/delivery`.
+- Declare [telemetry policies](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md); `[PreservedByCollector]` covers storage readback of spans.
+- Run: `dotnet test --project Qyl.Telemetry.EndToEndTests/Qyl.Telemetry.EndToEndTests.csproj -c Release`.
