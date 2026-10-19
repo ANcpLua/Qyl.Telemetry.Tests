@@ -12,12 +12,15 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - name: Run unit, integration and application suites
+      - name: Test, measure coverage and inspect source
         run: ./build.sh
       - name: Retain native test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: telemetry-test-results
-          path: artifacts/results
+          name: telemetry-verification
+          path: |
+            artifacts/results
+            artifacts/coverage
+            artifacts/inspection.sarif
           if-no-files-found: warn

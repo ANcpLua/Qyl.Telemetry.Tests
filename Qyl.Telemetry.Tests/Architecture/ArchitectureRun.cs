@@ -18,11 +18,13 @@ internal sealed class ArchitectureRun(CancellationToken cancellationToken)
         lock (_systems)
         {
             ObjectDisposedException.ThrowIf(_closed, this);
-            if (!_systems.TryGetValue(testClass, out var startup))
+            if (_systems.TryGetValue(testClass, out var startup))
             {
-                startup = RunningSystem.StartAsync(this, architecture, bricks, _lifetime.Token);
-                _systems.Add(testClass, startup);
+                return startup.WaitAsync(cancellationToken);
             }
+
+            startup = RunningSystem.StartAsync(this, architecture, bricks, _lifetime.Token);
+            _systems.Add(testClass, startup);
             return startup.WaitAsync(cancellationToken);
         }
     }

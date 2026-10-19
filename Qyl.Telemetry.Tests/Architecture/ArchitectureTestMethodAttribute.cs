@@ -87,11 +87,13 @@ internal sealed class ArchitectureTestMethodAttribute(
         foreach (var result in results)
         {
             result.LogOutput += diagnostics;
-            if (failure is not null && result.Outcome == UnitTestOutcome.Passed)
+            if (failure is null || result.Outcome != UnitTestOutcome.Passed)
             {
-                result.Outcome = UnitTestOutcome.Failed;
-                result.TestFailureException = failure;
+                continue;
             }
+
+            result.Outcome = UnitTestOutcome.Failed;
+            result.TestFailureException = failure;
         }
         return results;
     }

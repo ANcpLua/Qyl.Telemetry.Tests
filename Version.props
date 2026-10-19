@@ -14,5 +14,7 @@
   </PropertyGroup>
   <PropertyGroup Label="Tooling">
     <JetBrainsAnnotationsVersion>2026.2.0</JetBrainsAnnotationsVersion>
+    <FalloutVersion>10.4.0</FalloutVersion>
+    <DotCovVersion>4.7.0</DotCovVersion>
   </PropertyGroup>
 </Project>

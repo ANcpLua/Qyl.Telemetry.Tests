@@ -7,9 +7,7 @@ using Qyl.Telemetry.Tests.Architecture;
 using Google.Protobuf;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http.Features;
-using Qyl;
 using Qyl.Api.Contracts.Common;
-using Qyl.Telemetry.Tests;
 using RpcStatus = Google.Rpc.Status;
 
 namespace Qyl.Telemetry.IntegrationTests.Collector;
@@ -80,14 +78,11 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         var traceId = root.TraceId.ToHexString();
         try
         {
-            try
-            {
-                throw new InvalidOperationException("payment declined");
-            }
-            catch (InvalidOperationException exception)
-            {
-                _ = root.RecordFailure(exception);
-            }
+            throw new InvalidOperationException("payment declined");
+        }
+        catch (InvalidOperationException exception)
+        {
+            _ = root.RecordFailure(exception);
         }
         finally
         {

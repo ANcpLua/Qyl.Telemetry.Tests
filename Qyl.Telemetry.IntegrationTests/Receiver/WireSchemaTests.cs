@@ -21,10 +21,12 @@ public sealed class WireSchemaTests
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var source = new ActivitySource("wire-" + Guid.NewGuid().ToString("N"), "1.2.3");
         var sourceName = source.Name;
+#pragma warning disable QYL0006 // Deliberately misleading attribute must not replace the actual resource schema URL.
         var resource = ResourceBuilder.CreateEmpty().AddAttributes(
             new Dictionary<string, object>
                 { ["service.name"] = "schema-producer", ["telemetry.schema_url"] = "https://attribute.invalid/" },
             schemaUrl);
+#pragma warning restore QYL0006
         var endpoint = new Uri(receiver.Endpoint, "v1/traces");
         using var provider = Sdk.CreateTracerProviderBuilder().SetResourceBuilder(resource).AddSource(sourceName)
             .AddOtlpExporter(options =>

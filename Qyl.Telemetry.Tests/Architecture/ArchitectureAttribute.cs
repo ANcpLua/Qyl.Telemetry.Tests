@@ -38,7 +38,7 @@ public abstract class ArchitectureAttribute : TestClassAttribute
 
         if (trace.Services.Count == 0)
         {
-            return new(ArchitectureOutcome.InsufficientEvidence,
+            return new ArchitectureVerdict(ArchitectureOutcome.InsufficientEvidence,
                 "No span from any brick reached the test, so the architecture was not measured.");
         }
 
@@ -46,14 +46,14 @@ public abstract class ArchitectureAttribute : TestClassAttribute
         {
             if (!bricks.Contains(service))
             {
-                return new(ArchitectureOutcome.Violated, $"{service} produced spans but is not a stacked brick.");
+                return new ArchitectureVerdict(ArchitectureOutcome.Violated, $"{service} produced spans but is not a stacked brick.");
             }
         }
 
         // Report the relationship between stores before checking each store's name.
         if (VerifyShape(trace) is { } problem)
         {
-            return new(ArchitectureOutcome.Violated, problem);
+            return new ArchitectureVerdict(ArchitectureOutcome.Violated, problem);
         }
 
         foreach (var service in trace.Services)
@@ -61,16 +61,16 @@ public abstract class ArchitectureAttribute : TestClassAttribute
             var foreign = trace.StoresOf(service).Where(store => store.Namespace != StoreOf(service)).ToList();
             if (foreign.Count > 0)
             {
-                return new(ArchitectureOutcome.Violated,
+                return new ArchitectureVerdict(ArchitectureOutcome.Violated,
                     $"{service} wrote to {string.Join(", ", foreign.Select(store => store.Namespace))}, but as part of a {Kind} it owns the store {StoreOf(service)}.");
             }
         }
 
         var unmeasured = bricks.Where(brick => trace.StoresOf(brick).Count == 0).ToArray();
         return unmeasured.Length > 0
-            ? new(ArchitectureOutcome.InsufficientEvidence,
+            ? new ArchitectureVerdict(ArchitectureOutcome.InsufficientEvidence,
                 $"Architecture not measured: no store activity was captured for {string.Join(", ", unmeasured)}.")
-            : new(ArchitectureOutcome.Conforms, $"Observed store activity conforms to {Kind} for every declared brick.");
+            : new ArchitectureVerdict(ArchitectureOutcome.Conforms, $"Observed store activity conforms to {Kind} for every declared brick.");
     }
 
     /// <summary>The rule that sets this architecture apart, checked on the trace.</summary>

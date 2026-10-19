@@ -2,6 +2,10 @@
   <PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="JetBrains.Annotations" Version="$(JetBrainsAnnotationsVersion)" />
+    <PackageVersion Include="Fallout.Common" Version="$(FalloutVersion)" />
+    <PackageVersion Include="DotCov" Version="$(DotCovVersion)" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="$(DotNetRuntimeVersion)" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="$(DotNetRuntimeVersion)" />
     <PackageVersion Include="Qyl.Telemetry.SemanticConventions" Version="$(QylSemanticConventionsVersion)" />
     <PackageVersion Include="Qyl.Telemetry.Hosting" Version="$(QylTelemetryVersion)" />
     <PackageVersion Include="Qyl.Orchestration" Version="$(QylPlatformVersion)" />

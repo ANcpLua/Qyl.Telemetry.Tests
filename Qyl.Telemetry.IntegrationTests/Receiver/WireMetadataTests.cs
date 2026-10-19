@@ -2,12 +2,8 @@ using static Qyl.Telemetry.Tests.Evidence.OtlpEvidence;
 using System.Diagnostics;
 using Google.Protobuf;
 using JetBrains.Annotations;
-using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Common.V1;
-using OpenTelemetry.Proto.Trace.V1;
 using Qyl.Telemetry.SemanticConventions;
-using EntityRef = OpenTelemetry.Proto.Common.V1.EntityRef;
-using ProtoResource = OpenTelemetry.Proto.Resource.V1.Resource;
 
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
 

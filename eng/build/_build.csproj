@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>_build</AssemblyName>
+    <FalloutRootDirectory>../..</FalloutRootDirectory>
+    <FalloutScriptDirectory>../..</FalloutScriptDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Fallout.Common" />
+    <PackageReference Include="DotCov" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    <PackageReference Include="System.Security.Cryptography.Xml" />
+  </ItemGroup>
+</Project>

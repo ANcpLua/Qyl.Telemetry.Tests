@@ -1,9 +1,7 @@
-using System.Diagnostics;
 using Google.Protobuf;
 using JetBrains.Annotations;
 using OpenTelemetry.Proto.Common.V1;
 using Qyl.Telemetry.SemanticConventions;
-using Qyl.Telemetry.SemanticConventions.Spans;
 using static Qyl.Telemetry.Tests.Evidence.OtlpEvidence;
 using ProtoSpan = OpenTelemetry.Proto.Trace.V1.Span;
 

@@ -36,13 +36,13 @@ public static class ArchitectureFixtures
             try { context.AddResultFile(path); }
             catch (Exception error) { errors.Add(error); }
         }
-        if (errors.Count == 1)
+        switch (errors.Count)
         {
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        }
-        if (errors.Count > 1)
-        {
-            throw new AggregateException("Architecture cleanup failed; retained evidence attachment was still attempted.", errors);
+            case 1:
+                ExceptionDispatchInfo.Capture(errors[0]).Throw();
+                break;
+            case > 1:
+                throw new AggregateException("Architecture cleanup failed; retained evidence attachment was still attempted.", errors);
         }
     }
 }

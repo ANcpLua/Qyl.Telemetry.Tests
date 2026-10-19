@@ -14,7 +14,7 @@ public sealed class ArchitectureRulesTests
     [DataRow(2, false, true)]
     public void DeployableCountsAreValidated(int count, bool monolith, bool distributed)
     {
-        var bricks = Enumerable.Range(0, count).Select(index => (BrickAttribute)new ServiceAttribute<object>($"service-{index}")).ToArray();
+        var bricks = Enumerable.Range(0, count).Select(BrickAttribute (index) => new ServiceAttribute<object>($"service-{index}")).ToArray();
         Assert.AreEqual(monolith, new MonolithAttribute().Check(bricks) is null);
         Assert.AreEqual(distributed, new MicroservicesAttribute().Check(bricks) is null);
         Assert.AreEqual(distributed, new DistributedMonolithAttribute().Check(bricks) is null);

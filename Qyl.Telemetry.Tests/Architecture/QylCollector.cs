@@ -42,7 +42,7 @@ internal sealed class QylCollector : IAsyncDisposable
             ArgumentList = { assembly },
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false,
+            UseShellExecute = false
         };
         foreach (var key in start.Environment.Keys.Where(key => key.StartsWith("QYL_", StringComparison.Ordinal)
                      || key.StartsWith("OTEL_", StringComparison.Ordinal)).ToArray())

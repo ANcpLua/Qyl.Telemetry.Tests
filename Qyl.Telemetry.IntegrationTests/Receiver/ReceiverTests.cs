@@ -9,6 +9,7 @@ using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Metrics.V1;
 using OpenTelemetry.Proto.Trace.V1;
 using Qyl.Telemetry.SemanticConventions;
+using Qyl.Telemetry.Tests.Evidence;
 
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
 
@@ -147,7 +148,7 @@ public sealed class ReceiverTests
         using var output = new MemoryStream();
         await using (var gzip = new GZipStream(output, CompressionLevel.SmallestSize, true))
         {
-            await gzip.WriteAsync(Qyl.Telemetry.Tests.Evidence.OtlpEvidence.RichSpan().ToByteArray(), TestContext.CancellationToken);
+            await gzip.WriteAsync(OtlpEvidence.RichSpan().ToByteArray(), TestContext.CancellationToken);
         }
 
         var client = TelemetryLifecycle.Http;
@@ -163,7 +164,7 @@ public sealed class ReceiverTests
         Assert.AreEqual(SpanKind.Consumer, span.Kind);
         Assert.AreEqual(ActivityStatusCode.Error, span.Status);
         Assert.AreEqual("rich-scope", span.Scope?.Name);
-        Assert.AreSequenceEqual(Qyl.Telemetry.Tests.Evidence.OtlpEvidence.RichSpan().ToByteArray(),
+        Assert.AreSequenceEqual(OtlpEvidence.RichSpan().ToByteArray(),
             Assert.ContainsSingle(receiver.Snapshot().Requests).Payload.ToArray());
     }
 

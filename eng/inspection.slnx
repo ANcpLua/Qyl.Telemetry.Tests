@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="../Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj" />
+  <Project Path="../Qyl.Telemetry.UnitTests/Qyl.Telemetry.UnitTests.csproj" />
+  <Project Path="../Qyl.Telemetry.IntegrationTests/Qyl.Telemetry.IntegrationTests.csproj" />
+  <Project Path="../Qyl.Telemetry.EndToEndTests/Qyl.Telemetry.EndToEndTests.csproj" />
+  <Project Path="../Qyl.Telemetry.EndToEndTests/Applications/Orders.Api/Orders.Api.csproj" />
+  <Project Path="../Qyl.Telemetry.EndToEndTests/Applications/Payments.Api/Payments.Api.csproj" />
+  <Project Path="build/_build.csproj" />
+</Solution>

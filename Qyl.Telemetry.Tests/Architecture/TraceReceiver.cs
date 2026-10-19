@@ -81,7 +81,8 @@ internal sealed class TraceReceiver : IAsyncDisposable
                         (int)forwarded.StatusCode, collectorReply));
                     response.StatusCode = (int)forwarded.StatusCode;
                     response.ContentType = forwarded.Content.Headers.ContentType?.ToString();
-                    response.Headers.ContentEncoding = forwarded.Content.Headers.ContentEncoding.ToArray();
+                    string[] contentEncodings = [.. forwarded.Content.Headers.ContentEncoding];
+                    response.Headers.ContentEncoding = contentEncodings;
                 }
                 catch (Exception error) when (error is HttpRequestException or OperationCanceledException)
                 {

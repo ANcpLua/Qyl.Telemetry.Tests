@@ -24,10 +24,16 @@ the manifest during the port. Keep the accompanying license and
 [third-party notices](../THIRD-PARTY-NOTICES.md).
 
 Generic MSTest navigation probes, runner-contract child programs and reflection
-emit tests were not copied into the telemetry suites. They verify the framework
-extension/tooling contract rather than a Qyl telemetry interaction. The retained
-telemetry cases still exercise native data rows, execution attributes, automatic
-fixtures and invocation cancellation through their actual consumers.
+emit tests were not copied into the telemetry suites. The old receiver's
+`QylTelemetryAttribute` and `QylTestHooks` remain implemented here, so its native
+result-preservation and navigation probes remain relevant review candidates.
+[The extension API map](extension-api.md) records their coverage gap and the
+old harness assumptions. Retained telemetry cases exercise native data rows,
+execution attributes, automatic fixtures and cancellation through actual consumers.
+
+The technical MSBuild/NuGet references and adapted Fallout coverage/inspection
+targets are retained here. Historical package-publication scripts remain in the
+archived repository; this solution has no package release path yet.
 
 The existing application baseline uses released packages, managed Collector
 execution and REST investigation. It does not establish candidate-package

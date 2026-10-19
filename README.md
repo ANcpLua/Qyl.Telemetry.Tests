@@ -24,14 +24,22 @@ Install .NET SDK **10.0.401**, then run:
 ./build.sh
 ```
 
-The normal entrypoint executes the three suites through Microsoft.Testing.Platform
+The default Fallout `Check` target builds once, executes the three suites with
+Microsoft coverage, merges coverage with DotCov, and runs the pinned JetBrains
+InspectCode tool across support, suites, fixture applications and the build host.
+Coverage is informational; reported inspection findings fail the check.
+Use `./build.sh --target Test`, `Coverage` or `InspectCode` for a focused target.
+
+The suites execute through Microsoft.Testing.Platform
 **2.5.1**, using **MSTest.Sdk 4.5.1**, net10.0 and the AllMicrosoft extension
 profile (including Microsoft.CodeCoverage). The shared project is a library via
 `IsTestApplication=false`. Dependency versions live in `Version.props`;
 `Directory.Packages.props` maps packages to those properties.
 `NuGet.Config` selects the public feed explicitly.
 One `QylPlatformVersion` property selects both the Collector runtime and
-Orchestration package. TRX reports are written to `artifacts/results`.
+Orchestration package. TRX and individual coverage reports are written to
+`artifacts/results`; merged coverage is in `artifacts/coverage`, and inspection
+findings are in `artifacts/inspection.sarif`.
 For a focused run, use the native MTP options:
 
 ```sh
@@ -66,3 +74,7 @@ Start with [AGENTS.md](AGENTS.md). Each project owns its skill under skills/;
 the root .agents/skills folders link to those sources for discovery. Reusable
 policy design lives in the support skill's optional
 [telemetry catalogue](Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md).
+
+[Build infrastructure](docs/build-infrastructure/README.md) describes MSBuild,
+central packages and verification mechanics. [Implemented extension APIs](docs/extension-api.md)
+distinguishes the receiver wrapper, architecture composition and policy proposals.
