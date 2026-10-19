@@ -1,0 +1,7 @@
+<Project Sdk="MSTest.Sdk">
+  <PropertyGroup><RootNamespace>Qyl.Telemetry.IntegrationTests.Probes</RootNamespace></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj" />
+    <None Include="ProbeCases.cs" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

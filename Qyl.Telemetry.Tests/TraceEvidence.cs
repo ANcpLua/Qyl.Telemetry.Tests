@@ -27,9 +27,9 @@ public sealed record MetricEvidence(
     IReadOnlyList<int> PointIndexes);
 
 [PublicAPI]
-public sealed class QylTrace
+public sealed class TraceEvidence
 {
-    public QylTrace(string traceId, TelemetrySnapshot capture, MetricPartition? partition = null)
+    public TraceEvidence(string traceId, TelemetrySnapshot capture, MetricPartition? partition = null)
     {
         ArgumentNullException.ThrowIfNull(traceId);
         ArgumentNullException.ThrowIfNull(capture);

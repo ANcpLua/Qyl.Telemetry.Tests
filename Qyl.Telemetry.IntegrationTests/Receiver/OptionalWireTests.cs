@@ -173,7 +173,7 @@ public sealed class OptionalWireTests
         Assert.IsNull(log.SpanId);
         Assert.IsNull(log.Body);
         Assert.IsNull(log.Resource.SchemaUrl);
-        var trace = new QylTrace("11111111111111111111111111111111", snapshot);
+        var trace = new TraceEvidence("11111111111111111111111111111111", snapshot);
         Assert.IsEmpty(trace.Logs);
         Assert.HasCount(1, trace.Capture.Logs);
         Assert.IsNull(trace.SessionId);
@@ -202,7 +202,7 @@ public sealed class OptionalWireTests
         var metric = Assert.ContainsSingle(snapshot.Metrics);
         Assert.AreEqual("unspecified", metric.Name);
         Assert.IsInstanceOfType<UnspecifiedMetricData>(metric.Data);
-        Assert.IsEmpty(new QylTrace("11111111111111111111111111111111", snapshot,
+        Assert.IsEmpty(new TraceEvidence("11111111111111111111111111111111", snapshot,
             new MetricPartition("qyl.test.id", "partition")).Metrics);
         Assert.AreEqual(0L, Assert.ContainsSingle(snapshot.Receipts).Accepted);
     }

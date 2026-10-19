@@ -1,3 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
-  <ItemGroup><PackageReference Include="Qyl.Telemetry.Hosting" /></ItemGroup>
-</Project>

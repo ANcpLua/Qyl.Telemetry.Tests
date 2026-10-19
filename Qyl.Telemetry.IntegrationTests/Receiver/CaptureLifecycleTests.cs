@@ -67,14 +67,14 @@ public sealed class CaptureLifecycleTests
     public async Task Capture_timeout_fails_instead_of_accepting_missing_evidence()
     {
         var previous = Activity.Current;
-        await Assert.ThrowsExactlyAsync<TimeoutException>(() => QylTest.TraceAsync(_ => Task.CompletedTask,
+        await Assert.ThrowsExactlyAsync<TimeoutException>(() => TelemetryCapture.TraceAsync(_ => Task.CompletedTask,
             trace => trace.Spans.Count > 0, TimeSpan.Zero, TestContext.CancellationToken));
         Assert.AreSame(previous, Activity.Current);
     }
 
-    private Task<QylTrace> CaptureAsync(int number)
+    private Task<TraceEvidence> CaptureAsync(int number)
     {
-        return QylTest.TraceAsync(async capture =>
+        return TelemetryCapture.TraceAsync(async capture =>
             {
                 Assert.IsNotNull(Activity.Current);
                 Assert.AreEqual("qyl.test", Activity.Current.OperationName);

@@ -5,21 +5,21 @@ using JetBrains.Annotations;
 namespace Qyl.Telemetry.Tests;
 
 [PublicAPI]
-public static class QylTest
+public static class TelemetryCapture
 {
-    public static Task<QylTrace> TraceAsync(Func<QylCapture, Task> action, Func<QylTrace, bool> until,
+    public static Task<TraceEvidence> TraceAsync(Func<CaptureContext, Task> action, Func<TraceEvidence, bool> until,
         TimeSpan? timeout = null, CancellationToken cancellationToken = default) =>
         TraceAsync(action, until, OtlpReceiver.DefaultMaxPayloadBytes, timeout, cancellationToken);
 
-    public static async Task<QylTrace> TraceAsync(Func<QylCapture, Task> action, Func<QylTrace, bool> until,
+    public static async Task<TraceEvidence> TraceAsync(Func<CaptureContext, Task> action, Func<TraceEvidence, bool> until,
         int maxPayloadBytes, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(until);
         await using var receiver = await OtlpReceiver.StartAsync(maxPayloadBytes, cancellationToken).ConfigureAwait(false);
-        using var ownedRoot = Activity.Current?.OperationName == QylTestHooks.Operation ? null : QylTestHooks.NewRoot();
+        using var ownedRoot = Activity.Current?.OperationName == TelemetryActivity.Name ? null : TelemetryActivity.Start();
         var root = Activity.Current!;
-        var capture = new QylCapture(receiver, root.TraceId.ToHexString(), root.Id!);
+        var capture = new CaptureContext(receiver, root.TraceId.ToHexString(), root.Id!);
         await action(capture).ConfigureAwait(false);
         var snapshot = await receiver
             .AwaitAsync(s => until(capture.Read(s)), timeout ?? TimeSpan.FromSeconds(10), cancellationToken)
@@ -29,11 +29,11 @@ public static class QylTest
 }
 
 [PublicAPI]
-public sealed class QylCapture
+public sealed class CaptureContext
 {
     private readonly OtlpReceiver _receiver;
 
-    internal QylCapture(OtlpReceiver receiver, string traceId, string traceParent)
+    internal CaptureContext(OtlpReceiver receiver, string traceId, string traceParent)
     {
         _receiver = receiver;
         TraceId = traceId;
@@ -47,14 +47,14 @@ public sealed class QylCapture
     public string TraceParent { get; }
     public MetricPartition Partition { get; }
 
-    public QylTrace Read()
+    public TraceEvidence Read()
     {
         return Read(_receiver.Snapshot());
     }
 
-    internal QylTrace Read(TelemetrySnapshot snapshot)
+    internal TraceEvidence Read(TelemetrySnapshot snapshot)
     {
-        return new QylTrace(TraceId, snapshot, Partition);
+        return new TraceEvidence(TraceId, snapshot, Partition);
     }
 
     public Task<TelemetrySnapshot> AwaitAsync(Func<TelemetrySnapshot, bool> until, TimeSpan timeout,
@@ -64,47 +64,35 @@ public sealed class QylCapture
     }
 }
 
-[PublicAPI]
-public static class QylTestHooks
+internal static class TelemetryActivity
 {
-    internal const string Operation = "qyl.test";
-    public const string TraceIdProperty = "Qyl.Telemetry.Tests.TraceId";
+    internal const string Name = TracePerTestAttribute.ActivityName;
 
-    public static void Initialize(TestContext context)
-    {
-        context.Properties[TraceIdProperty] = Activity.Current?.TraceId.ToHexString();
-    }
-
-    public static void Cleanup(TestContext context)
-    {
-        context.Properties.Remove(TraceIdProperty);
-    }
-
-    internal static Activity NewRoot()
-    {
-        return new Activity(Operation).SetIdFormat(ActivityIdFormat.W3C)
-            .SetParentId(ActivityTraceId.CreateRandom(), default, ActivityTraceFlags.Recorded).Start();
-    }
+    internal static Activity Start() => new Activity(Name).SetIdFormat(ActivityIdFormat.W3C)
+        .SetParentId(ActivityTraceId.CreateRandom(), default, ActivityTraceFlags.Recorded).Start();
 }
 
 [PublicAPI]
-public sealed class QylTelemetryAttribute : TestClassAttribute
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class TracePerTestAttribute : TestClassAttribute
 {
+    public const string ActivityName = "qyl.test";
+
     public override TestMethodAttribute GetTestMethodAttribute(TestMethodAttribute testMethodAttribute)
     {
         ArgumentNullException.ThrowIfNull(testMethodAttribute);
-        return new QylTelemetryMethodAttribute(testMethodAttribute);
+        return new TracePerTestMethodAttribute(testMethodAttribute);
     }
 }
 
-internal sealed class QylTelemetryMethodAttribute(
+internal sealed class TracePerTestMethodAttribute(
     TestMethodAttribute inner,
     [CallerFilePath] string file = "",
     [CallerLineNumber] int line = -1) : TestMethodAttribute(file, line)
 {
     public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
-        using var root = QylTestHooks.NewRoot();
+        using var root = TelemetryActivity.Start();
         return await inner.ExecuteAsync(testMethod).ConfigureAwait(false);
     }
 }

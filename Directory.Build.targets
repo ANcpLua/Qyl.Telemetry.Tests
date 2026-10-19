@@ -4,4 +4,17 @@
     <Content Include="$(NuGetPackageRoot)qyl.$(NETCoreSdkRuntimeIdentifier)/$(QylPlatformVersion)/tools/net10.0/$(NETCoreSdkRuntimeIdentifier)/collector/**/*"
              Link="qyl/collector/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="CopyTestFixturePayloads" AfterTargets="Build" Condition="'@(TestFixtureProject)' != ''">
+    <MSBuild Projects="@(TestFixtureProject)" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_TestFixtureTarget" />
+    </MSBuild>
+    <ItemGroup>
+      <_TestFixturePayload Include="%(_TestFixtureTarget.RootDir)%(_TestFixtureTarget.Directory)**/*">
+        <FixtureName>%(_TestFixtureTarget.Filename)</FixtureName>
+      </_TestFixturePayload>
+    </ItemGroup>
+    <Copy SourceFiles="@(_TestFixturePayload)"
+          DestinationFiles="@(_TestFixturePayload->'$(TargetDir)fixtures/%(FixtureName)/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>

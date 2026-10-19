@@ -1,15 +1,15 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Qyl.Telemetry.Tests.Architecture;
+using Qyl.Telemetry.Tests.Collector;
 using Qyl.Api.Contracts.OTel.Metrics;
 
-namespace Qyl.Telemetry.UnitTests.Architecture;
+namespace Qyl.Telemetry.UnitTests.Collector;
 
 /// <summary>Checks qyl query pagination, wire failures and explicit metric windows.</summary>
 /// <param name="testContext">The runner context supplies cancellation.</param>
 [TestClass]
-public sealed class QylTelemetryTests(TestContext testContext)
+public sealed class CollectorClientTests(TestContext testContext)
 {
     /// <summary>Every log page is read and cursors and trace IDs are safely encoded.</summary>
     [TestMethod]
@@ -23,7 +23,7 @@ public sealed class QylTelemetryTests(TestContext testContext)
                 ? """{"items":[],"has_more":true,"next_cursor":"next +&"}"""
                 : """{"items":[],"has_more":false}""");
         });
-        var logs = await new QylTelemetry(client).LogsAsync("trace&one", testContext.CancellationToken);
+        var logs = await new CollectorClient(client).LogsAsync("trace&one", testContext.CancellationToken);
         Assert.IsEmpty(logs);
         Assert.HasCount(2, requests);
         Assert.Contains("trace_id=trace%26one", requests[0]);
@@ -39,7 +39,7 @@ public sealed class QylTelemetryTests(TestContext testContext)
     {
         using var client = Client(_ => Json(JsonSerializer.Serialize(new { items = Array.Empty<object>(), has_more = true, next_cursor = cursor })));
         var failure = await Assert.ThrowsExactlyAsync<InvalidDataException>(() =>
-            new QylTelemetry(client).LogsAsync("trace", testContext.CancellationToken));
+            new CollectorClient(client).LogsAsync("trace", testContext.CancellationToken));
         Assert.Contains("continuation cursor", failure.Message);
     }
 
@@ -48,9 +48,9 @@ public sealed class QylTelemetryTests(TestContext testContext)
     public async Task QueryErrorsAreNotConvertedToEmptyResults()
     {
         using var failed = Client(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
-        _ = await Assert.ThrowsExactlyAsync<HttpRequestException>(() => new QylTelemetry(failed).LogsAsync("trace", testContext.CancellationToken));
+        _ = await Assert.ThrowsExactlyAsync<HttpRequestException>(() => new CollectorClient(failed).LogsAsync("trace", testContext.CancellationToken));
         using var empty = Client(_ => Json("null"));
-        _ = await Assert.ThrowsExactlyAsync<InvalidDataException>(() => new QylTelemetry(empty).LogsAsync("trace", testContext.CancellationToken));
+        _ = await Assert.ThrowsExactlyAsync<InvalidDataException>(() => new CollectorClient(empty).LogsAsync("trace", testContext.CancellationToken));
     }
 
     /// <summary>Metric queries preserve their explicit UTC window, aggregation and response metadata.</summary>
@@ -78,7 +78,7 @@ public sealed class QylTelemetryTests(TestContext testContext)
             Assert.Contains("start_time=2026-10-16T10%3A00%3A00", request.RequestUri.Query);
             return Json(JsonSerializer.Serialize(expected));
         });
-        var telemetry = new QylTelemetry(client);
+        var telemetry = new CollectorClient(client);
         var actual = await telemetry.QueryMetricAsync(expected.Name, start, start.AddMinutes(1),
             MetricAggregation.P95, testContext.CancellationToken);
         Assert.AreEqual(expected.Name, actual.Name);
@@ -92,15 +92,15 @@ public sealed class QylTelemetryTests(TestContext testContext)
     public async Task TraceForwardingPreservesTheActualAcknowledgement()
     {
         using var accepted = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([]) });
-        using var acceptedReply = await new QylTelemetry(accepted).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);
+        using var acceptedReply = await new CollectorClient(accepted).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.OK, acceptedReply.StatusCode);
         byte[] expectedReply = [.. "\n\0"u8];
         using var partial = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(expectedReply) });
-        using var acknowledged = await new QylTelemetry(partial).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);
+        using var acknowledged = await new CollectorClient(partial).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.OK, acknowledged.StatusCode);
         Assert.AreSequenceEqual(expectedReply, await acknowledged.Content.ReadAsByteArrayAsync(testContext.CancellationToken));
         using var failed = Client(_ => new HttpResponseMessage(HttpStatusCode.BadRequest));
-        using var rejected = await new QylTelemetry(failed).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);
+        using var rejected = await new CollectorClient(failed).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.BadRequest, rejected.StatusCode);
     }
 

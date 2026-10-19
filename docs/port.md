@@ -1,47 +1,25 @@
-# Port ownership and evidence
+# Ownership and delivery evidence
 
-The receiver and reusable prototype support are absorbed into this repository.
-The four projects have no project or package reference back to
-`Qyl.Telemetry.Testing` or `mstest-architecture-prototype`. The original
-repositories are retained as archived history. Existing published
-`Qyl.Telemetry.Testing` packages remain available; external package consumers
-have not automatically migrated to this source repository. Public Qyl production packages retain their own
-production implementations and release ownership.
+`Qyl.Telemetry.Tests` owns reusable testing support for Qyl telemetry behavior.
+The original receiver implementation came from `Qyl.Telemetry.Testing`;
+its published 3.0.3 package remains unchanged for existing external consumers.
+This solution uses project references to its shared library.
 
-| Retained source responsibility | Destination |
+| Responsibility | Owner |
 | --- | --- |
-| Canonical in-process OTLP receiver, typed records, raw requests and official generated protocol | Shared library root and `Protos/` |
-| Trace graph, registry and protocol interpretation | Shared library; deterministic cases in UnitTests |
-| Reusable architecture attributes, native execution composition, bounded trace observation and Collector fixture primitives | Shared `Architecture/` |
-| Real OTLP transport, exporter interactions, payload presence/types and cancellation | IntegrationTests `Receiver/` |
-| Collector process lifecycle and recorder restart/isolation | IntegrationTests `Collector/` |
-| Orders/Payments workloads and application-specific scenario expectations | EndToEndTests `Applications/` and `Architecture/` |
-| Native assembly lifecycle registration | Each consuming test assembly |
+| OTLP receiver, raw requests, typed records, trace selection, registry checks | Qyl.Telemetry.Tests |
+| Pure interpretation, field presence, precision and assertion diagnostics | Qyl.Telemetry.UnitTests |
+| Exporters, transports, Collector processes, storage and native runner composition | Qyl.Telemetry.IntegrationTests |
+| Published Qyl application-to-Collector delivery | Qyl.Telemetry.EndToEndTests |
+| Monolith/microservices demonstration, synthetic stores, Orders/Payments workloads | architecture-template-fixtures |
 
-Receiver protocol generation preserves the eight official proto inputs pinned
-in `Qyl.Telemetry.Tests/Protos/upstream.json`. Their hashes were checked against
-the manifest during the port. Keep the accompanying license and
-[third-party notices](../THIRD-PARTY-NOTICES.md).
+The [architecture demonstration](https://github.com/ANcpLua/architecture-template-fixtures) is independently buildable and uses public
+packages. It has no project reference back to this checkout. Qyl's suites no
+longer apply architecture labels to telemetry verdicts.
 
-Generic MSTest navigation probes, runner-contract child programs and reflection
-emit tests were not copied into the telemetry suites. The old receiver's
-`QylTelemetryAttribute` and `QylTestHooks` remain implemented here, so its native
-result-preservation and navigation probes remain relevant review candidates.
-[The extension API map](extension-api.md) records their coverage gap and the
-old harness assumptions. Retained telemetry cases exercise native data rows,
-execution attributes, automatic fixtures and cancellation through actual consumers.
-
-The technical MSBuild/NuGet references and adapted Fallout coverage/inspection
-targets are retained here. Historical package-publication scripts remain in the
-archived repository; this solution has no package release path yet.
-
-The existing application baseline uses released packages, managed Collector
-execution and REST investigation. It does not establish candidate-package
-selection, Native AOT execution or MCP transport. Add those as explicit delivered
-artifact scenarios, recording package/feed identity, executable RID/hash and
-actual investigation interface. Collector retention and read-time redaction must
-be verified against the corresponding Collector/MCP artifact, not inferred from
-successful receiver capture.
+[Implemented APIs](extension-api.md) identify the shared fixtures, current names
+and native runner checks. [Build infrastructure](build-infrastructure/README.md)
+describes the local verification setup.
 
 ## Production contract owners
 
@@ -51,15 +29,24 @@ Resolve the revision matching the selected packages before using these sources.
   registry vocabulary, typed signals and entities, generated definitions,
   deprecation mappings, persistence policy and analyzers.
 - [Qyl.Telemetry.AutoInstrumentation](https://github.com/ANcpLua/Qyl.Telemetry.AutoInstrumentation):
-  hosting and registration, native sources, interceptors/listeners, capture,
-  signal export, package/generator compatibility and integration-specific NativeAOT behavior.
+  hosting, native source enrichment, configured capture, export and supported
+  integration-specific NativeAOT behavior.
 - [qyl](https://github.com/ANcpLua/qyl): Collector ingestion, storage, migrations,
-  retention, metric fidelity, sessions, authorization, project isolation,
-  investigation, streams, writable resources, orchestration and Qyl.Api.Sdk.
+  retention, metric fidelity, sessions, project isolation and investigation.
 - [qyl-api-schema](https://github.com/ANcpLua/qyl-api-schema): public request,
-  response, error, pagination and stream contracts, generated schemas and models,
-  validators and contract revision.
+  response, pagination and stream contracts, schemas and models.
 
-Production-local generator, analyzer, storage-internal and schema-emitter cases
-remain with their production owner. This solution owns reusable testing support
-and the contracts connecting the selected products.
+The delivery fixture currently executes a managed application and the packaged
+managed Collector, then reads through REST. Candidate-package selection,
+published NativeAOT artifact execution and MCP protocol verification are distinct
+future scenarios; they are not established by this baseline.
+
+The application probe selects its own log category. Its log assertions establish
+workload delivery and correlation, not the shape of every framework operational
+log. The pinned stack's unhandled Kestrel log repeats `ConnectionId` between its
+message state and scope; validating that producer remains separate work. Capture
+still rejects malformed exported records and retains their receipts.
+
+Official protocol inputs and their provenance remain in
+`Qyl.Telemetry.Tests/Protos/upstream.json`. Preserve the accompanying license and
+[third-party notices](../THIRD-PARTY-NOTICES.md).

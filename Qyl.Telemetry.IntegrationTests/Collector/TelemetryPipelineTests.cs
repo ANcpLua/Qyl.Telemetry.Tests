@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Qyl.Telemetry.Tests.Architecture;
+using Qyl.Telemetry.Tests.Collector;
 using Google.Protobuf;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http.Features;
@@ -16,9 +16,9 @@ namespace Qyl.Telemetry.IntegrationTests.Collector;
 /// <param name="testContext">The runner owns cancellation and evidence attachments.</param>
 [TestClass]
 [DoNotParallelize]
-public sealed class RecorderTests(TestContext testContext) : IDisposable
+public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisposable
 {
-    private SpanRecorder Recorder => ArchitectureFixtures.GetRun(testContext).Recorder;
+    private TelemetryPipeline Recorder { get; } = new(testContext);
 
     private readonly HttpClient _client = new();
     private static readonly string[] Checkpoints = ["first", "second"];
@@ -61,7 +61,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         var spans = trace.GetProperty("spans").EnumerateArray().ToArray();
         var ids = spans.Select(span => span.GetProperty("span_id").GetString()).ToHashSet();
         Assert.Contains(span => span.GetProperty("span_id").GetString() == rootId
-            && span.GetProperty("name").GetString() == "architecture.test", spans);
+            && span.GetProperty("name").GetString() == TracePerTestAttribute.ActivityName, spans);
         Assert.Contains(span => span.GetProperty("kind").GetInt32() == 3
             && span.GetProperty("parent_span_id").GetString() == rootId, spans);
         Assert.IsTrue(spans.All(span => !span.TryGetProperty("parent_span_id", out var parent)
@@ -98,7 +98,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         {
             try
             {
-                var events = await Recorder.Collector.Telemetry.SpanEventsAsync(traceId, deadline.Token);
+                var events = await Recorder.Collector.Client.SpanEventsAsync(traceId, deadline.Token);
                 if (events.FirstOrDefault(spanEvent => spanEvent.Name == "exception") is { } exception)
                 {
                     var attributes = exception.Attributes!.ToDictionary(attribute => attribute.Key, attribute => attribute.Value);
@@ -121,10 +121,10 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
     public async Task RecorderCanStopAndRestart()
     {
         await Recorder.StartAsync(testContext.CancellationToken);
-        await ArchitectureFixtures.GetRun(testContext).StopAsync();
+        await Recorder.StopAsync();
         try
         {
-            await ArchitectureFixtures.GetRun(testContext).StopAsync();
+            await Recorder.StopAsync();
             _ = Assert.ThrowsExactly<InvalidOperationException>(() => Recorder.ReceiverAddress);
             _ = Assert.ThrowsExactly<InvalidOperationException>(() => Recorder.Collector);
             _ = Assert.ThrowsExactly<InvalidOperationException>(() => Recorder.Begin("not-listening"));
@@ -171,7 +171,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
             Assert.AreEqual(long.MaxValue, captured.Events[0].Attributes["checkout.sequence"]);
             Assert.IsTrue(Assert.IsInstanceOfType<bool>(captured.Events[0].Attributes["checkout.accepted"]));
             Assert.IsTrue(captured.Events.All(item => item.TimeUnixNano >= captured.StartTimeUnixNano && item.TimeUnixNano <= captured.EndTimeUnixNano));
-            Assert.AreEqual(SpanRecorder.TestProcess, captured.Service);
+            Assert.AreEqual(TelemetryPipeline.TestProcess, captured.Service);
             Assert.IsNotNull(captured.Scope);
             Assert.IsNotNull(captured.Scope.SchemaUrl);
             Assert.IsNotNull(captured.Resource.Attributes["telemetry.sdk.name"]);
@@ -224,7 +224,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         {
             features.Set<IServerAddressesFeature>(new ServerAddressesFeature());
         }
-        var failure = Assert.ThrowsExactly<InvalidOperationException>(() => TraceReceiver.BoundAddress(features));
+        var failure = Assert.ThrowsExactly<InvalidOperationException>(() => OtlpRelay.BoundAddress(features));
         Assert.AreEqual("The trace receiver has no address.", failure.Message);
     }
 
@@ -236,7 +236,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         var addresses = new ServerAddressesFeature();
         addresses.Addresses.Add("http://127.0.0.1:43210");
         features.Set<IServerAddressesFeature>(addresses);
-        Assert.AreEqual(new Uri("http://127.0.0.1:43210"), TraceReceiver.BoundAddress(features));
+        Assert.AreEqual(new Uri("http://127.0.0.1:43210"), OtlpRelay.BoundAddress(features));
     }
 
     /// <summary>A nonempty zero-rejection acknowledgement is valid for every signal and must be relayed intact.</summary>
@@ -249,7 +249,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         var acknowledgement = Convert.FromHexString("0A00");
         using var collector = CollectorClient(HttpStatusCode.OK, acknowledgement);
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
-        await using var receiver = await TraceReceiver.StartAsync(capture, new QylTelemetry(collector), testContext.CancellationToken);
+        await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
         using var body = new ByteArrayContent([]);
         body.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
         using var response = await _client.PostAsync(new Uri(receiver.Address, $"/v1/{signal}"), body, testContext.CancellationToken);
@@ -267,7 +267,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         var diagnostic = new RpcStatus { Code = 3, Message = "Malformed OTLP request." }.ToByteArray();
         using var collector = CollectorClient(HttpStatusCode.BadRequest, diagnostic);
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
-        await using var receiver = await TraceReceiver.StartAsync(capture, new QylTelemetry(collector), testContext.CancellationToken);
+        await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
         using var body = new ByteArrayContent([0x0b]);
         body.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
         using var response = await _client.PostAsync(new Uri(receiver.Address, "/v1/traces"), body, testContext.CancellationToken);
@@ -297,7 +297,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         try
         {
             Environment.SetEnvironmentVariable(setting, "invalid-listener-address");
-            _ = await Assert.ThrowsAsync<FormatException>(() => TraceReceiver.StartAsync(capture, new QylTelemetry(collector), testContext.CancellationToken));
+            _ = await Assert.ThrowsAsync<FormatException>(() => OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken));
         }
         finally
         {
@@ -330,7 +330,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         using var collector = new HttpClient(handler);
         collector.BaseAddress = new Uri("https://collector.test/");
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
-        var receiver = await TraceReceiver.StartAsync(capture, new QylTelemetry(collector), testContext.CancellationToken);
+        var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
         try
         {
             using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
@@ -365,7 +365,7 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
         using var collector = new HttpClient(handler);
         collector.BaseAddress = new Uri("https://collector.test/");
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
-        await using var receiver = await TraceReceiver.StartAsync(capture, new QylTelemetry(collector), testContext.CancellationToken);
+        await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
         using var body = new ByteArrayContent([]);
         body.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
         var send = _client.PostAsync(new Uri(receiver.Address, "v1/logs"), body, testContext.CancellationToken);
@@ -396,5 +396,9 @@ public sealed class RecorderTests(TestContext testContext) : IDisposable
             };
         }
     }
-    public void Dispose() => _client.Dispose();
+    public async ValueTask DisposeAsync()
+    {
+        try { await Recorder.DisposeAsync(); }
+        finally { _client.Dispose(); }
+    }
 }

@@ -67,7 +67,7 @@ public sealed class MetricWireTests
         var payload = archive.RootElement.GetProperty("Requests")[0];
         Assert.AreEqual("metrics", payload.GetProperty("Signal").GetString());
         Assert.AreSequenceEqual(request.ToByteArray(), payload.GetProperty("Payload").GetBytesFromBase64());
-        var partitioned = new QylTrace("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", receiver.Snapshot(),
+        var partitioned = new TraceEvidence("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", receiver.Snapshot(),
             new MetricPartition("service.name", "metric-service"));
         var attributed = Assert.ContainsSingle(partitioned.Metrics);
         Assert.AreEqual(MetricCorrelation.ResourcePartition, attributed.Correlation);
@@ -89,16 +89,16 @@ public sealed class MetricWireTests
             TestContext.CancellationToken, "metrics");
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
-        var unrelated = new QylTrace("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", snapshot);
+        var unrelated = new TraceEvidence("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", snapshot);
         Assert.IsEmpty(unrelated.Metrics);
         Assert.HasCount(1, unrelated.Capture.Metrics);
-        var related = new QylTrace("11111111111111111111111111111111", snapshot);
+        var related = new TraceEvidence("11111111111111111111111111111111", snapshot);
         var evidence = Assert.ContainsSingle(related.Metrics);
         Assert.AreEqual("metric.gauge", evidence.Metric.Name);
         Assert.AreEqual(MetricCorrelation.Exemplar, evidence.Correlation);
         Assert.AreSequenceEqual([0], evidence.PointIndexes);
         Assert.HasCount(2, Assert.IsInstanceOfType<GaugeData>(evidence.Metric.Data).Points);
-        var mismatch = new QylTrace("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", snapshot,
+        var mismatch = new TraceEvidence("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", snapshot,
             new MetricPartition("qyl.test.id", "wrong"));
         Assert.IsEmpty(mismatch.Metrics);
     }

@@ -1,6 +1,6 @@
 ---
 name: qyl-telemetry-end-to-end
-description: Write or review complete application-to-investigation scenarios in Qyl.Telemetry.EndToEndTests, including Orders/Payments workloads, candidate delivery, NativeAOT artifacts and explicit REST or MCP paths.
+description: Write or review complete application-to-investigation scenarios in Qyl.Telemetry.EndToEndTests, including instrumented Qyl workloads, candidate delivery, NativeAOT artifacts and explicit REST or MCP paths.
 ---
 
 # Application to investigation
@@ -11,7 +11,7 @@ Target Qyl.Telemetry.EndToEndTests/Qyl.Telemetry.EndToEndTests.csproj.
 
 Connect an observable application outcome to required telemetry and the actual
 Collector investigation result. Keep workloads under Applications/ and scenario
-expectations under Architecture/. Select the signals, producers and terminal
+expectations beside their delivery tests. Select the signals, producers and terminal
 observations required by that scenario.
 
 Determine the requested execution mode before choosing fixtures. For candidate
@@ -24,9 +24,8 @@ Exercise REST and MCP through explicit transport paths. Reach the final
 assertion through the promised investigation interface. Managed execution,
 successful publication and backend calls establish their own narrower claims.
 
-Limit architecture verdicts to observed relationships. Workload store spans
-establish telemetry relationships; business persistence requires actual stored
-business data and readback. Collector persistence requires Collector readback.
+Require Collector readback for storage claims. Native span ownership requires
+source, operation and parentage evidence; a span count alone is insufficient.
 
 Share immutable publication under fixture ownership. Isolate mutable scenario
 state and child-process workspaces. Bound readiness and terminal observation,

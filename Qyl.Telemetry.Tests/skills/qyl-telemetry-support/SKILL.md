@@ -20,8 +20,8 @@ Keep the project a support library through its evaluated IsTestApplication
 setting; executable cases belong in the consuming suites.
 
 Read the [implemented API map](../../../docs/extension-api.md) when selecting
-between the receiver's QylTelemetryAttribute and the architecture class hook.
-Extend the applicable existing composition point.
+TracePerTestAttribute, TelemetryCapture and the isolated Collector/application
+fixtures. Extend the applicable existing composition point.
 Delegate to the original method attribute once and preserve every native result,
 data case, cancellation and failure. Keep policy declarations passive. Let
 MSTest own discovery and row expansion.

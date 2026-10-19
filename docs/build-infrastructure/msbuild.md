@@ -51,6 +51,12 @@ layout. `GetTargetPath` exposes a project's evaluated target output through
 MSBuild. Child test applications can be deployed through build-time items or
 evaluated target metadata without runtime reflection over build configuration.
 
+The intentionally failing telemetry invocation probe is not a solution test
+project. Its parent sets `ShouldUnsetParentConfigurationAndPlatform=false` so
+MSBuild preserves the selected configuration for that out-of-solution reference.
+`CopyTestFixturePayloads` obtains the child's output through `GetTargetPath` and
+deploys its complete runnable payload; it does not construct a `bin/Release` path.
+
 ## Targets and generated files
 
 `DependsOnTargets` expresses prerequisite targets; `BeforeTargets` and

@@ -45,7 +45,7 @@ public sealed class TraceModelTests
         using var response =
             await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
-        var trace = new QylTrace("11111111111111111111111111111111", receiver.Snapshot());
+        var trace = new TraceEvidence("11111111111111111111111111111111", receiver.Snapshot());
         Assert.AreSequenceEqual(["orders", "payments"], trace.Services);
         Assert.AreEqual("business-session", trace.SessionId);
         Assert.AreSequenceEqual(["business-session"], trace.SessionIds);
@@ -93,7 +93,7 @@ public sealed class TraceModelTests
             response.EnsureSuccessStatusCode();
         }
         var capture = receiver.Snapshot();
-        var trace = new QylTrace("11111111111111111111111111111111", capture);
+        var trace = new TraceEvidence("11111111111111111111111111111111", capture);
         Assert.HasCount(8, capture.Spans);
         Assert.HasCount(8, trace.Spans);
         Assert.HasCount(2, capture.Requests);

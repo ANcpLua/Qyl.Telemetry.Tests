@@ -115,7 +115,7 @@ public sealed class PayloadLimitTests
     [TestMethod]
     public async Task Trace_capture_applies_the_configured_limit_to_both_transports()
     {
-        var trace = await QylTest.TraceAsync(async capture =>
+        var trace = await TelemetryCapture.TraceAsync(async capture =>
         {
             using var channel = GrpcChannel.ForAddress(capture.GrpcEndpoint);
             var bytes = Marshallers.Create<byte[]>(static (value, context) => context.Complete(value),

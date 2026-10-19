@@ -110,7 +110,7 @@ public sealed class NumberAndSessionTests
         using var second = await ReceiverTests.PostAsync(receiver.Endpoint, logs.ToByteArray(),
             TestContext.CancellationToken, "logs");
         second.EnsureSuccessStatusCode();
-        var trace = new QylTrace("11111111111111111111111111111111", receiver.Snapshot());
+        var trace = new TraceEvidence("11111111111111111111111111111111", receiver.Snapshot());
         Assert.AreEqual("rich.operation", Assert.ContainsSingle(trace.Spans).Name);
         var log = Assert.ContainsSingle(trace.Logs);
         Assert.AreEqual("SessionObserved", log.EventName);

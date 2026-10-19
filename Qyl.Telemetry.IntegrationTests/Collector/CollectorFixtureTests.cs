@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text.Json;
-using Qyl.Telemetry.Tests.Architecture;
+using Qyl.Telemetry.Tests.Collector;
 
 namespace Qyl.Telemetry.IntegrationTests.Collector;
 
@@ -8,7 +8,7 @@ namespace Qyl.Telemetry.IntegrationTests.Collector;
 /// <param name="testContext">The runner owns cancellation.</param>
 [TestClass]
 [DoNotParallelize]
-public sealed class QylCollectorTests(TestContext testContext) : IDisposable
+public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
 {
     private readonly HttpClient _client = new();
     private static string AssemblyPath => Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll");
@@ -25,12 +25,12 @@ public sealed class QylCollectorTests(TestContext testContext) : IDisposable
         {
             Environment.SetEnvironmentVariable(portSetting, "invalid");
             Environment.SetEnvironmentVariable(endpointSetting, "invalid");
-            var collector = await QylCollector.StartAsync(AssemblyPath, testContext.CancellationToken);
+            var collector = await CollectorFixture.StartAsync(AssemblyPath, cancellationToken: testContext.CancellationToken);
             await using (collector)
             {
                 using var health = await _client.GetAsync(new Uri(collector.Address, "health"), testContext.CancellationToken);
                 Assert.AreEqual(HttpStatusCode.OK, health.StatusCode);
-                Assert.IsEmpty(await collector.Telemetry.LogsAsync("00000000000000000000000000000001", testContext.CancellationToken));
+                Assert.IsEmpty(await collector.Client.LogsAsync("00000000000000000000000000000001", testContext.CancellationToken));
             }
 
             await collector.DisposeAsync();
@@ -41,7 +41,7 @@ public sealed class QylCollectorTests(TestContext testContext) : IDisposable
                 Assert.IsFalse(shutdown.RootElement.GetProperty("Forced").GetBoolean());
             }
             _ = await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() =>
-                collector.Telemetry.LogsAsync("trace", testContext.CancellationToken));
+                collector.Client.LogsAsync("trace", testContext.CancellationToken));
         }
         finally
         {
@@ -55,7 +55,7 @@ public sealed class QylCollectorTests(TestContext testContext) : IDisposable
     public async Task MissingCollectorAssemblyReportsItsExit()
     {
         var failure = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
-            QylCollector.StartAsync(Path.Combine(AppContext.BaseDirectory, "missing-qyl-collector.dll"), testContext.CancellationToken));
+            CollectorFixture.StartAsync(Path.Combine(AppContext.BaseDirectory, "missing-qyl-collector.dll"), cancellationToken: testContext.CancellationToken));
         Assert.Contains("qyl exited with code", failure.Message);
         Assert.Contains("missing-qyl-collector.dll", failure.Message);
     }
@@ -66,7 +66,7 @@ public sealed class QylCollectorTests(TestContext testContext) : IDisposable
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
         await cancellation.CancelAsync();
-        _ = await Assert.ThrowsAsync<OperationCanceledException>(() => QylCollector.StartAsync(AssemblyPath, cancellation.Token));
+        _ = await Assert.ThrowsAsync<OperationCanceledException>(() => CollectorFixture.StartAsync(AssemblyPath, cancellationToken: cancellation.Token));
     }
     public void Dispose() => _client.Dispose();
 }

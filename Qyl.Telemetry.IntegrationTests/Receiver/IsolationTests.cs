@@ -9,7 +9,7 @@ using SpanKind = Qyl.Telemetry.SemanticConventions.SpanKind;
 
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
 
-[QylTelemetry]
+[TracePerTest]
 public sealed class IsolationTests
 {
     private static readonly ConcurrentDictionary<string, byte> SeenTraceIds = new(StringComparer.Ordinal);
@@ -32,16 +32,15 @@ public sealed class IsolationTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
-    public async Task Native_wrapper_and_global_hooks_preserve_each_data_rows_trace_identity(int row)
+    public async Task Native_trace_scope_preserves_each_data_rows_identity(int row)
     {
         var root = Activity.Current;
         Assert.IsNotNull(root);
-        Assert.AreEqual("qyl.test", root.OperationName);
+        Assert.AreEqual(TracePerTestAttribute.ActivityName, root.OperationName);
         Assert.IsTrue(SeenTraceIds.TryAdd(root.TraceId.ToHexString(), 0),
             "Each native DataRow must own a distinct trace ID.");
         Assert.AreEqual("0000000000000000", root.ParentSpanId.ToHexString());
-        Assert.AreEqual(root.TraceId.ToHexString(), TestContext.Properties[QylTestHooks.TraceIdProperty]);
-        var capture = await QylTest.TraceAsync(async test =>
+        var capture = await TelemetryCapture.TraceAsync(async test =>
         {
             Assert.AreEqual(root.TraceId.ToHexString(), test.TraceId);
             using var source = new ActivitySource("isolated-" + Guid.NewGuid().ToString("N"));
@@ -83,7 +82,7 @@ public sealed class IsolationTests
     public async Task Action_failure_is_preserved_and_the_receiver_is_closed()
     {
         Uri? endpoint = null;
-        var failure = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => QylTest.TraceAsync(
+        var failure = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => TelemetryCapture.TraceAsync(
             test =>
             {
                 endpoint = test.Endpoint;

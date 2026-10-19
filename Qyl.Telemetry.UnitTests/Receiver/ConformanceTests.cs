@@ -10,7 +10,7 @@ public sealed class ConformanceTests
     [TestMethod]
     public void Empty_selection_is_a_conformance_failure_and_never_a_green_empty_loop()
     {
-        var trace = new QylTrace("trace", new TelemetrySnapshot([], [], [], []));
+        var trace = new TraceEvidence("trace", new TelemetrySnapshot([], [], [], []));
         var report = trace.Conformance(Definition("string"), _ => true);
         Assert.IsFalse(report.IsConformant);
         Assert.AreEqual(0, report.SpansChecked);
@@ -77,7 +77,7 @@ public sealed class ConformanceTests
     {
         var span = Model(new Dictionary<string, object?> { ["field"] = Literal(valueType) });
         var report =
-            new QylTrace(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(Definition(type),
+            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(Definition(type),
                 _ => true);
         Assert.AreEqual("test.server", report.DefinitionId);
         Assert.AreEqual(1, report.SpansChecked);
@@ -100,7 +100,7 @@ public sealed class ConformanceTests
             Stability.Stable, Deprecation.None, attributes, []);
         var span = Model(new Dictionary<string, object?> { ["deprecated"] = 7L });
         var report =
-            new QylTrace(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
+            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
         Assert.IsFalse(report.IsConformant);
         Assert.AreSequenceEqual(["required", "deprecated"], report.Issues.Select(i => i.Attribute));
         Assert.AreEqual("Required attribute is absent.", report.Issues[0].Message);
@@ -115,7 +115,7 @@ public sealed class ConformanceTests
         var span = new SpanRecord("11111111111111111111111111111111", "2222222222222222", "operation")
             { Kind = SpanKind.Client, Attributes = new Dictionary<string, object?> { ["field"] = "value" } };
         var report =
-            new QylTrace(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(Definition("string"),
+            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(Definition("string"),
                 _ => true);
         Assert.IsFalse(report.IsConformant);
         var issue = Assert.ContainsSingle(report.Issues);
@@ -135,7 +135,7 @@ public sealed class ConformanceTests
             []);
         var span = Model(new Dictionary<string, object?>());
         var report =
-            new QylTrace(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
+            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
         Assert.AreEqual(1, report.SpansChecked);
         Assert.AreEqual("optional.server", report.DefinitionId);
         Assert.IsEmpty(report.Issues);
@@ -156,7 +156,7 @@ public sealed class ConformanceTests
             [new AttributeRef("field", "string", (RequirementLevel)99, false, null, AttributePhase.Start, true)], []);
         var span = Model(attributes);
         var error = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
-            new QylTrace(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true));
+            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true));
         Assert.AreEqual("definition", error.ParamName);
         Assert.AreEqual((RequirementLevel)99, error.ActualValue);
         Assert.Contains("Attribute 'field' has an unsupported requirement level.", error.Message);
@@ -174,7 +174,7 @@ public sealed class ConformanceTests
             ], []);
         var span = Model(new Dictionary<string, object?> { ["field"] = "value" });
         var report =
-            new QylTrace(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
+            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
         Assert.AreEqual(1, report.SpansChecked);
         Assert.IsEmpty(report.Issues);
         Assert.IsEmpty(report.UnevaluatedConditions);
@@ -188,7 +188,7 @@ public sealed class ConformanceTests
         {
             ["http.request.method"] = "GET", ["url.path"] = "/checkout", ["url.scheme"] = "https"
         });
-        var report = new QylTrace(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(
+        var report = new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(
             HttpSpanDefinitions.HttpServer, _ => true);
         Assert.AreEqual("http.server", report.DefinitionId);
         Assert.AreEqual(1, report.SpansChecked);

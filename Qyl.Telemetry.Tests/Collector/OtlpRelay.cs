@@ -13,17 +13,17 @@ using Google.Protobuf;
 using Code = Google.Rpc.Code;
 using RpcStatus = Google.Rpc.Status;
 
-namespace Qyl.Telemetry.Tests.Architecture;
+namespace Qyl.Telemetry.Tests.Collector;
 
 /// <summary>Captures every OTLP export and relays the Collector's actual response to the producer.</summary>
-internal sealed class TraceReceiver : IAsyncDisposable
+internal sealed class OtlpRelay : IAsyncDisposable
 {
     private static readonly HttpClient Transport = new() { Timeout = TimeSpan.FromSeconds(15) };
     private readonly WebApplication _app;
-    private readonly ConcurrentQueue<ExportDelivery> _deliveries;
+    private readonly ConcurrentQueue<OtlpDelivery> _deliveries;
     private int _disposed;
 
-    private TraceReceiver(WebApplication app, Uri address, ConcurrentQueue<ExportDelivery> deliveries)
+    private OtlpRelay(WebApplication app, Uri address, ConcurrentQueue<OtlpDelivery> deliveries)
     {
         _app = app;
         Address = address;
@@ -31,9 +31,9 @@ internal sealed class TraceReceiver : IAsyncDisposable
     }
 
     public Uri Address { get; }
-    public IReadOnlyList<ExportDelivery> Deliveries => [.. _deliveries];
+    public IReadOnlyList<OtlpDelivery> Deliveries => [.. _deliveries];
 
-    public static async Task<TraceReceiver> StartAsync(OtlpReceiver capture, QylTelemetry collector,
+    public static async Task<OtlpRelay> StartAsync(OtlpReceiver capture, CollectorClient collector,
         CancellationToken cancellationToken = default)
     {
         var builder = WebApplication.CreateSlimBuilder();
@@ -41,7 +41,7 @@ internal sealed class TraceReceiver : IAsyncDisposable
         _ = builder.WebHost.UseUrls("http://127.0.0.1:0");
         _ = builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 16 * 1024 * 1024);
         var app = builder.Build();
-        var deliveries = new ConcurrentQueue<ExportDelivery>();
+        var deliveries = new ConcurrentQueue<OtlpDelivery>();
         foreach (var signal in new[] { "traces", "metrics", "logs" })
         {
             _ = app.MapPost($"/v1/{signal}", async (HttpRequest request, HttpResponse response, CancellationToken token) =>
@@ -77,7 +77,7 @@ internal sealed class TraceReceiver : IAsyncDisposable
                     captureReply = await captured.Content.ReadAsByteArrayAsync(deadline.Token).ConfigureAwait(false);
                     using var forwarded = await collector.ExportAsync($"v1/{signal}", payload, request.ContentType, encoding, deadline.Token).ConfigureAwait(false);
                     collectorReply = await forwarded.Content.ReadAsByteArrayAsync(deadline.Token).ConfigureAwait(false);
-                    deliveries.Enqueue(new ExportDelivery(signal, captureStatus, captureReply,
+                    deliveries.Enqueue(new OtlpDelivery(signal, captureStatus, captureReply,
                         (int)forwarded.StatusCode, collectorReply));
                     response.StatusCode = (int)forwarded.StatusCode;
                     response.ContentType = forwarded.Content.Headers.ContentType?.ToString();
@@ -86,7 +86,7 @@ internal sealed class TraceReceiver : IAsyncDisposable
                 }
                 catch (Exception error) when (error is HttpRequestException or OperationCanceledException)
                 {
-                    deliveries.Enqueue(new ExportDelivery(signal, captureStatus, captureReply, null, [])
+                    deliveries.Enqueue(new OtlpDelivery(signal, captureStatus, captureReply, null, [])
                     {
                         Failure = error.GetType().Name
                     });
@@ -102,7 +102,7 @@ internal sealed class TraceReceiver : IAsyncDisposable
         try
         {
             await app.StartAsync(cancellationToken).ConfigureAwait(false);
-            var receiver = new TraceReceiver(app, BoundAddress(app.Services.GetRequiredService<IServer>().Features), deliveries);
+            var receiver = new OtlpRelay(app, BoundAddress(app.Services.GetRequiredService<IServer>().Features), deliveries);
             transferred = true;
             return receiver;
         }
@@ -139,7 +139,7 @@ internal sealed class TraceReceiver : IAsyncDisposable
     }
 }
 
-internal sealed record ExportDelivery(string Signal, int? CaptureStatus, byte[] CaptureResponse,
+internal sealed record OtlpDelivery(string Signal, int? CaptureStatus, byte[] CaptureResponse,
     int? CollectorStatus, byte[] CollectorResponse)
 {
     public string? Failure { get; init; }

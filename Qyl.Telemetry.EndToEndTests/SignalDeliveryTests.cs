@@ -1,0 +1,115 @@
+using System.Diagnostics;
+using System.Net;
+using Qyl.Api.Contracts.Common;
+using Qyl.Api.Contracts.OTel.Metrics;
+
+namespace Qyl.Telemetry.EndToEndTests;
+
+[TestClass]
+[DoNotParallelize]
+public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFixture(context)
+{
+    [TestMethod]
+    public async Task Application_event_and_stored_log_retain_the_server_span_and_resource()
+    {
+        var evidence = await SendRequestAsync();
+        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
+        var completed = Assert.ContainsSingle(server.Events.Where(item => item.Name == ProbeSignals.CompletedEvent));
+        Assert.AreEqual(ProbeSignals.RequestId, completed.Attributes[ProbeSignals.RequestAttribute]);
+        Assert.IsGreaterThanOrEqualTo(server.StartTimeUnixNano, completed.TimeUnixNano);
+        Assert.IsLessThanOrEqualTo(server.EndTimeUnixNano, completed.TimeUnixNano);
+
+        var capture = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Logs.Any(log =>
+            log.TraceId == evidence.TraceId && log.EventName == ProbeSignals.CompletedLog), Context.CancellationToken);
+        var original = Assert.ContainsSingle(capture.Logs.Where(log => log.TraceId == evidence.TraceId
+            && log.EventName == ProbeSignals.CompletedLog));
+        Assert.AreEqual(server.SpanId, original.SpanId);
+        Assert.AreEqual(server.Resource.Attributes["service.instance.id"], original.Resource.Attributes["service.instance.id"]);
+        var stored = await Application.Telemetry.Collector.Client.WaitForLogsAsync(evidence.TraceId,
+            logs => logs.Any(log => log.EventName == ProbeSignals.CompletedLog), Context.CancellationToken);
+        var log = Assert.ContainsSingle(stored.Where(log => log.EventName == ProbeSignals.CompletedLog));
+        Assert.AreEqual(server.SpanId, log.SpanId);
+        Assert.AreEqual(evidence.TraceId, log.TraceId);
+        Assert.Contains(ProbeSignals.RequestId, Assert.IsInstanceOfType<AttributeValue.StringValue>(log.Body).Value);
+    }
+
+    [TestMethod]
+    public async Task Application_counter_is_attributed_by_resource_and_survives_storage()
+    {
+        var start = DateTimeOffset.UtcNow.AddSeconds(-1);
+        var evidence = await SendRequestAsync();
+        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
+        var instance = server.Resource.Attributes["service.instance.id"];
+        var capture = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Metrics.Any(metric =>
+            metric.Name == ProbeSignals.CounterName && Equals(metric.Resource.Attributes["service.instance.id"], instance)),
+            Context.CancellationToken);
+        var counter = capture.Metrics.Last(metric => metric.Name == ProbeSignals.CounterName
+            && Equals(metric.Resource.Attributes["service.instance.id"], instance));
+        Assert.AreEqual(ProbeSignals.CounterUnit, counter.Unit);
+        Assert.AreEqual(ProbeSignals.MeterName, counter.Scope?.Name);
+        var sum = Assert.IsInstanceOfType<SumData>(counter.Data);
+        Assert.IsTrue(sum.IsMonotonic);
+        Assert.AreEqual(1L, Assert.IsInstanceOfType<long>(Assert.ContainsSingle(sum.Points).Value));
+        var end = DateTimeOffset.UtcNow.AddSeconds(1);
+        var stored = await Application.Telemetry.Collector.Client.WaitForMetricAsync(ProbeSignals.CounterName, start, end,
+            metric => metric.Series.Any(series => series.Buckets.Any(bucket => bucket.Value is not null)),
+            cancellationToken: Context.CancellationToken);
+        Assert.AreEqual(ProbeSignals.CounterUnit, stored.Unit);
+        Assert.AreEqual(MetricKind.Sum, stored.Kind);
+        Assert.IsFalse(stored.Truncated);
+        var persisted = Assert.ContainsSingle(stored.Series).Buckets.Where(bucket => bucket.Value is not null).ToArray();
+        Assert.IsNotEmpty(persisted);
+        foreach (var bucket in persisted) Assert.AreEqual(1d, bucket.Value, "The stored cumulative counter must retain its measured value.");
+    }
+
+    [TestMethod]
+    [DataRow(NativeMetric.ServerDuration)]
+    [DataRow(NativeMetric.CpuTime)]
+    [DataRow(NativeMetric.WorkingSet)]
+    public async Task Native_metrics_keep_their_type_unit_scope_and_producer(NativeMetric metric)
+    {
+        var expected = metric switch
+        {
+            NativeMetric.ServerDuration => (Name: "http.server.request.duration", Unit: "s", Scope: "Microsoft.AspNetCore.Hosting", Kind: typeof(HistogramData)),
+            NativeMetric.CpuTime => (Name: "dotnet.process.cpu.time", Unit: "s", Scope: "System.Runtime", Kind: typeof(SumData)),
+            NativeMetric.WorkingSet => (Name: "dotnet.process.memory.working_set", Unit: "By", Scope: "System.Runtime", Kind: typeof(SumData)),
+            _ => throw new ArgumentOutOfRangeException(nameof(metric))
+        };
+        var evidence = await SendRequestAsync();
+        var instance = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService)).Resource.Attributes["service.instance.id"];
+        var capture = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Metrics.Any(item =>
+            item.Name == expected.Name && Equals(item.Resource.Attributes["service.instance.id"], instance)), Context.CancellationToken);
+        var observed = capture.Metrics.Where(item => item.Name == expected.Name
+            && Equals(item.Resource.Attributes["service.instance.id"], instance)).ToArray();
+        Assert.IsNotEmpty(observed);
+        foreach (var item in observed)
+        {
+            Assert.AreEqual(expected.Unit, item.Unit);
+            Assert.AreEqual(expected.Scope, item.Scope?.Name);
+            Assert.IsInstanceOfType(item.Data, expected.Kind);
+            Assert.AreEqual("dotnet", item.Resource.Attributes["telemetry.sdk.language"]);
+        }
+    }
+
+    [TestMethod]
+    public async Task Failed_application_request_keeps_error_status_and_exception_evidence()
+    {
+        var evidence = await SendRequestAsync("failure", HttpStatusCode.InternalServerError);
+        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
+        Assert.AreEqual(ActivityStatusCode.Error, server.Status);
+        Assert.Contains(item => item.Name == "exception" && item.Attributes.TryGetValue("exception.message", out var message)
+            && Equals(message, ProbeSignals.FailureMessage), server.Events,
+            $"Observed events: {string.Join("; ", server.Events.Select(item => item.Name + ":" + string.Join(", ", item.Attributes.Select(pair => pair.Key + "=" + pair.Value))))}; error.type={server.GetString("error.type")}");
+        var stored = await Application.Telemetry.Collector.Client.WaitForTraceAsync(evidence.TraceId,
+            trace => trace.GetProperty("spans").EnumerateArray().Any(span =>
+                span.GetProperty("span_id").GetString() == server.SpanId), Context.CancellationToken);
+        var span = Assert.ContainsSingle(stored.GetProperty("spans").EnumerateArray().Where(span =>
+            span.GetProperty("span_id").GetString() == server.SpanId));
+        Assert.AreEqual(2, span.GetProperty("status").GetProperty("code").GetInt32());
+        var events = await Application.Telemetry.Collector.Client.SpanEventsAsync(evidence.TraceId, Context.CancellationToken);
+        Assert.Contains(item => item is { Name: "exception", Attributes: { } attributes } && attributes.Any(attribute =>
+            attribute is { Key: "exception.message", Value: AttributeValue.StringValue { Value: ProbeSignals.FailureMessage } }), events);
+    }
+
+    public enum NativeMetric { ServerDuration, CpuTime, WorkingSet }
+}

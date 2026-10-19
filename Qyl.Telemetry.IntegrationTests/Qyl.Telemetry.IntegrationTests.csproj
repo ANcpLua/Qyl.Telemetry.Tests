@@ -1,9 +1,19 @@
 <Project Sdk="MSTest.Sdk">
-  <PropertyGroup><UsesQylCollector>true</UsesQylCollector></PropertyGroup>
+  <PropertyGroup>
+    <UsesQylCollector>true</UsesQylCollector>
+    <!-- The intentionally failing child stays outside the solution but inherits its parent's configuration. -->
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj" />
+    <ProjectReference Include="Fixtures/TelemetryInvocation.Probe/TelemetryInvocation.Probe.csproj" ReferenceOutputAssembly="false" />
+    <TestFixtureProject Include="Fixtures/TelemetryInvocation.Probe/TelemetryInvocation.Probe.csproj" />
     <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="OpenTelemetry" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Fixtures/**/*.cs" />
+    <Compile Include="Fixtures/TelemetryInvocation.Probe/ProbeContract.cs" Link="Probes/ProbeContract.cs" />
   </ItemGroup>
 </Project>

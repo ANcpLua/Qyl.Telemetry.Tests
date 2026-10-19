@@ -7,12 +7,62 @@ using StoredLogRecord = Qyl.Api.Contracts.OTel.Logs.LogRecord;
 using Qyl.Api.Contracts.OTel.Metrics;
 using Qyl.Api.Contracts.OTel.Traces;
 
-namespace Qyl.Telemetry.Tests.Architecture;
+namespace Qyl.Telemetry.Tests.Collector;
 
 /// <summary>Reads telemetry persisted by the qyl platform. The caller owns the supplied HTTP client.</summary>
 /// <param name="client">A client whose base address is the qyl collector.</param>
-public sealed class QylTelemetry(HttpClient client)
+[JetBrains.Annotations.PublicAPI]
+public sealed class CollectorClient(HttpClient client)
 {
+    public Task<JsonElement> ReadTraceAsync(string traceId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(traceId);
+        return ReadAsync<JsonElement>($"api/v1/traces/{Uri.EscapeDataString(traceId)}", cancellationToken);
+    }
+
+    public Task<JsonElement> WaitForTraceAsync(string traceId, Func<JsonElement, bool> until,
+        CancellationToken cancellationToken = default) =>
+        WaitUntilAsync(token => ReadTraceAsync(traceId, token), until, $"trace '{traceId}'", cancellationToken);
+
+    public Task<IReadOnlyList<StoredLogRecord>> WaitForLogsAsync(string traceId,
+        Func<IReadOnlyList<StoredLogRecord>, bool> until, CancellationToken cancellationToken = default) =>
+        WaitUntilAsync(token => LogsAsync(traceId, token), until, $"logs for trace '{traceId}'", cancellationToken);
+
+    public Task<MetricQueryResult> WaitForMetricAsync(string name, DateTimeOffset start, DateTimeOffset end,
+        Func<MetricQueryResult, bool> until, MetricAggregation aggregation = MetricAggregation.Last,
+        CancellationToken cancellationToken = default) =>
+        WaitUntilAsync(token => QueryMetricAsync(name, start, end, aggregation, token), until,
+            $"metric '{name}'", cancellationToken);
+
+    private static async Task<T> WaitUntilAsync<T>(Func<CancellationToken, Task<T>> read, Func<T, bool> until,
+        string operation, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(until);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(20));
+        using var polling = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+        try
+        {
+            do
+            {
+                try
+                {
+                    var result = await read(deadline.Token).ConfigureAwait(false);
+                    if (until(result)) return result;
+                }
+                catch (HttpRequestException error) when (error.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                }
+            } while (await polling.WaitForNextTickAsync(deadline.Token).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Collector did not return the required evidence for {operation}.", error);
+        }
+
+        throw new TimeoutException($"Collector did not return the required evidence for {operation}.");
+    }
+
     internal async Task<HttpResponseMessage> ExportAsync(string route, ReadOnlyMemory<byte> payload, string? contentType,
         string? contentEncoding, CancellationToken cancellationToken)
     {

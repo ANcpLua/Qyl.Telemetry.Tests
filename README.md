@@ -1,20 +1,20 @@
 # Qyl telemetry tests
 
-Active successor to [Qyl.Telemetry.Testing](https://github.com/ANcpLua/Qyl.Telemetry.Testing)
-and [mstest-architecture-prototype](https://github.com/ANcpLua/mstest-architecture-prototype).
-Their reusable receiver and architecture code is maintained here. Existing
-`Qyl.Telemetry.Testing` NuGet releases remain available to pinned consumers;
-this repository's shared support project is not currently published as a replacement package.
+Reusable test support and executable suites for Qyl-owned telemetry behavior.
+The receiver originated in [Qyl.Telemetry.Testing](https://github.com/ANcpLua/Qyl.Telemetry.Testing).
+Existing releases of that package are unchanged; this shared support project
+is not currently published as its replacement.
+The separate architecture demonstration lives in [architecture-template-fixtures](https://github.com/ANcpLua/architecture-template-fixtures).
 
 Four projects protect Qyl-owned telemetry behavior across instrumentation,
 conventions, capture, collection, storage and investigation.
 
 | Project | Responsibility |
 | --- | --- |
-| `Qyl.Telemetry.Tests` | Shared library: canonical OTLP receiver, raw and typed evidence, trace graphs, assertions and reusable architecture fixture primitives. |
-| `Qyl.Telemetry.UnitTests` | Deterministic protocol interpretation, registry validation, graph selection, architecture rules and query diagnostics with explicit inputs. |
-| `Qyl.Telemetry.IntegrationTests` | Real HTTP/gRPC and SDK export into the receiver, public `AddQyl()` registration, Collector lifecycle, persistence and recorder isolation. |
-| `Qyl.Telemetry.EndToEndTests` | Retained Orders/Payments applications and assembled architecture, failure, hosting, log and metric scenarios. |
+| `Qyl.Telemetry.Tests` | Shared library: canonical OTLP receiver, raw and typed evidence, trace graphs, assertions and isolated Collector/application fixtures. |
+| `Qyl.Telemetry.UnitTests` | Deterministic protocol interpretation, registry validation, graph selection and query diagnostics with explicit inputs. |
+| `Qyl.Telemetry.IntegrationTests` | Real HTTP/gRPC and SDK export into the receiver, public `AddQyl()` registration, Collector lifecycle, persistence and pipeline isolation. |
+| `Qyl.Telemetry.EndToEndTests` | Instrumented Qyl application-to-Collector delivery, selected capture and stored evidence. |
 
 ## Run
 
@@ -55,18 +55,18 @@ application scenarios have explicit sequential ownership.
 
 ## Delivery evidence
 
-The v16 package baseline passes **278 cases** through the solution entrypoint
-(verified 2026-10-18). It includes
-real exporter/receiver transport and application-to-Collector persistence.
-The retained Collector fixture currently launches the packaged **managed**
-`qyl.collector.dll`; investigation assertions use the Collector's REST API.
-This is managed execution against pinned public packages.
-The v16-specific selected-header/metadata regression scenarios remain follow-up work.
+The suites exercise real exporters and receivers, native MSTest composition,
+and application-to-Collector delivery. Each mutable application/Collector fixture
+owns an isolated workspace and is disposed by its consuming test.
 
-Candidate-package restore, execution of a published Native AOT Collector binary,
-and MCP protocol investigation remain subsequent delivery work. MTP execution,
-AOT publishing and MCP invocation are separate evidence boundaries. See
-[the ownership map](docs/port.md) for retained and deferred source responsibilities.
+The delivered workload uses public pinned Qyl packages, a managed application,
+and the packaged managed `qyl.collector.dll`. Investigation uses REST. Selected
+capture cases verify field identity and array fidelity through storage; native
+runner probes verify failures, data rows and source locations.
+
+Candidate-package selection, published NativeAOT execution and MCP protocol
+investigation remain separate delivery work. See [ownership](docs/port.md) and
+[implemented APIs](docs/extension-api.md).
 
 ## Agent guidance
 
@@ -77,4 +77,4 @@ policy design lives in the support skill's optional
 
 [Build infrastructure](docs/build-infrastructure/README.md) describes MSBuild,
 central packages and verification mechanics. [Implemented extension APIs](docs/extension-api.md)
-distinguishes the receiver wrapper, architecture composition and policy proposals.
+distinguishes implemented fixtures and native composition from policy proposals.

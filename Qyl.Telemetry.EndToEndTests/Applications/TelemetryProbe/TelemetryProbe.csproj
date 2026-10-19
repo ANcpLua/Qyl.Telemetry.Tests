@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><RootNamespace>Qyl.Telemetry.EndToEndTests</RootNamespace></PropertyGroup>
+  <ItemGroup><PackageReference Include="Qyl.Telemetry.Hosting" /></ItemGroup>
+  <ItemGroup><Compile Include="../../ProbeSignals.cs" Link="ProbeSignals.cs" /></ItemGroup>
+</Project>

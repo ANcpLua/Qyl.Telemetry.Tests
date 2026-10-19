@@ -1,6 +1,6 @@
 ---
 name: qyl-telemetry-unit
-description: Write or review deterministic interpretation and policy tests in Qyl.Telemetry.UnitTests, including decoding, validation, correlation, architecture decisions and assertion diagnostics.
+description: Write or review deterministic interpretation and policy tests in Qyl.Telemetry.UnitTests, including decoding, validation, correlation and assertion diagnostics.
 ---
 
 # Deterministic interpretation and policy
@@ -11,8 +11,7 @@ Target Qyl.Telemetry.UnitTests/Qyl.Telemetry.UnitTests.csproj.
 
 Use explicit inputs and independently derived expected outcomes for protocol
 decoding, captured-value transformations, exact numbers and timestamps,
-registry-driven validation, trace relationships, metric correlation, architecture
-decisions and the support library's assertions and diagnostics.
+registry-driven validation, trace relationships, metric correlation and the support library's assertions and diagnostics.
 
 Distinguish conformance, violations and insufficient evidence where the rule
 defines those outcomes. Assert type, field presence, identity and ordering when

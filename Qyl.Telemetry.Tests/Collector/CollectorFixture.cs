@@ -4,10 +4,11 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
 
-namespace Qyl.Telemetry.Tests.Architecture;
+namespace Qyl.Telemetry.Tests.Collector;
 
 /// <summary>Owns an isolated instance of the published qyl collector for a test run.</summary>
-internal sealed class QylCollector : IAsyncDisposable
+[JetBrains.Annotations.PublicAPI]
+public sealed class CollectorFixture : IAsyncDisposable
 {
     private readonly Process _process;
     private readonly HttpClient _client;
@@ -15,7 +16,7 @@ internal sealed class QylCollector : IAsyncDisposable
     private readonly Task<string> _error;
     private bool _disposed;
 
-    private QylCollector(Process process, Uri address, string directory)
+    private CollectorFixture(Process process, Uri address, string directory)
     {
         _process = process;
         Address = address;
@@ -23,19 +24,21 @@ internal sealed class QylCollector : IAsyncDisposable
         _client = new HttpClient { BaseAddress = address };
         _output = process.StandardOutput.ReadToEndAsync();
         _error = process.StandardError.ReadToEndAsync();
-        Telemetry = new QylTelemetry(_client);
+        Client = new CollectorClient(_client);
     }
 
     public Uri Address { get; }
-    public QylTelemetry Telemetry { get; }
+    public CollectorClient Client { get; }
     public string DataDirectory { get; }
 
-    public static async Task<QylCollector> StartAsync(string assembly, CancellationToken cancellationToken = default)
+    public static async Task<CollectorFixture> StartAsync(string assembly, string? workspace = null,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         using var reservation = new TcpListener(IPAddress.Loopback, 0);
         reservation.Start();
         var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
-        var directory = Path.Combine(AppContext.BaseDirectory, "qyl-data", Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(workspace ?? Path.GetTempPath(), "qyl-collector-" + Guid.NewGuid().ToString("N"));
         _ = Directory.CreateDirectory(directory);
         var start = new ProcessStartInfo("dotnet")
         {
@@ -63,7 +66,7 @@ internal sealed class QylCollector : IAsyncDisposable
         start.Environment["Logging__LogLevel__Default"] = "Warning";
         reservation.Stop();
         var process = Process.Start(start)!;
-        var collector = new QylCollector(process, new Uri($"http://127.0.0.1:{port}/"), directory);
+        var collector = new CollectorFixture(process, new Uri($"http://127.0.0.1:{port}/"), directory);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
         var startup = WaitUntilReadyAsync(deadline.Token);
@@ -71,13 +74,17 @@ internal sealed class QylCollector : IAsyncDisposable
         {
             return await startup.ConfigureAwait(false);
         }
-        catch (Exception)
+        catch (Exception startupFailure)
         {
-            await collector.DisposeAsync().ConfigureAwait(false);
+            try { await collector.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception cleanupFailure)
+            {
+                throw new AggregateException("Collector startup and cleanup both failed.", startupFailure, cleanupFailure);
+            }
             return await startup.ConfigureAwait(false);
         }
 
-        async Task<QylCollector> WaitUntilReadyAsync(CancellationToken token)
+        async Task<CollectorFixture> WaitUntilReadyAsync(CancellationToken token)
         {
             while (true)
             {

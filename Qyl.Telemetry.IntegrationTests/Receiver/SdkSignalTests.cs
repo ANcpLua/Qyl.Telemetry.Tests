@@ -26,7 +26,7 @@ public sealed class SdkSignalTests
     public async Task Official_sdk_exports_trace_named_log_and_partitioned_counter(OtlpTransport transport)
     {
         var sourceName = "sdk-" + Guid.NewGuid().ToString("N");
-        var result = await QylTest.TraceAsync(test =>
+        var result = await TelemetryCapture.TraceAsync(test =>
             {
                 var resource = ResourceBuilder.CreateEmpty().AddAttributes(new Dictionary<string, object>
                         { ["service.name"] = "sdk-service", [test.Partition.ResourceAttribute] = test.Partition.Value },

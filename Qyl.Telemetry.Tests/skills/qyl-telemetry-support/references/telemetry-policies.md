@@ -12,10 +12,16 @@ the smallest suitable native MSTest mechanism.
 - [Ingestion and persistence](#ingestion-and-persistence)
 - [Investigation](#investigation)
 - [Delivery and lifecycle](#delivery-and-lifecycle)
-- [Architecture relationships](#architecture-relationships)
 - [Data providers](#data-providers)
 
 ## Selection and composition
+
+Existing building blocks: `TracePerTestAttribute` supplies invocation identity;
+`TelemetryCapture.TraceAsync` and `TelemetryPipeline` collect real evidence;
+`Assert.That.HasCapturedValues` verifies stored string-array fidelity;
+`RegistryConformance.Check` evaluates registry definitions. Prefer these concrete
+APIs before implementing a proposed attribute. The Collector/application fixtures
+use per-invocation native TestContext ownership and retain failure evidence.
 
 Keep expected application values, producer selection and observation windows
 in the consuming scenario. Reuse published registry and API definitions while
@@ -29,9 +35,9 @@ Use an assertion extension for a repeated expectation, native data mechanisms
 for repeated inputs and execution composition for an invocation-wide obligation.
 Passive policy attributes share one executor; they do not each rerun the test.
 Inspect the resolved MSTest APIs and the existing
-[ArchitectureAttribute](../../../Architecture/ArchitectureAttribute.cs) and
-[method executor](../../../Architecture/ArchitectureTestMethodAttribute.cs).
-[QylTelemetry](../../../Architecture/QylTelemetry.cs) is an investigation reader.
+[TracePerTestAttribute](../../../TelemetryCapture.cs).
+[CollectorClient](../../../Collector/CollectorClient.cs) is the investigation reader;
+[TelemetryPipeline](../../../Collector/TelemetryPipeline.cs) owns capture and delivery.
 
 When implementing an entry, replace its proposed status and empty implementation
 with links to the actual declaration and its consuming executor or assertion.
@@ -177,27 +183,6 @@ Status: proposed. Implementation: none.
 - Applies when: a scenario claims execution of a designated published NativeAOT artifact.
 - Evidence: artifact role, path, RID and hash, with the actual launched executable and observed behavior.
 - Decision: require execution of that artifact. Publish success or managed execution cannot establish native behavior. Select application and Collector roles explicitly.
-
-## Architecture relationships
-
-### ServiceOwnedStores
-
-Status: proposed. Implementation: none.
-- Applies when: the exercised services promise separate store ownership.
-- Evidence: declared service/store ownership and observed attributable store operations for every required service.
-- Decision: require the selected ownership relationships without foreign or shared access that violates the declaration. Missing required service/store observations are insufficient evidence.
-
-### SharedStore
-
-Status: proposed. Implementation: none.
-- Applies when: declared services intentionally share a store.
-- Evidence: the expected service set, selected shared-store identity and attributable operations from each required service.
-- Decision: require the declared shared relationship within the exercised observations. Store-shaped spans establish observed relationships; business persistence requires actual stored business data and readback.
-
-[Monolith, Microservices and DistributedMonolith](../../../Architecture/ArchitectureAttribute.cs)
-are fixture profiles. Keep their verdicts scoped to measured behavior. The
-[Orders workload store](../../../../Qyl.Telemetry.EndToEndTests/Applications/Orders.Api/Store.cs)
-is a telemetry model; Collector persistence is a separate storage contract.
 
 ## Data providers
 
