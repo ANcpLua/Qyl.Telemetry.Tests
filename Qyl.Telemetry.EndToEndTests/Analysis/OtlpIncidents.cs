@@ -1,0 +1,154 @@
+using System.Security.Cryptography;
+using System.Text;
+using Google.Protobuf;
+using OpenTelemetry.Proto.Collector.Logs.V1;
+using OpenTelemetry.Proto.Collector.Metrics.V1;
+using OpenTelemetry.Proto.Collector.Trace.V1;
+using OpenTelemetry.Proto.Common.V1;
+using OpenTelemetry.Proto.Logs.V1;
+using OpenTelemetry.Proto.Metrics.V1;
+using OpenTelemetry.Proto.Resource.V1;
+using OpenTelemetry.Proto.Trace.V1;
+using Qyl.Telemetry.Tests.Collector;
+using OtlpLogRecord = OpenTelemetry.Proto.Logs.V1.LogRecord;
+using OtlpSpan = OpenTelemetry.Proto.Trace.V1.Span;
+
+namespace Qyl.Telemetry.EndToEndTests.Analysis;
+
+internal readonly record struct SpanKey(string TraceId, string SpanId);
+
+/// <summary>Builds incidents as OTLP protobuf and sends them through the Collector's real ingestion routes.</summary>
+internal sealed class OtlpIncidents
+{
+    internal const ulong Millisecond = 1_000_000;
+    internal const ulong Minute = 60_000 * Millisecond;
+    private readonly List<ResourceSpans> _spans = [];
+    private readonly List<ResourceLogs> _logs = [];
+    private readonly List<ResourceMetrics> _metrics = [];
+    private readonly Dictionary<string, SpanKey> _keys = new(StringComparer.Ordinal);
+
+    internal IReadOnlyDictionary<string, SpanKey> Keys => _keys;
+
+    /// <summary>A deterministic hex identity derived from a scenario key.</summary>
+    internal static string Id(string key, int length) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..length];
+
+    internal static ulong Nanoseconds(DateTimeOffset time) => (ulong)time.ToUnixTimeMilliseconds() * Millisecond;
+
+    internal static DateTimeOffset Time(ulong nanoseconds) => DateTimeOffset.FromUnixTimeMilliseconds((long)(nanoseconds / Millisecond));
+
+    internal SpanKey Span(string key, string service, string name, ulong at, double durationMs = 20, bool error = false,
+        string? session = null, string? parent = null, string? trace = null, IReadOnlyDictionary<string, object>? attributes = null,
+        IReadOnlyDictionary<string, object>? resource = null, string? message = null, string? spanId = null)
+    {
+        var identity = new SpanKey(trace ?? Id(key, 32), spanId ?? Id(key, 16));
+        var span = new OtlpSpan
+        {
+            TraceId = Bytes(identity.TraceId), SpanId = Bytes(identity.SpanId), Name = name, Kind = OtlpSpan.Types.SpanKind.Server,
+            StartTimeUnixNano = at, EndTimeUnixNano = at + (ulong)(durationMs * Millisecond),
+            Status = new Status { Code = error ? Status.Types.StatusCode.Error : Status.Types.StatusCode.Ok, Message = message ?? "" }
+        };
+        if (parent is not null) span.ParentSpanId = Bytes(parent);
+        span.Attributes.Add(Attributes(attributes));
+        if (session is not null) span.Attributes.Add(Pair("session.id", session));
+        _spans.Add(new ResourceSpans
+        {
+            Resource = Resource(service, resource),
+            ScopeSpans = { new ScopeSpans { Scope = new InstrumentationScope { Name = "qyl-answer-key" }, Spans = { span } } }
+        });
+        _keys[key] = identity;
+        return identity;
+    }
+
+    internal void Log(string service, ulong at, int severity, string body, SpanKey? span = null,
+        IReadOnlyDictionary<string, object>? attributes = null)
+    {
+        var log = new OtlpLogRecord
+        {
+            TimeUnixNano = at, ObservedTimeUnixNano = at, SeverityNumber = (SeverityNumber)severity,
+            SeverityText = severity >= 17 ? "ERROR" : "INFO", Body = Value(body)
+        };
+        if (span is { } owner)
+        {
+            log.TraceId = Bytes(owner.TraceId);
+            log.SpanId = Bytes(owner.SpanId);
+        }
+        log.Attributes.Add(Attributes(attributes));
+        _logs.Add(new ResourceLogs
+        {
+            Resource = Resource(service, null),
+            ScopeLogs = { new ScopeLogs { Scope = new InstrumentationScope { Name = "qyl-answer-key" }, LogRecords = { log } } }
+        });
+    }
+
+    internal void Metric(string service, Metric metric) => _metrics.Add(new ResourceMetrics
+    {
+        Resource = Resource(service, null),
+        ScopeMetrics = { new ScopeMetrics { Scope = new InstrumentationScope { Name = "qyl-answer-key" }, Metrics = { metric } } }
+    });
+
+    internal static IEnumerable<KeyValue> Attributes(IReadOnlyDictionary<string, object>? attributes) =>
+        (attributes ?? new Dictionary<string, object>()).Select(pair => Pair(pair.Key, pair.Value));
+
+    internal static KeyValue Pair(string key, object value) => new() { Key = key, Value = Value(value) };
+
+    /// <summary>Sends every pending signal and requires each export to be accepted completely.</summary>
+    internal async Task SendAsync(CollectorClient client, CancellationToken cancellationToken)
+    {
+        if (_spans.Count > 0)
+        {
+            var request = new ExportTraceServiceRequest();
+            request.ResourceSpans.Add(_spans);
+            var response = ExportTraceServiceResponse.Parser.ParseFrom(await ExportAsync(client, "v1/traces", request, cancellationToken));
+            Assert.AreEqual(0L, response.PartialSuccess?.RejectedSpans ?? 0, response.PartialSuccess?.ErrorMessage);
+        }
+
+        if (_logs.Count > 0)
+        {
+            var request = new ExportLogsServiceRequest();
+            request.ResourceLogs.Add(_logs);
+            var response = ExportLogsServiceResponse.Parser.ParseFrom(await ExportAsync(client, "v1/logs", request, cancellationToken));
+            Assert.AreEqual(0L, response.PartialSuccess?.RejectedLogRecords ?? 0, response.PartialSuccess?.ErrorMessage);
+        }
+
+        if (_metrics.Count > 0)
+        {
+            var request = new ExportMetricsServiceRequest();
+            request.ResourceMetrics.Add(_metrics);
+            var response = ExportMetricsServiceResponse.Parser.ParseFrom(await ExportAsync(client, "v1/metrics", request, cancellationToken));
+            Assert.AreEqual(0L, response.PartialSuccess?.RejectedDataPoints ?? 0, response.PartialSuccess?.ErrorMessage);
+        }
+
+        _spans.Clear();
+        _logs.Clear();
+        _metrics.Clear();
+    }
+
+    private static async Task<byte[]> ExportAsync(CollectorClient client, string route, IMessage request, CancellationToken cancellationToken)
+    {
+        using var response = await client.ExportAsync(route, request.ToByteArray(), "application/x-protobuf", null, cancellationToken);
+        var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        Assert.IsTrue(response.IsSuccessStatusCode, $"{route} returned {(int)response.StatusCode}: {Encoding.UTF8.GetString(body)}");
+        return body;
+    }
+
+    private static Resource Resource(string service, IReadOnlyDictionary<string, object>? attributes)
+    {
+        var resource = new Resource { Attributes = { Pair("service.name", service) } };
+        resource.Attributes.Add(Attributes(attributes));
+        return resource;
+    }
+
+    private static AnyValue Value(object value) => value switch
+    {
+        string text => new AnyValue { StringValue = text },
+        bool flag => new AnyValue { BoolValue = flag },
+        int number => new AnyValue { IntValue = number },
+        long number => new AnyValue { IntValue = number },
+        double number => new AnyValue { DoubleValue = number },
+        string[] items => new AnyValue { ArrayValue = new ArrayValue { Values = { items.Select(Value) } } },
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported OTLP attribute value.")
+    };
+
+    private static ByteString Bytes(string hex) => ByteString.CopyFrom(Convert.FromHexString(hex));
+}

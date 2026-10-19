@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Qyl.Api.Contracts.Common.Pagination;
 using StoredLogRecord = Qyl.Api.Contracts.OTel.Logs.LogRecord;
 using Qyl.Api.Contracts.OTel.Metrics;
@@ -149,6 +150,22 @@ public sealed class CollectorClient(HttpClient client)
         var route = $"api/v1/metrics/{Uri.EscapeDataString(name)}/query"
             + $"?start_time={Timestamp(start)}&end_time={Timestamp(end)}&aggregation={aggregation.ToString().ToLowerInvariant()}";
         return ReadAsync<MetricQueryResult>(route, cancellationToken);
+    }
+
+    /// <summary>Runs one analysis operation, such as triage or verify_fix, through the Collector's HTTP route.</summary>
+    /// <param name="operation">The analysis route and MCP tool name.</param>
+    /// <param name="input">The tool input, in its snake_case wire form.</param>
+    public async Task<T> AnalyzeAsync<T>(string operation, JsonObject input, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operation);
+        ArgumentNullException.ThrowIfNull(input);
+        using var response = await client.PostAsJsonAsync($"api/v1/analysis/{Uri.EscapeDataString(operation)}", input, cancellationToken)
+            .ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"{operation} returned {(int)response.StatusCode}: {body}", null, response.StatusCode);
+        return JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web)
+            ?? throw new InvalidDataException($"{operation} returned an empty JSON response.");
     }
 
     private async Task<T> ReadAsync<T>(string route, CancellationToken cancellationToken) =>

@@ -30,15 +30,37 @@ internal sealed class DeliveryArtifacts(TestContext context)
     private string _directory = "";
     private int _command;
 
-    internal async Task<PreparedDelivery> PrepareAsync()
+    /// <summary>Installs the pinned npm MCP server once per version and returns its stdio entrypoint.</summary>
+    internal async Task<string> InstallMcpAsync()
     {
-        var inputFile = Path.Combine(AppContext.BaseDirectory, "delivery-inputs.json");
-        var inputText = await File.ReadAllTextAsync(inputFile, _cancellation);
+        var (_, inputs, root, _) = await ReadInputsAsync();
+        _directory = Path.Combine(root, "artifacts", "mcp", $"{inputs.Mcp.Name}-{inputs.Mcp.Version}");
+        Directory.CreateDirectory(_directory);
+        var entryPoint = Path.Combine(_directory, "node_modules", inputs.Mcp.Name, "dist", "main.js");
+        if (!File.Exists(entryPoint))
+            await RunAsync("install-published-mcp", "npm", ["install", "--prefix", _directory,
+                "--ignore-scripts", "--no-audit", "--no-fund", "--save-exact", $"{inputs.Mcp.Name}@{inputs.Mcp.Version}"], root);
+        using var npm = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(_directory, "package-lock.json"), _cancellation));
+        var package = npm.RootElement.GetProperty("packages").GetProperty("node_modules/" + inputs.Mcp.Name);
+        if (package.GetProperty("version").GetString() != inputs.Mcp.Version
+            || package.GetProperty("integrity").GetString() != inputs.Mcp.Integrity)
+            throw new InvalidDataException("The MCP package does not match its pinned registry identity.");
+        return entryPoint;
+    }
+
+    private async Task<(string Text, DeliveryInputs Inputs, string Root, string Project)> ReadInputsAsync()
+    {
+        var inputText = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "delivery-inputs.json"), _cancellation);
         var inputs = JsonSerializer.Deserialize<DeliveryInputs>(inputText, Json)
             ?? throw new InvalidDataException("Delivery inputs are missing.");
         var project = (await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "delivery-project.txt"), _cancellation)).Trim();
+        return (inputText, inputs, Path.GetFullPath(Path.Combine(Path.GetDirectoryName(project)!, "../../..")), project);
+    }
+
+    internal async Task<PreparedDelivery> PrepareAsync()
+    {
+        var (inputText, inputs, root, project) = await ReadInputsAsync();
         var applicationDirectory = Path.GetDirectoryName(project)!;
-        var root = Path.GetFullPath(Path.Combine(applicationDirectory, "../../.."));
         var semanticProject = (await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "semantic-project.txt"), _cancellation)).Trim();
         var fingerprint = new StringBuilder(inputText).Append(RuntimeInformation.RuntimeIdentifier);
         foreach (var path in new[] { project, Path.Combine(applicationDirectory, "Program.cs"),
@@ -94,25 +116,14 @@ internal sealed class DeliveryArtifacts(TestContext context)
             ?? throw new InvalidDataException("Native Collector identity is missing.");
         collectorArtifact.VerifyIntegrity();
 
-        var mcp = Path.Combine(_directory, "mcp");
-        Directory.CreateDirectory(mcp);
-        if (!File.Exists(Path.Combine(mcp, "node_modules", inputs.Mcp.Name, "dist", "main.js")))
-            await RunAsync("install-published-mcp", "npm", ["install", "--prefix", mcp,
-                "--ignore-scripts", "--no-audit", "--no-fund", "--save-exact", $"{inputs.Mcp.Name}@{inputs.Mcp.Version}"], root);
-        using (var npm = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(mcp, "package-lock.json"), _cancellation)))
-        {
-            var package = npm.RootElement.GetProperty("packages").GetProperty("node_modules/" + inputs.Mcp.Name);
-            if (package.GetProperty("version").GetString() != inputs.Mcp.Version
-                || package.GetProperty("integrity").GetString() != inputs.Mcp.Integrity)
-                throw new InvalidDataException("The MCP package does not match its pinned registry identity.");
-        }
+        var mcpEntryPoint = await new DeliveryArtifacts(context).InstallMcpAsync();
         var executableExtension = OperatingSystem.IsWindows() ? ".exe" : "";
         var prepared = new PreparedDelivery(inputs,
             PublishedExecutable.Identify(Path.Combine(managed, "TelemetryProbe.dll"), ExecutableFormat.ManagedAssembly, rid),
             PublishedExecutable.Identify(Path.Combine(native, "TelemetryProbe" + executableExtension), ExecutableFormat.NativeAot, rid),
             collectorArtifact,
             PublishedExecutable.Identify(Path.Combine(semanticNative, "SemanticContractProbe" + executableExtension), ExecutableFormat.NativeAot, rid),
-            packages, Path.Combine(mcp, "node_modules", inputs.Mcp.Name, "dist", "main.js"), manifestPath);
+            packages, mcpEntryPoint, manifestPath);
         Verify(prepared);
         await File.WriteAllTextAsync(manifestPath + ".tmp", JsonSerializer.Serialize(prepared, Json), _cancellation);
         File.Move(manifestPath + ".tmp", manifestPath, overwrite: true);

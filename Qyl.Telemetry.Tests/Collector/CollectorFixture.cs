@@ -17,9 +17,12 @@ public sealed class CollectorFixture : IAsyncDisposable
     private bool _disposed;
     private bool _ready;
 
-    private CollectorFixture(Process process, Uri address, string directory)
+    private readonly PublishedExecutable _executable;
+
+    private CollectorFixture(Process process, PublishedExecutable executable, Uri address, string directory)
     {
         _process = process;
+        _executable = executable;
         Address = address;
         DataDirectory = directory;
         _client = new HttpClient { BaseAddress = address };
@@ -40,16 +43,30 @@ public sealed class CollectorFixture : IAsyncDisposable
             System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier), workspace, cancellationToken);
     }
 
-    public static async Task<CollectorFixture> StartAsync(PublishedExecutable executable, string? workspace = null,
+    public static Task<CollectorFixture> StartAsync(PublishedExecutable executable, string? workspace = null,
         CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var directory = Path.Combine(workspace ?? Path.GetTempPath(), "qyl-collector-" + Guid.NewGuid().ToString("N"));
+        return StartAsync(executable, directory, created: true, cancellationToken);
+    }
+
+    /// <summary>Stops this Collector gracefully and starts the same executable on the same data directory.</summary>
+    public async Task<CollectorFixture> RestartAsync(CancellationToken cancellationToken = default)
+    {
+        await DisposeAsync().ConfigureAwait(false);
+        return await StartAsync(_executable, DataDirectory, created: false, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<CollectorFixture> StartAsync(PublishedExecutable executable, string directory, bool created,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var start = executable.StartInfo();
         using var reservation = new TcpListener(IPAddress.Loopback, 0);
         reservation.Start();
         var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
-        var directory = Path.Combine(workspace ?? Path.GetTempPath(), "qyl-collector-" + Guid.NewGuid().ToString("N"));
-        _ = Directory.CreateDirectory(directory);
+        if (created) _ = Directory.CreateDirectory(directory);
         start.RedirectStandardOutput = true;
         start.RedirectStandardError = true;
         foreach (var key in start.Environment.Keys.Where(key => key.StartsWith("QYL_", StringComparison.Ordinal)
@@ -71,7 +88,7 @@ public sealed class CollectorFixture : IAsyncDisposable
         start.Environment["Logging__LogLevel__Default"] = "Warning";
         reservation.Stop();
         var process = Process.Start(start)!;
-        var collector = new CollectorFixture(process, new Uri($"http://127.0.0.1:{port}/"), directory);
+        var collector = new CollectorFixture(process, executable, new Uri($"http://127.0.0.1:{port}/"), directory);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
         var startup = WaitUntilReadyAsync(deadline.Token);
