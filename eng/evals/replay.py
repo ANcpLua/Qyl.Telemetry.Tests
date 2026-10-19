@@ -71,14 +71,14 @@ def apply_variant(source: pathlib.Path, spec: dict, scratch: pathlib.Path) -> pa
     return target
 
 
-def claude_command(case: dict, args: argparse.Namespace, mcp_config: pathlib.Path, plugin_dir: pathlib.Path,
+def claude_command(case: dict, args: argparse.Namespace, mcp_config: pathlib.Path, plugin_dir: pathlib.Path | None,
                    server: str) -> list[str]:
     return [
         "claude", "-p", case["prompt"],
         "--model", args.model,
         "--strict-mcp-config", "--mcp-config", str(mcp_config),
         "--setting-sources", "project",
-        "--plugin-dir", str(plugin_dir),
+        *([] if plugin_dir is None else ["--plugin-dir", str(plugin_dir)]),
         "--allowedTools", f"mcp__{server}", "ToolSearch", "Skill",
         "--max-turns", str(case.get("max_turns", 12)),
         "--no-session-persistence",
@@ -249,6 +249,8 @@ def main() -> int:
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--model", default="sonnet")
     parser.add_argument("--plugin-dir", help="plugin to load; default: the installed qyl plugin cache")
+    parser.add_argument("--no-plugin", action="store_true",
+                        help="load no plugin: the connector as a claude.ai reviewer sees it, server instructions and tool descriptions only")
     parser.add_argument("--variant", help="A/B spec (evals/qyl-investigate/variants/*.json) applied to a copy of the plugin")
     parser.add_argument("--label", help="results directory suffix; default: variant name or baseline")
     parser.add_argument("--judge", action="store_true", help="also grade each answer against the rubric with --judge-model")
@@ -266,9 +268,11 @@ def main() -> int:
         sys.exit("no case matched")
 
     scratch = pathlib.Path(tempfile.mkdtemp(prefix="qyl-eval-"))
-    plugin_dir = pathlib.Path(args.plugin_dir).resolve() if args.plugin_dir else installed_plugin_dir()
-    label = args.label or "baseline"
+    plugin_dir = None if args.no_plugin else (pathlib.Path(args.plugin_dir).resolve() if args.plugin_dir else installed_plugin_dir())
+    label = args.label or ("no-plugin" if args.no_plugin else "baseline")
     if args.variant:
+        if plugin_dir is None:
+            sys.exit("--variant needs a plugin to change; drop --no-plugin")
         spec = load_json(pathlib.Path(args.variant))
         plugin_dir = apply_variant(plugin_dir, spec, scratch)
         label = args.label or spec.get("name", "variant")
@@ -311,7 +315,7 @@ def main() -> int:
             print(f"{case['id']} run {index}: {status}; score {run['scores']['score']}; tools {[call['tool'] for call in run['tool_calls']]}; "
                   f"cost {run['cost_usd']}; notes {run['scores']['notes']}")
 
-    summary = summarize(case_runs, {"label": label, "model": args.model, "plugin_dir": str(plugin_dir),
+    summary = summarize(case_runs, {"label": label, "model": args.model, "plugin_dir": "none" if plugin_dir is None else str(plugin_dir),
                                     "variant": args.variant, "bound_to": names["bound_to"], "started": started.isoformat(timespec="seconds"),
                                     "judge": args.judge_model if args.judge else None})
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")

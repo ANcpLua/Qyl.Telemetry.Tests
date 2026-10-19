@@ -27,6 +27,7 @@ python3 -I eng/evals/replay.py --judge               # plus an LLM grade of each
 python3 -I eng/evals/replay.py --case what-changed --runs 1 --model opus
 python3 -I eng/evals/replay.py --tag writes          # the save-query case; it deletes what it saved
 python3 -I eng/evals/replay.py --dry-run             # print the claude commands only
+python3 -I eng/evals/replay.py --no-plugin --tag read --tag writes --model opus --judge   # the reviewer's view: no plugin, server instructions and tool descriptions only
 ```
 
 Results land in `results/<timestamp>-<label>/`: the raw stream and the parsed run per case
