@@ -61,6 +61,30 @@ internal sealed class AnalysisSession : IAsyncDisposable
             ?? throw new InvalidDataException($"{tool} returned empty structured content.");
     }
 
+    /// <summary>Asks one analysis question that must fail and returns the HTTP status (null on MCP) with the error as text.</summary>
+    internal async Task<(int? Status, string Error)> AskErrorAsync(AnalysisPath path, string tool, JsonObject input, CancellationToken cancellationToken)
+    {
+        if (path == AnalysisPath.Http)
+        {
+            try
+            {
+                await Client.AnalyzeAsync<JsonElement>(tool, input, cancellationToken);
+            }
+            catch (HttpRequestException rejected)
+            {
+                return ((int?)rejected.StatusCode, rejected.Message);
+            }
+            Assert.Fail($"{tool} succeeded over HTTP but was expected to fail.");
+        }
+        var result = await _mcp.CallToolAsync(new CallToolRequestParams
+        {
+            Name = tool,
+            Arguments = input.ToDictionary(pair => pair.Key, pair => JsonSerializer.SerializeToElement(pair.Value))
+        }, cancellationToken);
+        Assert.IsTrue(result.IsError ?? false, $"{tool} succeeded over MCP but was expected to fail: {JsonSerializer.Serialize(result.StructuredContent)}");
+        return (null, JsonSerializer.Serialize(result.StructuredContent) + JsonSerializer.Serialize(result.Content));
+    }
+
     /// <summary>Restarts the Collector on its data directory and reconnects the MCP server to it.</summary>
     internal async Task RestartAsync(CancellationToken cancellationToken)
     {
