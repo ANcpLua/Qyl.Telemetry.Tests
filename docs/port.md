@@ -43,16 +43,25 @@ Resolve the revision matching the selected packages before using these sources.
 - [qyl-api-schema](https://github.com/ANcpLua/qyl-api-schema): public request,
   response, pagination and stream contracts, schemas and models.
 
-The delivery fixture currently executes a managed application and the packaged
-managed Collector, then reads through REST. Candidate-package selection,
-published NativeAOT artifact execution and MCP protocol verification are distinct
-future scenarios; they are not established by this baseline.
+Baseline delivery executes a managed application and the packaged managed
+Collector, then reads through REST. The candidate fixture separately packs the
+source commits in `Delivery/inputs.json`, verifies restored package hashes,
+publishes native application and Collector artifacts, and invokes the pinned
+npm MCP server through the official C# stdio client. Its two execution rows run
+managed and native application binaries against the native Collector.
 
-The application probe selects its own log category. Its log assertions establish
-workload delivery and correlation, not the shape of every framework operational
-log. The pinned stack's unhandled Kestrel log repeats `ConnectionId` between its
-message state and scope; validating that producer remains separate work. Capture
-still rejects malformed exported records and retains their receipts.
+The semantic contract consumer executes as NativeAOT and checks candidate public
+typed views and generated metadata. Production-local generator fixtures remain
+in SemanticConventions; these cases check the delivered consumer boundary.
+Publication is class-owned and reusable; every delivery invocation owns its
+processes, workspace, receiver and evidence partition.
+
+The .NET OTLP exporter can repeat a typed attribute when it flattens ILogger
+message state and scopes; Kestrel's unhandled-error log repeats `ConnectionId`.
+The receiver follows the Collector's policy: identical typed entries coalesce in
+the projected record with a warning, conflicting values remain invalid, and the
+original protobuf request retains every entry. The real failure scenario verifies
+the Kestrel record, correlation and warning without filtering that logger out.
 
 Official protocol inputs and their provenance remain in
 `Qyl.Telemetry.Tests/Protos/upstream.json`. Preserve the accompanying license and

@@ -20,18 +20,33 @@ public sealed class InstrumentedApplicationFixture : IAsyncDisposable
     public TelemetryPipeline Telemetry { get; }
     public HttpClient Client { get; }
 
-    public static async Task<InstrumentedApplicationFixture> StartAsync(string assembly, TestContext context,
+    public static Task<InstrumentedApplicationFixture> StartAsync(string assembly, TestContext context,
         IReadOnlyDictionary<string, string>? environment = null)
     {
         ArgumentNullException.ThrowIfNull(context);
+        context.CancellationToken.ThrowIfCancellationRequested();
+        return StartCoreAsync(PublishedExecutable.Identify(assembly, ExecutableFormat.ManagedAssembly,
+            System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier), null, context, environment);
+    }
+
+    public static Task<InstrumentedApplicationFixture> StartAsync(PublishedExecutable application,
+        PublishedExecutable collector, TestContext context, IReadOnlyDictionary<string, string>? environment = null) =>
+        StartCoreAsync(application, collector, context, environment);
+
+    private static async Task<InstrumentedApplicationFixture> StartCoreAsync(PublishedExecutable executable,
+        PublishedExecutable? collector, TestContext context, IReadOnlyDictionary<string, string>? environment)
+    {
+        ArgumentNullException.ThrowIfNull(context);
         var cancellationToken = context.CancellationToken;
-        var telemetry = new TelemetryPipeline(context);
+        cancellationToken.ThrowIfCancellationRequested();
+        executable.VerifyIntegrity();
+        var telemetry = new TelemetryPipeline(context, collector);
         QylApplication? application = null;
         try
         {
             await telemetry.StartAsync(cancellationToken).ConfigureAwait(false);
             var builder = new QylApplicationBuilder { StartupTimeoutSeconds = 30, MaxRestarts = 0 };
-            var service = builder.AddDotnetService(ServiceName, assembly)
+            var service = builder.AddExecutable(ServiceName, executable.Command, executable.Arguments, Path.GetDirectoryName(executable.Path))
                 .WithoutEnvironmentPrefix("OTEL_")
                 .WithoutEnvironmentPrefix("QYL_")
                 .WithoutEnvironmentPrefix("services__")

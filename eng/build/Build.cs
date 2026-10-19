@@ -57,6 +57,22 @@ internal sealed class Build : FalloutBuild
     {
         var report = RootDirectory / "artifacts/inspection.sarif";
         DotNet($"tool run jb -- inspectcode \"{RootDirectory / "eng/inspection.slnx"}\" --no-build --no-updates --disable-settings-layers=GlobalAll --properties=Configuration=Release --severity=INFO --format=Sarif --output=\"{report}\"");
+        ValidateInspection(report);
+    });
+
+    private Target InspectCandidate => target => target.DependsOn(Coverage).Executes(() =>
+    {
+        using var context = JsonDocument.Parse(File.ReadAllText(RootDirectory / "artifacts/candidate-inspection.json"));
+        var root = context.RootElement;
+        var project = root.GetProperty("project").GetString();
+        var properties = $"Configuration=Release;DirectoryPackagesPropsPath={root.GetProperty("packageOverrides").GetString()};ArtifactsPath={root.GetProperty("artifacts").GetString()};RuntimeIdentifier={root.GetProperty("runtimeIdentifier").GetString()}";
+        var report = RootDirectory / "artifacts/candidate-inspection.sarif";
+        DotNet($"tool run jb -- inspectcode \"{project}\" --no-build --no-updates --disable-settings-layers=GlobalAll --properties=\"{properties}\" --severity=INFO --format=Sarif --output=\"{report}\"");
+        ValidateInspection(report);
+    });
+
+    private static void ValidateInspection(AbsolutePath report)
+    {
         using var document = JsonDocument.Parse(File.ReadAllText(report));
         var runs = document.RootElement.GetProperty("runs").EnumerateArray().ToArray();
         if (runs.Length == 0 || runs.Any(run => run.TryGetProperty("invocations", out var invocations)
@@ -72,7 +88,7 @@ internal sealed class Build : FalloutBuild
         {
             throw new InvalidOperationException($"InspectCode reported {count} findings: {report}");
         }
-    });
+    }
 
-    private Target Check => target => target.DependsOn(Coverage, InspectCode);
+    private Target Check => target => target.DependsOn(Coverage, InspectCode, InspectCandidate);
 }

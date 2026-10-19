@@ -50,14 +50,31 @@ public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
         }
     }
 
+    /// <summary>A missing input is rejected before a process or workspace is acquired.</summary>
+    [TestMethod]
+    public async Task MissingCollectorArtifactDoesNotCreateAWorkspace()
+    {
+        var assembly = Path.Combine(AppContext.BaseDirectory, "missing-qyl-collector.dll");
+        var workspace = Path.Combine(testContext.TestTempDirectory!, "not-created");
+        var failure = await Assert.ThrowsExactlyAsync<FileNotFoundException>(() =>
+            CollectorFixture.StartAsync(assembly, workspace, testContext.CancellationToken));
+        Assert.AreEqual(assembly, failure.FileName);
+        Assert.IsFalse(Directory.Exists(workspace));
+    }
+
     /// <summary>An early process exit reports its original output and is reaped.</summary>
     [TestMethod]
-    public async Task MissingCollectorAssemblyReportsItsExit()
+    public async Task InvalidCollectorAssemblyReportsItsExit()
     {
+        var assembly = Path.Combine(testContext.TestTempDirectory!, "invalid-qyl-collector.dll");
+        await File.WriteAllTextAsync(assembly, "not a managed executable", testContext.CancellationToken);
         var failure = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
-            CollectorFixture.StartAsync(Path.Combine(AppContext.BaseDirectory, "missing-qyl-collector.dll"), cancellationToken: testContext.CancellationToken));
+            CollectorFixture.StartAsync(assembly, testContext.TestTempDirectory, testContext.CancellationToken));
         Assert.Contains("qyl exited with code", failure.Message);
-        Assert.Contains("missing-qyl-collector.dll", failure.Message);
+        var workspace = Assert.ContainsSingle(Directory.GetDirectories(testContext.TestTempDirectory!, "qyl-collector-*"));
+        using var shutdown = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(workspace, "shutdown.json"), testContext.CancellationToken));
+        Assert.AreNotEqual(0, shutdown.RootElement.GetProperty("ExitCode").GetInt32());
+        Assert.IsFalse(shutdown.RootElement.GetProperty("Forced").GetBoolean());
     }
 
     /// <summary>Cancelling startup terminates and joins the process instead of leaking it.</summary>

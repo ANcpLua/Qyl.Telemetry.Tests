@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Qyl.Telemetry.SemanticConventions" />
+    <PackageReference Include="Qyl.Telemetry.SemanticConventions.Incubating" />
+  </ItemGroup>
+</Project>

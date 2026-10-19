@@ -21,7 +21,7 @@ public sealed class RawActivityCaptureTests
         activity.SetTag(Key, replacement);
 
         Assert.AreEqual("/ok", snapshot.Path);
-        CaptureAssert.Values(snapshot.Tags, Key, "first", "first", "", "comma,kept");
+        CapturedActivityAssertions.RequireStringValues(snapshot.Tags, Key, "first", "first", "", "comma,kept");
     }
 
     [TestMethod]
@@ -49,7 +49,7 @@ public sealed class RawActivityCaptureTests
             };
         }
 
-        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CaptureAssert.Values(tags, Key, "first", "first", ""));
+        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireStringValues(tags, Key, "first", "first", ""));
         Assert.Contains(Key, error.Message);
         Assert.Contains("string[]", error.Message);
     }
@@ -61,10 +61,10 @@ public sealed class RawActivityCaptureTests
         using var child = new Activity("child").Start();
         var snapshot = ActivitySnapshot.Capture(child);
         var expectedParent = parent.Context;
-        CaptureAssert.Parent(snapshot, expectedParent);
+        CapturedActivityAssertions.RequireParentContext(snapshot, expectedParent);
 
         var wrongTrace = snapshot with { Trace = ActivityTraceId.CreateRandom() };
-        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CaptureAssert.Parent(wrongTrace, expectedParent));
+        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireParentContext(wrongTrace, expectedParent));
         Assert.Contains("trace changed", error.Message);
         Assert.Contains(parent.TraceId.ToHexString(), error.Message);
     }
@@ -74,8 +74,8 @@ public sealed class RawActivityCaptureTests
     {
         using var activity = new Activity("operation").SetIdFormat(ActivityIdFormat.W3C).Start();
         var snapshot = ActivitySnapshot.Capture(activity);
-        CaptureAssert.UniqueSpans([snapshot]);
-        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CaptureAssert.UniqueSpans([snapshot, snapshot]));
+        CapturedActivityAssertions.RequireUniqueSpanIdentities([snapshot]);
+        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireUniqueSpanIdentities([snapshot, snapshot]));
         Assert.Contains("duplicate", error.Message);
     }
 
@@ -91,7 +91,7 @@ public sealed class RawActivityCaptureTests
             .SetTag("rpc.response.metadata.trace-bin", grpcValues).Start();
         var httpSnapshot = ActivitySnapshot.Capture(http);
         var grpcSnapshot = ActivitySnapshot.Capture(grpc);
-        using var document = JsonDocument.Parse(NativeCaptureReport.Serialize("configured", [httpSnapshot, grpcSnapshot], []));
+        using var document = JsonDocument.Parse(ActivityCaptureReport.Serialize("configured", [httpSnapshot, grpcSnapshot], []));
         var report = document.RootElement;
         Assert.AreEqual(1, report.GetProperty("schema_version").GetInt32());
         Assert.AreEqual("passed", report.GetProperty("status").GetString());
@@ -112,7 +112,7 @@ public sealed class RawActivityCaptureTests
         List<string> invalidValues = ["value"];
         using var activity = new Activity("wrong-clr-type").SetTag(Key, invalidValues).Start();
         var snapshot = ActivitySnapshot.Capture(activity);
-        var error = Assert.ThrowsExactly<InvalidOperationException>(() => NativeCaptureReport.Serialize("configured", [snapshot], []));
+        var error = Assert.ThrowsExactly<InvalidOperationException>(() => ActivityCaptureReport.Serialize("configured", [snapshot], []));
         Assert.Contains("expected CLR string[]", error.Message);
     }
 
@@ -121,10 +121,10 @@ public sealed class RawActivityCaptureTests
     {
         using var activity = new Activity("after-disposal").SetIdFormat(ActivityIdFormat.W3C).Start();
         var snapshot = ActivitySnapshot.Capture(activity) with { Source = "System.Net.Http" };
-        CaptureAssert.AfterDisposal([snapshot], "System.Net.Http");
-        Assert.ThrowsExactly<InvalidOperationException>(() => CaptureAssert.AfterDisposal([], "System.Net.Http"));
+        CapturedActivityAssertions.RequireCaptureStopped([snapshot], "System.Net.Http");
+        Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireCaptureStopped([], "System.Net.Http"));
         var captured = snapshot with { Tags = new Dictionary<string, object?> { [Key] = new[] { "leftover" } } };
-        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CaptureAssert.AfterDisposal([captured], "System.Net.Http"));
+        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireCaptureStopped([captured], "System.Net.Http"));
         Assert.Contains("outlived", error.Message);
     }
 

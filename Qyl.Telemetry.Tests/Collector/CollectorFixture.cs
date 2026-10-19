@@ -31,22 +31,26 @@ public sealed class CollectorFixture : IAsyncDisposable
     public CollectorClient Client { get; }
     public string DataDirectory { get; }
 
-    public static async Task<CollectorFixture> StartAsync(string assembly, string? workspace = null,
+    public static Task<CollectorFixture> StartAsync(string assembly, string? workspace = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        return StartAsync(PublishedExecutable.Identify(assembly, ExecutableFormat.ManagedAssembly,
+            System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier), workspace, cancellationToken);
+    }
+
+    public static async Task<CollectorFixture> StartAsync(PublishedExecutable executable, string? workspace = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var start = executable.StartInfo();
         using var reservation = new TcpListener(IPAddress.Loopback, 0);
         reservation.Start();
         var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
         var directory = Path.Combine(workspace ?? Path.GetTempPath(), "qyl-collector-" + Guid.NewGuid().ToString("N"));
         _ = Directory.CreateDirectory(directory);
-        var start = new ProcessStartInfo("dotnet")
-        {
-            ArgumentList = { assembly },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
+        start.RedirectStandardOutput = true;
+        start.RedirectStandardError = true;
         foreach (var key in start.Environment.Keys.Where(key => key.StartsWith("QYL_", StringComparison.Ordinal)
                      || key.StartsWith("OTEL_", StringComparison.Ordinal)).ToArray())
         {

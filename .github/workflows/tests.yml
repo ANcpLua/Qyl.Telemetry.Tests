@@ -6,21 +6,36 @@ permissions:
   contents: read
 jobs:
   tests:
-    runs-on: macos-15
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.402'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Linux NativeAOT prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev libssl-dev
       - name: Test, measure coverage and inspect source
         run: ./build.sh
       - name: Retain native test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: telemetry-verification
+          name: telemetry-verification-${{ matrix.os }}
           path: |
             artifacts/results
             artifacts/coverage
             artifacts/inspection.sarif
+            artifacts/candidate-inspection.sarif
+            artifacts/delivery/**/prepared-*.json
+            artifacts/delivery/**/logs/*.log
           if-no-files-found: warn

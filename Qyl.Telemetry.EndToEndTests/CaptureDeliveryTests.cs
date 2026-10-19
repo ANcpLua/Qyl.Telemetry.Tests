@@ -61,12 +61,14 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
         var capture = await Application.Telemetry.AwaitAsync(
             snapshot => snapshot.Spans.Any(span => span.TraceId == traceId && span is { Service: ProbeService, Kind: SpanKind.Server }), context.CancellationToken);
         var evidence = new TraceEvidence(traceId, capture);
-        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span is { Service: ProbeService, Kind: SpanKind.Server }));
-        Assert.AreEqual("Microsoft.AspNetCore", server.Scope?.Name);
-        Assert.AreEqual("GET /" + route, server.Name);
+        var server = Assert.HasSingleNativeSpan(evidence.Spans.Where(span => span.Service == ProbeService),
+            "Microsoft.AspNetCore", "GET /" + route, SpanKind.Server);
         var client = Assert.ContainsSingle(evidence.Spans.Where(span => span.Kind == SpanKind.Client
             && span.SpanId == server.ParentSpanId));
         Assert.AreEqual(TelemetryPipeline.TestProcess, client.Service);
+        Assert.HasParentContext(server, client);
+        Assert.HasParentContext(client, root.Context);
+        Assert.HasUniqueSpanIdentities(evidence.Spans);
         return evidence;
     }
 

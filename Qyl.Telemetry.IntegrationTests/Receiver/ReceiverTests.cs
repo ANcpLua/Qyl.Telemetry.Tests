@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using Google.Protobuf;
 using JetBrains.Annotations;
+using OpenTelemetry.Proto.Common.V1;
 using OpenTelemetry.Proto.Collector.Metrics.V1;
 using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Metrics.V1;
@@ -119,7 +120,9 @@ public sealed class ReceiverTests
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var metric = MetricWireTests.Fixture("gauge");
         metric.Gauge.DataPoints.Add(metric.Gauge.DataPoints[0].Clone());
-        metric.Gauge.DataPoints[0].Attributes.Add(metric.Gauge.DataPoints[0].Attributes[0].Clone());
+        var conflicting = metric.Gauge.DataPoints[0].Attributes[0].Clone();
+        conflicting.Value = new AnyValue { StringValue = "conflicting" };
+        metric.Gauge.DataPoints[0].Attributes.Add(conflicting);
         var request = new ExportMetricsServiceRequest
         {
             ResourceMetrics =

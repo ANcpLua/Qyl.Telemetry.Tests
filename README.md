@@ -19,7 +19,8 @@ conventions, capture, collection, storage and investigation.
 
 ## Run
 
-Install .NET SDK **10.0.401**, then run:
+Install .NET SDK **10.0.401**, **10.0.402** (for the pinned production checkouts),
+and Node.js **24**, then run:
 
 ```sh
 ./build.sh
@@ -28,6 +29,9 @@ Install .NET SDK **10.0.401**, then run:
 The default Fallout `Check` target builds once, executes the three suites with
 Microsoft coverage, merges coverage with DotCov, and runs the pinned JetBrains
 InspectCode tool across support, suites, fixture applications and the build host.
+The candidate delivery fixture packs pinned source revisions and publishes native
+applications and a native Collector. Its first run needs network access, a native
+compiler, and several minutes; verified immutable artifacts are reused locally.
 Coverage is informational; reported inspection findings fail the check.
 Use `./build.sh --target Test`, `Coverage` or `InspectCode` for a focused target.
 
@@ -60,14 +64,23 @@ The suites exercise real exporters and receivers, native MSTest composition,
 and application-to-Collector delivery. Each mutable application/Collector fixture
 owns an isolated workspace and is disposed by its consuming test.
 
-The delivered workload uses public pinned Qyl packages, a managed application,
-and the packaged managed `qyl.collector.dll`. Investigation uses REST. Selected
-capture cases verify field identity and array fidelity through storage; native
-runner probes verify failures, data rows and source locations.
+Baseline scenarios use public pinned packages, a managed application and the
+packaged managed Collector through REST. Candidate scenarios use the exact
+commits in [delivery inputs](Qyl.Telemetry.EndToEndTests/Delivery/inputs.json),
+pack them into an isolated feed, and verify restored package hashes. Managed and
+NativeAOT applications send captured fields into a separately published native
+Collector. The official C# MCP client launches the pinned npm server over stdio
+and reads the stored trace through its real `get_trace` tool.
 
-Candidate-package selection, published NativeAOT execution and MCP protocol
-investigation remain separate delivery work. See [ownership](docs/port.md) and
-[implemented APIs](docs/extension-api.md).
+The native semantic consumer verifies required-value types and generated phase,
+sampling, collection and provenance metadata from the candidate packages.
+Published executable hashes, runtime identifiers, package identities and command
+logs are retained under `artifacts/delivery`; individual observations accompany
+the test results. No candidate package is published to a registry.
+
+Selected capture cases verify field identity and array fidelity through storage;
+native runner probes verify failures, data rows and source locations. See
+[ownership](docs/port.md) and [implemented APIs](docs/extension-api.md).
 
 ## Agent guidance
 

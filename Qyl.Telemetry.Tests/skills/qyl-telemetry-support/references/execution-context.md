@@ -5,7 +5,7 @@ delivery evidence. Resolve only the relevant inputs and reuse them until they
 change. The names below describe task context, not environment variables.
 
 - **Root and project:** `Qyl.Telemetry.Tests.slnx` identifies this repository's
-  four projects. The support project supplies reusable primitives; the three
+  support projects and three executable suites. The support projects supply reusable primitives; the three
   consuming suites own executable cases and lifecycle registration. Ownership
   and production contract sources are mapped in [port ownership](../../../../docs/port.md).
 - **Stack:** `global.json` selects the .NET SDK, MSTest.Sdk and native MTP runner.
@@ -24,6 +24,9 @@ change. The names below describe task context, not environment variables.
   Managed Collector execution, published NativeAOT execution, REST investigation
   and MCP protocol invocation establish different evidence. The current delivery
   baseline is recorded in [README.md](../../../../README.md#delivery-evidence).
+  Candidate source commits and the npm identity live in the end-to-end suite's
+  `Delivery/inputs.json`; the resulting manifest records actual package and
+  executable hashes. A local production checkout is not an implicit input.
 - **Commands:** README.md documents focused native MTP commands. `build.sh` and
   CI define the solution entrypoint and required checks.
 

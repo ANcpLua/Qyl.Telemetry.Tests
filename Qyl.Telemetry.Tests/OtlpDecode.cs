@@ -20,6 +20,7 @@ internal sealed class OtlpDecode
     private ReadOnlyDictionary<string, object?> Attributes(IEnumerable<KeyValue> values)
     {
         var result = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var original = new Dictionary<string, AnyValue?>(StringComparer.Ordinal);
         foreach (var pair in values)
         {
             // Profiling-only key references have the same non-fatal rule as indexed values:
@@ -29,8 +30,16 @@ internal sealed class OtlpDecode
                 _warnings.Add($"KeyStrindex {pair.KeyStrindex} is intended for profiling; its key reference was ignored.");
                 if (pair.Key.Length == 0) continue;
             }
-            if (!result.TryAdd(pair.Key, Value(pair.Value)))
-                throw new InvalidDataException($"Duplicate OTLP attribute: {pair.Key}.");
+            if (!original.TryAdd(pair.Key, pair.Value))
+            {
+                if (!Equals(original[pair.Key], pair.Value))
+                    throw new InvalidDataException($"Duplicate OTLP attribute: {pair.Key}.");
+                // ILogger state and scopes can repeat the same typed value. Keep the raw
+                // request intact and make this projection agree with the Collector.
+                _warnings.Add($"Coalesced identical OTLP attribute: {pair.Key}.");
+                continue;
+            }
+            result.Add(pair.Key, Value(pair.Value));
         }
         return new ReadOnlyDictionary<string, object?>(result);
     }

@@ -13,7 +13,7 @@ namespace Qyl.Telemetry.Tests.Collector;
 
 /// <summary>Owns the canonical OTLP capture, the published Collector and the test process's SDK.</summary>
 [JetBrains.Annotations.PublicAPI]
-public sealed class TelemetryPipeline(TestContext context) : IAsyncDisposable
+public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? collectorExecutable = null) : IAsyncDisposable
 {
     public const string TestProcess = "test";
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -52,7 +52,10 @@ public sealed class TelemetryPipeline(TestContext context) : IAsyncDisposable
 
             try
             {
-                _collector = await CollectorFixture.StartAsync(Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll"), context.TestTempDirectory, cancellationToken).ConfigureAwait(false);
+                var executable = collectorExecutable ?? PublishedExecutable.Identify(
+                    Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll"),
+                    ExecutableFormat.ManagedAssembly, System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
+                _collector = await CollectorFixture.StartAsync(executable, context.TestTempDirectory, cancellationToken).ConfigureAwait(false);
                 _capture = await OtlpReceiver.StartAsync(cancellationToken).ConfigureAwait(false);
                 _receiver = await OtlpRelay.StartAsync(_capture, _collector.Client, cancellationToken).ConfigureAwait(false);
                 _provider = Sdk.CreateTracerProviderBuilder()

@@ -8,17 +8,17 @@ namespace Qyl.Telemetry.Tests.Capture;
 
 /// <summary>Producer invariants usable inside a NativeAOT child without a test runner.</summary>
 [JetBrains.Annotations.PublicAPI]
-public static class CaptureAssert
+public static class CapturedActivityAssertions
 {
     public static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);
     }
 
-    public static void NativeAot() =>
+    public static void RequireNativeAot() =>
         Require(!RuntimeFeature.IsDynamicCodeSupported, "The capture fixture must execute as NativeAOT.");
 
-    public static string[] StringValues(IReadOnlyDictionary<string, object?> attributes, string key)
+    public static string[] GetStringValues(IReadOnlyDictionary<string, object?> attributes, string key)
     {
         ArgumentNullException.ThrowIfNull(attributes);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
@@ -28,15 +28,15 @@ public static class CaptureAssert
             : throw new InvalidOperationException($"Captured attribute '{key}': expected CLR string[]; actual {(present ? Describe(value) : "<missing>")}.");
     }
 
-    public static void Values(IReadOnlyDictionary<string, object?> attributes, string key, params string[] expected)
+    public static void RequireStringValues(IReadOnlyDictionary<string, object?> attributes, string key, params string[] expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
-        var actual = StringValues(attributes, key);
+        var actual = GetStringValues(attributes, key);
         Require(actual.SequenceEqual(expected, StringComparer.Ordinal),
             $"Captured attribute '{key}': expected string[] {FormatValues(expected)}; actual {Describe(actual)}.");
     }
 
-    public static void Parent(ActivitySnapshot span, ActivityContext parent)
+    public static void RequireParentContext(ActivitySnapshot span, ActivityContext parent)
     {
         Require(parent.TraceId != default && parent.SpanId != default, "The expected parent must have trace and span IDs.");
         Require(span.Trace == parent.TraceId,
@@ -47,7 +47,7 @@ public static class CaptureAssert
             $"'{span.Operation}' must have its own nonzero span ID; actual {span.Span}.");
     }
 
-    public static void UniqueSpans(IEnumerable<ActivitySnapshot> spans)
+    public static void RequireUniqueSpanIdentities(IEnumerable<ActivitySnapshot> spans)
     {
         var identities = new HashSet<(ActivityTraceId, ActivitySpanId)>();
         foreach (var span in spans)
@@ -61,14 +61,14 @@ public static class CaptureAssert
         key.StartsWith("rpc.request.metadata.", StringComparison.Ordinal) ||
         key.StartsWith("rpc.response.metadata.", StringComparison.Ordinal);
 
-    public static void AfterDisposal(IReadOnlyList<ActivitySnapshot> spans, string source)
+    public static void RequireCaptureStopped(IReadOnlyList<ActivitySnapshot> spans, string source)
     {
         Require(spans.Count(span => span.Source == source) == 1,
             $"Expected one native '{source}' span after provider disposal.");
         foreach (var span in spans)
             Require(!span.Tags.Keys.Any(IsCapturedField),
                 $"Capture subscription outlived its provider: '{span.Source}'/'{span.Operation}'.");
-        UniqueSpans(spans);
+        RequireUniqueSpanIdentities(spans);
     }
 
     private static string Describe(object? value) => value switch

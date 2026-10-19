@@ -130,7 +130,7 @@ public sealed class NumberAndSessionTests
             { EventName = "Valid", SeverityNumber = SeverityNumber.Warn };
         var invalid = new OpenTelemetry.Proto.Logs.V1.LogRecord
         {
-            EventName = "Invalid", Attributes = { Pair("duplicate", new AnyValue()), Pair("duplicate", new AnyValue()) }
+            EventName = "Invalid", Attributes = { Pair("duplicate", new AnyValue { StringValue = "first" }), Pair("duplicate", new AnyValue { StringValue = "second" }) }
         };
         var request = new ExportLogsServiceRequest
         {

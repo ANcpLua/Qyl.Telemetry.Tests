@@ -8,6 +8,7 @@
   <PropertyGroup Label="Runtime and telemetry dependencies">
     <DotNetRuntimeVersion>10.0.13</DotNetRuntimeVersion>
     <OpenTelemetryVersion>1.20.0</OpenTelemetryVersion>
+    <ModelContextProtocolVersion>2.2.0</ModelContextProtocolVersion>
     <GrpcVersion>2.84.0</GrpcVersion>
     <GoogleProtobufVersion>3.36.2</GoogleProtobufVersion>
     <GoogleApiCommonProtosVersion>2.17.0</GoogleApiCommonProtosVersion>

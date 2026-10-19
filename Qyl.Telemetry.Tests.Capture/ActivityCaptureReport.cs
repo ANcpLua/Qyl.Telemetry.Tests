@@ -7,7 +7,7 @@ namespace Qyl.Telemetry.Tests.Capture;
 
 /// <summary>The shared machine-readable report for raw native producer checks.</summary>
 [JetBrains.Annotations.PublicAPI]
-public static class NativeCaptureReport
+public static class ActivityCaptureReport
 {
     public const int SchemaVersion = 1;
 
@@ -46,10 +46,10 @@ public static class NativeCaptureReport
             writer.WriteString("span_id", span.Span.ToHexString());
             writer.WriteString("parent_span_id", span.Parent.ToHexString());
             writer.WriteStartObject("captured");
-            foreach (var key in span.Tags.Keys.Where(CaptureAssert.IsCapturedField).Order(StringComparer.Ordinal))
+            foreach (var key in span.Tags.Keys.Where(CapturedActivityAssertions.IsCapturedField).Order(StringComparer.Ordinal))
             {
                 writer.WriteStartArray(key);
-                foreach (var value in CaptureAssert.StringValues(span.Tags, key))
+                foreach (var value in CapturedActivityAssertions.GetStringValues(span.Tags, key))
                     writer.WriteStringValue(value);
                 writer.WriteEndArray();
             }

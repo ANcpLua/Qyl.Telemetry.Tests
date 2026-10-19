@@ -6,4 +6,15 @@
     <TestFixtureProject Include="Applications/TelemetryProbe/TelemetryProbe.csproj" />
   </ItemGroup>
   <ItemGroup><Compile Remove="Applications/**/*.cs" /></ItemGroup>
+  <ItemGroup>
+    <Content Include="Delivery/inputs.json" Link="delivery-inputs.json" CopyToOutputDirectory="PreserveNewest" />
+    <SemanticContractProject Include="Applications/SemanticContractProbe/SemanticContractProbe.csproj" />
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+  <Target Name="WriteDeliveryProjectPath" AfterTargets="Build">
+    <WriteLinesToFile File="$(TargetDir)delivery-project.txt" Lines="@(TestFixtureProject->'%(FullPath)')"
+                      Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(TargetDir)semantic-project.txt" Lines="@(SemanticContractProject->'%(FullPath)')"
+                      Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
 </Project>

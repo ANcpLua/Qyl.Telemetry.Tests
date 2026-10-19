@@ -97,6 +97,13 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
         var evidence = await SendRequestAsync("failure", HttpStatusCode.InternalServerError);
         var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
         Assert.AreEqual(ActivityStatusCode.Error, server.Status);
+        var completed = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Logs.Any(log =>
+            log.TraceId == evidence.TraceId && log.Scope?.Name == "Microsoft.AspNetCore.Server.Kestrel"), Context.CancellationToken);
+        var serverLog = Assert.ContainsSingle(completed.Logs.Where(log =>
+            log.TraceId == evidence.TraceId && log.Scope?.Name == "Microsoft.AspNetCore.Server.Kestrel"));
+        Assert.AreEqual(server.SpanId, serverLog.SpanId);
+        Assert.IsInstanceOfType<string>(serverLog.Attributes["ConnectionId"]);
+        Assert.Contains(receipt => receipt.Warnings.Contains("Coalesced identical OTLP attribute: ConnectionId."), completed.Receipts);
         Assert.Contains(item => item.Name == "exception" && item.Attributes.TryGetValue("exception.message", out var message)
             && Equals(message, ProbeSignals.FailureMessage), server.Events,
             $"Observed events: {string.Join("; ", server.Events.Select(item => item.Name + ":" + string.Join(", ", item.Attributes.Select(pair => pair.Key + "=" + pair.Value))))}; error.type={server.GetString("error.type")}");
