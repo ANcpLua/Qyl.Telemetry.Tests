@@ -145,7 +145,7 @@ public sealed class AnswerKeyTests(TestContext context)
         Assert.AreEqual("s", output.Unit);
         Assert.IsTrue(output.Approximate);
         var checkout = Assert.ContainsSingle(output.Series.Where(series => series.Attributes.Any(attribute =>
-            attribute.Key == "http.route" && attribute.Value is Qyl.Api.Contracts.Common.AttributeValue.StringValue { Value: "/checkout" })));
+            attribute is { Key: "http.route", Value: Qyl.Api.Contracts.Common.AttributeValue.StringValue { Value: "/checkout" } })));
         Assert.Contains(value => Math.Abs(value - AnswerKey.CheckoutSeconds) < .1,
             checkout.Buckets.Select(bucket => bucket.Value).OfType<double>());
     }

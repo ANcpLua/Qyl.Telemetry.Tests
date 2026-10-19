@@ -14,6 +14,7 @@ public sealed class RestartTests(TestContext context)
 {
     private const string Service = "durable";
     private const int FailureKinds = 5;
+    private static readonly string[] ExactStrings = ["a", "", "a"];
     private AnalysisSession? _session;
 
     private AnalysisSession Session => _session ?? throw new InvalidOperationException("The Collector has not started.");
@@ -37,7 +38,7 @@ public sealed class RestartTests(TestContext context)
         var incidents = new OtlpIncidents();
         var root = incidents.Span("durable-root", Service, "durable", now - 10 * Minute, 50, attributes: new Dictionary<string, object>
         {
-            ["exact.int"] = long.MaxValue, ["exact.double"] = .1 + .2, ["exact.bool"] = true, ["exact.strings"] = new[] { "a", "", "a" }
+            ["exact.int"] = long.MaxValue, ["exact.double"] = .1 + .2, ["exact.bool"] = true, ["exact.strings"] = ExactStrings
         });
         for (var i = 0; i < FailureKinds; i++)
             incidents.Span($"durable-failure-{i}", Service, $"operation-{i}", now - (9 - (ulong)i) * Minute, 5, error: true,
@@ -71,7 +72,7 @@ public sealed class RestartTests(TestContext context)
         Assert.AreEqual(.1 + .2, Assert.IsInstanceOfType<AttributeDoubleValue>(
             Assert.IsInstanceOfType<AttributeValue.ObjectValue>(attributes["exact.double"]).Value).Value);
         Assert.IsTrue(Assert.IsInstanceOfType<AttributeValue.BoolValue>(attributes["exact.bool"]).Value);
-        Assert.AreSequenceEqual(["a", "", "a"], Assert.IsInstanceOfType<AttributeValue.ArrayValue>(attributes["exact.strings"]).Value
+        Assert.AreSequenceEqual(ExactStrings, Assert.IsInstanceOfType<AttributeValue.ArrayValue>(attributes["exact.strings"]).Value
             .Select(value => Assert.IsInstanceOfType<AttributeValue.StringValue>(value).Value));
 
         var restarted = await FailuresAsync(path, window, null);

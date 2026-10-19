@@ -152,9 +152,10 @@ public sealed class CollectorClient(HttpClient client)
         return ReadAsync<MetricQueryResult>(route, cancellationToken);
     }
 
-    /// <summary>Runs one analysis operation, such as triage or verify_fix, through the Collector's HTTP route.</summary>
-    /// <param name="operation">The analysis route and MCP tool name.</param>
-    /// <param name="input">The tool input, in its snake_case wire form.</param>
+    /// <summary>
+    ///     Runs one analysis operation, such as triage or verify_fix, through the Collector's HTTP route. The operation
+    ///     is also the MCP tool name; the input is the tool's snake_case wire form.
+    /// </summary>
     public async Task<T> AnalyzeAsync<T>(string operation, JsonObject input, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(operation);

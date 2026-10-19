@@ -1,16 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
 using Google.Protobuf;
-using OpenTelemetry.Proto.Collector.Logs.V1;
 using OpenTelemetry.Proto.Collector.Metrics.V1;
 using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Common.V1;
-using OpenTelemetry.Proto.Logs.V1;
 using OpenTelemetry.Proto.Metrics.V1;
 using OpenTelemetry.Proto.Resource.V1;
 using OpenTelemetry.Proto.Trace.V1;
 using Qyl.Telemetry.Tests.Collector;
-using OtlpLogRecord = OpenTelemetry.Proto.Logs.V1.LogRecord;
 using OtlpSpan = OpenTelemetry.Proto.Trace.V1.Span;
 
 namespace Qyl.Telemetry.EndToEndTests.Analysis;
@@ -23,14 +20,13 @@ internal sealed class OtlpIncidents
     internal const ulong Millisecond = 1_000_000;
     internal const ulong Minute = 60_000 * Millisecond;
     private readonly List<ResourceSpans> _spans = [];
-    private readonly List<ResourceLogs> _logs = [];
     private readonly List<ResourceMetrics> _metrics = [];
     private readonly Dictionary<string, SpanKey> _keys = new(StringComparer.Ordinal);
 
     internal IReadOnlyDictionary<string, SpanKey> Keys => _keys;
 
     /// <summary>A deterministic hex identity derived from a scenario key.</summary>
-    internal static string Id(string key, int length) =>
+    private static string Id(string key, int length) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..length];
 
     internal static ulong Nanoseconds(DateTimeOffset time) => (ulong)time.ToUnixTimeMilliseconds() * Millisecond;
@@ -60,34 +56,13 @@ internal sealed class OtlpIncidents
         return identity;
     }
 
-    internal void Log(string service, ulong at, int severity, string body, SpanKey? span = null,
-        IReadOnlyDictionary<string, object>? attributes = null)
-    {
-        var log = new OtlpLogRecord
-        {
-            TimeUnixNano = at, ObservedTimeUnixNano = at, SeverityNumber = (SeverityNumber)severity,
-            SeverityText = severity >= 17 ? "ERROR" : "INFO", Body = Value(body)
-        };
-        if (span is { } owner)
-        {
-            log.TraceId = Bytes(owner.TraceId);
-            log.SpanId = Bytes(owner.SpanId);
-        }
-        log.Attributes.Add(Attributes(attributes));
-        _logs.Add(new ResourceLogs
-        {
-            Resource = Resource(service, null),
-            ScopeLogs = { new ScopeLogs { Scope = new InstrumentationScope { Name = "qyl-answer-key" }, LogRecords = { log } } }
-        });
-    }
-
     internal void Metric(string service, Metric metric) => _metrics.Add(new ResourceMetrics
     {
         Resource = Resource(service, null),
         ScopeMetrics = { new ScopeMetrics { Scope = new InstrumentationScope { Name = "qyl-answer-key" }, Metrics = { metric } } }
     });
 
-    internal static IEnumerable<KeyValue> Attributes(IReadOnlyDictionary<string, object>? attributes) =>
+    private static IEnumerable<KeyValue> Attributes(IReadOnlyDictionary<string, object>? attributes) =>
         (attributes ?? new Dictionary<string, object>()).Select(pair => Pair(pair.Key, pair.Value));
 
     internal static KeyValue Pair(string key, object value) => new() { Key = key, Value = Value(value) };
@@ -103,14 +78,6 @@ internal sealed class OtlpIncidents
             Assert.AreEqual(0L, response.PartialSuccess?.RejectedSpans ?? 0, response.PartialSuccess?.ErrorMessage);
         }
 
-        if (_logs.Count > 0)
-        {
-            var request = new ExportLogsServiceRequest();
-            request.ResourceLogs.Add(_logs);
-            var response = ExportLogsServiceResponse.Parser.ParseFrom(await ExportAsync(client, "v1/logs", request, cancellationToken));
-            Assert.AreEqual(0L, response.PartialSuccess?.RejectedLogRecords ?? 0, response.PartialSuccess?.ErrorMessage);
-        }
-
         if (_metrics.Count > 0)
         {
             var request = new ExportMetricsServiceRequest();
@@ -120,7 +87,6 @@ internal sealed class OtlpIncidents
         }
 
         _spans.Clear();
-        _logs.Clear();
         _metrics.Clear();
     }
 
