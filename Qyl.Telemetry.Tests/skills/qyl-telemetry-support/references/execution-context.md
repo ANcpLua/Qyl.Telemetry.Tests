@@ -24,9 +24,9 @@ change. The names below describe task context, not environment variables.
   Managed Collector execution, published NativeAOT execution, REST investigation
   and MCP protocol invocation establish different evidence. The current delivery
   baseline is recorded in [README.md](../../../../README.md#delivery-evidence).
-  Candidate source commits and the npm identity live in the end-to-end suite's
-  `Delivery/inputs.json`; the resulting manifest records actual package and
-  executable hashes. A local production checkout is not an implicit input.
+  The Collector commit and the npm identity live in the end-to-end suite's
+  `Delivery/inputs.json`; package versions come from `Version.props`, and the
+  resulting manifest records restored package and executable hashes. A local production checkout is not an implicit input.
 - **Commands:** README.md documents focused native MTP commands. `build.sh` and
   CI define the solution entrypoint and required checks.
 

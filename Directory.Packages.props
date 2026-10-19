@@ -7,6 +7,7 @@
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="$(DotNetRuntimeVersion)" />
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="$(DotNetRuntimeVersion)" />
     <PackageVersion Include="Qyl.Telemetry.SemanticConventions" Version="$(QylSemanticConventionsVersion)" />
+    <PackageVersion Include="Qyl.Telemetry.SemanticConventions.Incubating" Version="$(QylSemanticConventionsVersion)" />
     <PackageVersion Include="Qyl.Telemetry.Hosting" Version="$(QylTelemetryVersion)" />
     <PackageVersion Include="Qyl.Orchestration" Version="$(QylPlatformVersion)" />
     <PackageVersion Include="Qyl.Api.Contracts" Version="$(QylApiContractsVersion)" />

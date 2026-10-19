@@ -10,7 +10,7 @@ using SpanKind = Qyl.Telemetry.SemanticConventions.SpanKind;
 namespace Qyl.Telemetry.EndToEndTests.Delivery;
 
 [TracePerTest]
-public sealed class CandidateDeliveryTests(TestContext context)
+public sealed class DeliveryTests(TestContext context)
 {
     private const string TraceTool = "get_trace";
     private const string CapturedKey = HttpAttributes.RequestHeader + ".x-probe-id";
@@ -18,7 +18,7 @@ public sealed class CandidateDeliveryTests(TestContext context)
 
     [ClassInitialize]
     [Timeout(1_800_000, CooperativeCancellation = true)]
-    public static async Task PublishCandidatesAsync(TestContext context) =>
+    public static async Task PublishArtifactsAsync(TestContext context) =>
         _delivery = await new DeliveryArtifacts(context).PrepareAsync();
 
     [TestMethod]
@@ -28,7 +28,7 @@ public sealed class CandidateDeliveryTests(TestContext context)
     [DataRow(ExecutableFormat.ManagedAssembly)]
     [DataRow(ExecutableFormat.NativeAot)]
     [Timeout(180_000, CooperativeCancellation = true)]
-    public async Task Candidate_application_reaches_the_published_native_collector_and_real_mcp(ExecutableFormat format)
+    public async Task Published_packages_reach_the_native_collector_and_real_mcp(ExecutableFormat format)
     {
         Assert.IsNotNull(_delivery);
         context.AddResultFile(_delivery.ManifestPath);

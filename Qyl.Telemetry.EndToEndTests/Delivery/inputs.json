@@ -1,18 +1,7 @@
 {
-  "conventions": {
-    "repository": "https://github.com/ANcpLua/Qyl.Telemetry.SemanticConventions.git",
-    "commit": "5d43a76eaefd3817607f3ccbd43f9062ebeca54c",
-    "version": "15.0.2-candidate.5d43a76e"
-  },
-  "instrumentation": {
-    "repository": "https://github.com/ANcpLua/Qyl.Telemetry.AutoInstrumentation.git",
-    "commit": "ed3152ab7bf569a4c9656cf05a0a68bdf68bf9fb",
-    "version": "28.2.3-candidate.ed3152a"
-  },
   "collector": {
     "repository": "https://github.com/ANcpLua/qyl.git",
-    "commit": "ea7c98e954e4c8efd0105e475f6b1e9947642313",
-    "version": "16.0.1"
+    "commit": "ea7c98e954e4c8efd0105e475f6b1e9947642313"
   },
   "mcp": {
     "name": "qyl-mcp-server",

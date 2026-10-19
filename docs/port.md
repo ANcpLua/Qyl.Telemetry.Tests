@@ -44,13 +44,13 @@ Resolve the revision matching the selected packages before using these sources.
   response, pagination and stream contracts, schemas and models.
 
 Baseline delivery executes a managed application and the packaged managed
-Collector, then reads through REST. The candidate fixture separately packs the
-source commits in `Delivery/inputs.json`, verifies restored package hashes,
-publishes native application and Collector artifacts, and invokes the pinned
-npm MCP server through the official C# stdio client. Its two execution rows run
+Collector, then reads through REST. The delivery fixture publishes native
+application artifacts against the pinned packages and a native Collector from the
+qyl commit in `Delivery/inputs.json`, and invokes the pinned npm MCP server
+through the official C# stdio client. Its two execution rows run
 managed and native application binaries against the native Collector.
 
-The semantic contract consumer executes as NativeAOT and checks candidate public
+The semantic contract consumer executes as NativeAOT and checks published public
 typed views and generated metadata. Production-local generator fixtures remain
 in SemanticConventions; these cases check the delivered consumer boundary.
 Publication is class-owned and reusable; every delivery invocation owns its

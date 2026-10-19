@@ -1,6 +1,6 @@
 ---
 name: qyl-telemetry-end-to-end
-description: Write or review complete application-to-investigation scenarios in Qyl.Telemetry.EndToEndTests, including instrumented Qyl workloads, candidate delivery, NativeAOT artifacts and explicit REST or MCP paths.
+description: Write or review complete application-to-investigation scenarios in Qyl.Telemetry.EndToEndTests, including instrumented Qyl workloads, published-package delivery, NativeAOT artifacts and explicit REST or MCP paths.
 ---
 
 # Application to investigation
@@ -14,9 +14,8 @@ Collector investigation result. Keep workloads under Applications/ and scenario
 expectations beside their delivery tests. Select the signals, producers and terminal
 observations required by that scenario.
 
-Determine the requested execution mode before choosing fixtures. For candidate
-delivery, resolve the designated packages from the selected feed and manifest.
-For NativeAOT delivery, execute the designated published native applications
+Determine the requested execution mode before choosing fixtures. Delivery
+restores the published packages pinned in Version.props. For NativeAOT delivery, execute the designated published native applications
 and Collector artifacts. Record the package identities and artifact roles,
 RIDs and hashes actually exercised.
 

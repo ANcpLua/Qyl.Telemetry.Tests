@@ -19,8 +19,7 @@ conventions, capture, collection, storage and investigation.
 
 ## Run
 
-Install .NET SDK **10.0.401**, **10.0.402** (for the pinned production checkouts),
-and Node.js **24**, then run:
+Install .NET SDK **10.0.402** and Node.js **24**, then run:
 
 ```sh
 ./build.sh
@@ -29,9 +28,10 @@ and Node.js **24**, then run:
 The default Fallout `Check` target builds once, executes the three suites with
 Microsoft coverage, merges coverage with DotCov, and runs the pinned JetBrains
 InspectCode tool across support, suites, fixture applications and the build host.
-The candidate delivery fixture packs pinned source revisions and publishes native
-applications and a native Collector. Its first run needs network access, a native
-compiler, and several minutes; verified immutable artifacts are reused locally.
+The delivery fixture publishes managed and NativeAOT probes against the pinned
+packages and a native Collector from the pinned qyl commit. Its first run needs
+network access, a native compiler, and several minutes; verified immutable
+artifacts are reused locally.
 Coverage is informational; reported inspection findings fail the check.
 Use `./build.sh --target Test`, `Coverage` or `InspectCode` for a focused target.
 
@@ -65,18 +65,17 @@ and application-to-Collector delivery. Each mutable application/Collector fixtur
 owns an isolated workspace and is disposed by its consuming test.
 
 Baseline scenarios use public pinned packages, a managed application and the
-packaged managed Collector through REST. Candidate scenarios use the exact
-commits in [delivery inputs](Qyl.Telemetry.EndToEndTests/Delivery/inputs.json),
-pack them into an isolated feed, and verify restored package hashes. Managed and
-NativeAOT applications send captured fields into a separately published native
-Collector. The official C# MCP client launches the pinned npm server over stdio
+packaged managed Collector through REST. Delivery scenarios publish managed and
+NativeAOT applications against the same pinned packages and send captured fields
+into a native Collector built from the qyl commit in
+[delivery inputs](Qyl.Telemetry.EndToEndTests/Delivery/inputs.json). The official C# MCP client launches the pinned npm server over stdio
 and reads the stored trace through its real `get_trace` tool.
 
 The native semantic consumer verifies required-value types and generated phase,
-sampling, collection and provenance metadata from the candidate packages.
+sampling, collection and provenance metadata from the published packages.
 Published executable hashes, runtime identifiers, package identities and command
 logs are retained under `artifacts/delivery`; individual observations accompany
-the test results. No candidate package is published to a registry.
+the test results.
 
 Telemetry policies verify trace connectivity, duplicate instrumentation, capture
 selection, conventions, clean exports and Collector storage fidelity; native

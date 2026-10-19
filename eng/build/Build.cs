@@ -60,17 +60,6 @@ internal sealed class Build : FalloutBuild
         ValidateInspection(report);
     });
 
-    private Target InspectCandidate => target => target.DependsOn(Coverage).Executes(() =>
-    {
-        using var context = JsonDocument.Parse(File.ReadAllText(RootDirectory / "artifacts/candidate-inspection.json"));
-        var root = context.RootElement;
-        var project = root.GetProperty("project").GetString();
-        var properties = $"Configuration=Release;DirectoryPackagesPropsPath={root.GetProperty("packageOverrides").GetString()};ArtifactsPath={root.GetProperty("artifacts").GetString()};RuntimeIdentifier={root.GetProperty("runtimeIdentifier").GetString()}";
-        var report = RootDirectory / "artifacts/candidate-inspection.sarif";
-        DotNet($"tool run jb -- inspectcode \"{project}\" --no-build --no-updates --disable-settings-layers=GlobalAll --properties=\"{properties}\" --severity=INFO --format=Sarif --output=\"{report}\"");
-        ValidateInspection(report);
-    });
-
     private static void ValidateInspection(AbsolutePath report)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(report));
@@ -90,5 +79,5 @@ internal sealed class Build : FalloutBuild
         }
     }
 
-    private Target Check => target => target.DependsOn(Coverage, InspectCode, InspectCandidate);
+    private Target Check => target => target.DependsOn(Coverage, InspectCode);
 }

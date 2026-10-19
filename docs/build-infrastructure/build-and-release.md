@@ -42,7 +42,6 @@ folders.
 | Pure logic | In-memory assertion, filtering or evidence processing |
 | Component interaction | Receivers, transports, exporters and lifecycle behavior |
 | Assembled application | Applications and their external components |
-| Candidate package consumer | Outputs and dependencies from a locally packed package |
 | Public package consumer | Outputs and dependencies restored from the public package |
 
 A test filename does not establish its boundary. A model-named test can still

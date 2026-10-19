@@ -64,9 +64,9 @@ owner; propose them again only with a scenario-independent rule.
   investigation coverage, optimistic concurrency.
 - Already enforced: `RequiresTelemetryEvidence` (every policy fails without
   evidence), `HonorsOtlpRejectionContract` (`ExportsCleanly`, `TelemetryPipeline`),
-  `CompletesGracefulShutdown` (`CollectorFixture`), `UsesCandidatePackages` and
-  `RunsPublishedNativeArtifact` (`DeliveryArtifacts` verifies restored packages
-  and executable hashes).
+  `CompletesGracefulShutdown` (`CollectorFixture`), `UsesCandidatePackages`
+  (delivery restores published packages only) and `RunsPublishedNativeArtifact`
+  (`DeliveryArtifacts` verifies executable hashes).
 - Covered by assertions: `PreservesMetricSemantics` (units through
   `ConformsToSemanticConventions`; point values are scenario expectations).
 - Covered by native data: `OtlpTransportData` and `CapturedFieldData`

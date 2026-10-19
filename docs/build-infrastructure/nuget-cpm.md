@@ -57,8 +57,7 @@ version properties consumed by `Directory.Packages.props`.
 resolves a package identity and dependency graph. A source-reference test and a
 package-consumer test therefore exercise different delivery paths.
 
-A candidate feed exposes a locally packed package. Its consumer restore depends
-on that package already existing. A generated scratch project outside the
+A generated scratch project outside the
 repository's directory hierarchy does not inherit the repository's CPM file.
 A standalone consumer needs its own explicit version inputs and feed policy;
 it cannot assume this repository's imports exist outside the checkout.
@@ -71,8 +70,7 @@ does not identify which feed supplies an overlapping package ID/version.
 
 Restore writes assets, generated imports and package-folder information. Changing
 `NUGET_PACKAGES` changes package storage; existing assets may still point at the
-previous location. An isolated package cache distinguishes a fresh package
-consumer from one using an already cached candidate.
+previous location.
 
 `Directory.Build.targets` combines a RID-specific Collector `PackageDownload`
 with a copy from the restored package's tools directory. That asset acquisition

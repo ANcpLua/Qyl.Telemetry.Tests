@@ -27,7 +27,6 @@
         "Check",
         "Compile",
         "Coverage",
-        "InspectCandidate",
         "InspectCode",
         "Test"
       ]
