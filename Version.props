@@ -1,9 +1,9 @@
 <Project>
   <PropertyGroup Label="Qyl packages">
-    <QylPlatformVersion>17.0.5</QylPlatformVersion>
+    <QylPlatformVersion>17.0.6</QylPlatformVersion>
     <QylTelemetryVersion>28.2.3</QylTelemetryVersion>
     <QylSemanticConventionsVersion>15.0.2</QylSemanticConventionsVersion>
-    <QylApiContractsVersion>17.0.5</QylApiContractsVersion>
+    <QylApiContractsVersion>17.0.6</QylApiContractsVersion>
   </PropertyGroup>
   <PropertyGroup Label="Runtime and telemetry dependencies">
     <DotNetRuntimeVersion>10.0.13</DotNetRuntimeVersion>
