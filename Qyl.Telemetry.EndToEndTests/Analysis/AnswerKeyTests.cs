@@ -43,9 +43,9 @@ public sealed class AnswerKeyTests(TestContext context)
         var first = triage.Failures[0];
         Assert.AreEqual(checkout.FailureId, first.FailureId);
         Assert.AreEqual(AnswerKey.Release, first.CoincidingRelease?.Version);
-        Assert.Contains(failure => failure.Count == 2 && failure.Services.Contains("payments"), triage.Failures);
+        Assert.Contains(failure => failure.Count == 2 && failure.Service == "payments", triage.Failures);
         Assert.Contains(service => service.Service == "billing", triage.SilentServices);
-        var session = Assert.ContainsSingle(triage.Failures.Where(failure => failure.Services.Contains("sessions")));
+        var session = Assert.ContainsSingle(triage.Failures.Where(failure => failure.Service == "sessions"));
         Assert.AreEqual(3L, session.Count, "Only sess_bad contributes failures.");
         Assert.Contains(session.ExampleTraceId!, TraceIds("sess_bad-"));
         Assert.DoesNotContain(failure => TraceIds("sess_ok-").Contains(failure.ExampleTraceId!), triage.Failures);
@@ -62,8 +62,8 @@ public sealed class AnswerKeyTests(TestContext context)
             ["start_time"] = AnswerKey.Iso(Key.T + Minute - 10 * Millisecond),
             ["end_time"] = AnswerKey.Iso(Key.T + Minute + 500 * Millisecond)
         };
-        var first = await AskAsync<ListFailuresOutput>(path, "list_failures", input);
-        var second = await AskAsync<ListFailuresOutput>(path, "list_failures", input);
+        var first = await AskAsync<TriageOutput>(path, "triage", input);
+        var second = await AskAsync<TriageOutput>(path, "triage", input);
         Assert.HasCount(2, first.Failures);
         Assert.AreSequenceEqual(first.Failures.Select(failure => failure.FailureId), second.Failures.Select(failure => failure.FailureId));
     }
@@ -144,6 +144,7 @@ public sealed class AnswerKeyTests(TestContext context)
             ("aggregation", "p95"), ("group_by", new JsonArray("http.route")), ("step_ms", 3_600_000)));
         Assert.AreEqual("s", output.Unit);
         Assert.IsTrue(output.Approximate);
+        Assert.IsNotNull(output.Series);
         var checkout = Assert.ContainsSingle(output.Series.Where(series => series.Attributes.Any(attribute =>
             attribute is { Key: "http.route", Value: Qyl.Api.Contracts.Common.AttributeValue.StringValue { Value: "/checkout" } })));
         Assert.Contains(value => Math.Abs(value - AnswerKey.CheckoutSeconds) < .1,
@@ -157,14 +158,15 @@ public sealed class AnswerKeyTests(TestContext context)
     {
         var output = await AskAsync<QueryMetricOutput>(path, "query_metric", Input(("metric_name", "requests.total"),
             ("function", "increase"), ("step_ms", 3_600_000)));
+        Assert.IsNotNull(output.Series);
         Assert.AreEqual(AnswerKey.CounterIncrease, output.Series.SelectMany(series => series.Buckets).Sum(bucket => bucket.Value ?? 0));
     }
 
     private Task<T> AskAsync<T>(AnalysisPath path, string tool, JsonObject input) =>
         Session.AskAsync<T>(path, tool, input, context.CancellationToken);
 
-    private async Task<FailureDetail> CheckoutFailureAsync(AnalysisPath path) =>
-        Assert.ContainsSingle((await AskAsync<ListFailuresOutput>(path, "list_failures", Input(("service_name", "checkout"), ("status", "all"))))
+    private async Task<TriageFailure> CheckoutFailureAsync(AnalysisPath path) =>
+        Assert.ContainsSingle((await AskAsync<TriageOutput>(path, "triage", Input(("service_name", "checkout"), ("status", "all"))))
             .Failures.Where(failure => failure.Operation == "checkout"));
 
     private static JsonObject Input(params (string Key, JsonNode? Value)[] fields)

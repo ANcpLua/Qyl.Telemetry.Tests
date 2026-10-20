@@ -89,12 +89,12 @@ public sealed class RestartTests(TestContext context)
             "A cursor issued before the restart must continue the same ordered failure list.");
     }
 
-    private Task<ListFailuresOutput> FailuresAsync(AnalysisPath path, JsonObject window, int? limit, string? cursor = null)
+    private Task<TriageOutput> FailuresAsync(AnalysisPath path, JsonObject window, int? limit, string? cursor = null)
     {
         var input = window.DeepClone().AsObject();
         input["status"] = "all";
         if (limit is { } size) input["limit"] = size;
         if (cursor is not null) input["cursor"] = cursor;
-        return Session.AskAsync<ListFailuresOutput>(path, "list_failures", input, context.CancellationToken);
+        return Session.AskAsync<TriageOutput>(path, "triage", input, context.CancellationToken);
     }
 }

@@ -15,7 +15,9 @@ internal sealed class AnswerKey
     internal const string Release = "1.4.1";
     internal const int FixRequestsNeeded = 96;
     internal const double CheckoutSeconds = 1.84;
-    internal const long CounterIncrease = 90;
+    // The counter starts one minute before its first point, inside the window, so all 190 requests are the window's
+    // increase (qyl 17.0.5 answer key 20b), not the 90 between the first and the last point.
+    internal const long CounterIncrease = 190;
 
     internal AnswerKey(DateTimeOffset now)
     {

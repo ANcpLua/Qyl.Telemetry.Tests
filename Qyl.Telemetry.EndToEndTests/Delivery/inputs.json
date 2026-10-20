@@ -1,11 +1,11 @@
 {
   "collector": {
     "repository": "https://github.com/ANcpLua/qyl.git",
-    "commit": "c61d11f86de3e22284f84bc5acea7383ffdc409d"
+    "commit": "3fe4bd0555b3df6697db0a61f742742e31411569"
   },
   "mcp": {
     "name": "qyl-mcp-server",
-    "version": "17.0.3",
-    "integrity": "sha512-1Oy2n/XmxwY5bQ8g6mCs8/32fv2LKC0lAT+yK56qIOUvfPrZdE5gSN7g4AWNSKe1ZDE6f13RAscFd/gBvaOLBA=="
+    "version": "17.0.5",
+    "integrity": "sha512-VTxENxL+2ex9N5W5qKo5WqWGWPEHedw5RBbeKDJk8MmhenW3RuaoZh2r3lOr2mqOw7QNfQXwTUwT0QX9C3ZhvA=="
   }
 }

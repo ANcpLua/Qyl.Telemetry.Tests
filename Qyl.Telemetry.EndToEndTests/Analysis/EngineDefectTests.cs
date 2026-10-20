@@ -42,7 +42,7 @@ public sealed class EngineDefectTests(TestContext context)
         for (var i = 0; i < 150; i++)
             incidents.Span($"{service}-staging-{i}", service, "checkout", _now - 30 * Minute + (ulong)i * Millisecond, resource: Environment("staging"));
         await SendAsync(incidents, $"{service}-staging-149");
-        var failure = Assert.ContainsSingle((await AskAsync<ListFailuresOutput>(path, "list_failures",
+        var failure = Assert.ContainsSingle((await AskAsync<TriageOutput>(path, "triage",
             Window(("service_name", service), ("environment", "prod"), ("status", "all")))).Failures);
         // Since 17.0.1 verify_fix scopes requests and failures by one set of matchers (or by a failure_id alone), so the
         // environment is part of the matchers rather than a separate argument.
@@ -89,7 +89,7 @@ public sealed class EngineDefectTests(TestContext context)
                     resource: new Dictionary<string, object> { ["cloud.region"] = region });
             }
         await SendAsync(incidents, $"{service}-us-ok-9");
-        var failure = Assert.ContainsSingle((await AskAsync<ListFailuresOutput>(path, "list_failures",
+        var failure = Assert.ContainsSingle((await AskAsync<TriageOutput>(path, "triage",
             Window(("service_name", service), ("status", "all")))).Failures);
         var output = await AskAsync<CompareGroupsOutput>(path, "compare_groups", Window(
             ("matchers", new JsonArray(new JsonObject { ["key"] = "service.name", ["op"] = "eq", ["value"] = service, ["scope"] = "resource" })),
@@ -126,6 +126,7 @@ public sealed class EngineDefectTests(TestContext context)
             ["metric_name"] = name, ["aggregation"] = "last", ["step_ms"] = 60_000,
             ["start_time"] = AnswerKey.Iso(start), ["end_time"] = AnswerKey.Iso(start + 2 * Minute)
         });
+        Assert.IsNotNull(output.Series);
         Assert.AreSequenceEqual([7d, 9d], Assert.ContainsSingle(output.Series).Buckets.Select(bucket => bucket.Value ?? double.NaN));
     }
 
@@ -154,6 +155,7 @@ public sealed class EngineDefectTests(TestContext context)
         await incidents.SendAsync(Session.Client, context.CancellationToken);
         var output = await AskAsync<QueryMetricOutput>(path, "query_metric", Window(("metric_name", name), ("aggregation", "p50"),
             ("step_ms", 3_600_000)));
+        Assert.IsNotNull(output.Series);
         var median = Assert.ContainsSingle(Assert.ContainsSingle(output.Series).Buckets.Select(bucket => bucket.Value).OfType<double>());
         Assert.IsInRange(-20d, -12d, median);
     }
