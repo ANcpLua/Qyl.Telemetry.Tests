@@ -8,6 +8,6 @@
     "forbidden": ["update_failure_status", "create_annotation", "update_annotation"],
     "argument_checks": [],
     "must_mention": ["checkout latency by route", "delet|remov"],
-    "rubric": "The answer confirms that the saved query \"checkout latency by route\" was created with an id and etag, that it appeared in the listing, and that it was deleted again with its current etag. It does not leave the query behind and does not claim a step succeeded that the tool refused."
+    "rubric": "The answer confirms that the saved query \"checkout latency by route\" was created (an id is expected; naming the etag is optional), that it appeared in the listing, and that it was deleted again, ideally with a listing that shows it gone. It does not leave the query behind and does not claim a step succeeded that the tool refused. Saying what the saved filter does and does not cover is fine."
   }
 }

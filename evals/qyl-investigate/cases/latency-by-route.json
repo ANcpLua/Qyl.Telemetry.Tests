@@ -8,6 +8,6 @@
     "forbidden": ["create_annotation", "update_annotation", "create_saved_query", "update_saved_query", "update_failure_status", "delete_record"],
     "argument_checks": [],
     "must_mention": ["/checkout", "/cart", "1\\.8|18[0-9]{2}", "0\\.2|2[0-9]{2}"],
-    "rubric": "The answer gives /checkout a p95 of about 1.8 seconds (1840 ms) and /cart about 0.2 seconds (210 ms) over the last 24 hours, with the unit, and says the comparison comes from the recorded request duration metric or from the http service's spans. If it used query_metric it mentions that the value is approximate when the tool said so. It does not invent routes or numbers."
+    "rubric": "The answer gives /checkout a p95 of about 1.8 seconds (about 1840 ms) and /cart about 0.2 seconds (about 210 ms) over the last 24 hours, with the unit. Extra measures from the same call (p50, p99, counts, error rates, the window, the sample size) are fine. If it used query_metric it mentions that the value is approximate when the tool said so. It does not invent routes or numbers."
   }
 }
