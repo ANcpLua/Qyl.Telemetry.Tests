@@ -10,8 +10,10 @@ qyl-investigate skill or to the server's instructions to see what the change did
 - `claude` (Claude Code CLI) signed in, and the qyl MCP server signed in as the reviewer
   under the server name `qyl` (`claude mcp list` shows `qyl: https://mcp.qyl.at/mcp - Connected`).
   The replay passes only that server (`--strict-mcp-config`), so the sign-in stored for the
-  name `qyl` decides which project answers. The reviewer sign-in reaches `openai-review`, the
-  project reseeded daily at 21:53 UTC with the answer-key incidents; the plugin's own server
+  name `qyl` decides which project answers. The reviewer sign-in reaches `review`, the
+  project reseeded daily at 00:00 UTC with the answer-key incidents (releases are named by the
+  UTC date: checkout YYYY.MM.DD.1 is the bad release and .2 the fix, regional .3 fails in eu) and
+  fed healthy traffic every 10 minutes; the plugin's own server
   entry (`plugin:qyl:qyl`) is the owner's project and is not used.
 - The installed qyl plugin (`claude plugin list` shows `qyl@ancplua-anthropic`), or a plugin
   directory passed with `--plugin-dir`. The replay loads the plugin with `--plugin-dir` and

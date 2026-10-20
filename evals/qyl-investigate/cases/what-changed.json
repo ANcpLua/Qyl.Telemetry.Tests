@@ -9,7 +9,7 @@
     "argument_checks": [
       { "tool": "triage", "argument": "lookback_minutes", "gte": 1440, "or_present": ["start_time", "end_time"] }
     ],
-    "must_mention": ["checkout", "1\\.4\\.1", "payments|/pay", "sess_bad|sessions", "billing"],
-    "rubric": "The answer ranks the failures triage returned for a 24 hour window. It names the checkout failure and says it coincides with the checkout release 1.4.1, names the payments failure on route /pay, says the sessions failure comes only from session sess_bad, and lists billing as a silent service. It reports the window and any truncation or incomplete scan it was told about. It does not invent trace, span, failure or session ids and does not claim a release caused a failure; a coinciding release is a lead."
+    "must_mention": ["checkout", "\\d{4}\\.\\d{2}\\.\\d{2}\\.\\d", "payments|/pay", "sess_bad|sessions", "billing"],
+    "rubric": "The answer ranks the failures triage returned for a 24 hour window. It names the checkout failure and says it coincides with a checkout release named by its UTC date (the pattern YYYY.MM.DD.1 is the bad release; .2 is the fix), names the payments failure on route /pay, says the sessions failure comes only from session sess_bad, and lists billing as a silent service. It reports the window and any truncation or incomplete scan it was told about. It does not invent trace, span, failure or session ids and does not claim a release caused a failure; a coinciding release is a lead."
   }
 }
