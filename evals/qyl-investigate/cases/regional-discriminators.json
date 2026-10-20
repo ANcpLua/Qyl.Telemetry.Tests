@@ -1,13 +1,31 @@
 {
   "id": "regional-discriminators",
-  "tags": ["read"],
+  "tags": [
+    "read"
+  ],
   "prompt": "What distinguishes the failing requests of the regional service from the ones that succeed?",
   "max_turns": 12,
   "expect": {
-    "tools": [["compare_groups"]],
-    "forbidden": ["create_annotation", "update_annotation", "create_saved_query", "update_saved_query", "update_failure_status", "delete_record"],
+    "tools": [
+      [
+        "compare_groups"
+      ]
+    ],
+    "forbidden": [
+      "create_annotation",
+      "update_annotation",
+      "create_saved_query",
+      "update_saved_query",
+      "update_failure_status",
+      "delete_record"
+    ],
     "argument_checks": [],
-    "must_mention": ["cloud\\.region", "\\beu\\b", "service\\.version", "\\d{4}\\.\\d{2}\\.\\d{2}\\.3"],
-    "rubric": "The answer names the two leading discriminators compare_groups returned: cloud.region = eu and service.version = the regional release named by its UTC date with the pattern YYYY.MM.DD.3, and says every failing request is eu on that version while the succeeding ones span the other region and the previous release (.2). It reports the group sizes or lift it was given rather than inventing numbers, and it does not call a discriminator a cause."
+    "must_mention": [
+      "cloud\\.region",
+      "\\beu\\b",
+      "service\\.version",
+      "\\d{4}\\.\\d{2}\\.\\d{2}(?:\\.\\d{2})?\\.3"
+    ],
+    "rubric": "The answer names the two leading discriminators compare_groups returned: cloud.region = eu and service.version = the regional release named by its UTC date with the pattern YYYY.MM.DD.3 or YYYY.MM.DD.HH.3, and says every failing request is eu on that version while the succeeding ones span the other region and the previous release (.2). It reports the group sizes or lift it was given rather than inventing numbers, and it does not call a discriminator a cause."
   }
 }

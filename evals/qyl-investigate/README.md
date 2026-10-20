@@ -12,7 +12,8 @@ qyl-investigate skill or to the server's instructions to see what the change did
   The replay passes only that server (`--strict-mcp-config`), so the sign-in stored for the
   name `qyl` decides which project answers. The reviewer sign-in reaches `review`, the
   project reseeded daily at 00:00 UTC with the answer-key incidents (releases are named by the
-  UTC date: checkout YYYY.MM.DD.1 is the bad release and .2 the fix, regional .3 fails in eu) and
+  UTC date, and from qyl 17.0.9 by the date and the 12-hour slot: checkout YYYY.MM.DD[.HH].1 is the
+  bad release and .2 the fix, regional .3 fails in eu) and
   fed healthy traffic every 10 minutes; the plugin's own server
   entry (`plugin:qyl:qyl`) is the owner's project and is not used.
 - The installed qyl plugin (`claude plugin list` shows `qyl@ancplua-anthropic`), or a plugin

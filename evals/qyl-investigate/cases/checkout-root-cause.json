@@ -1,13 +1,40 @@
 {
   "id": "checkout-root-cause",
-  "tags": ["read"],
+  "tags": [
+    "read"
+  ],
   "prompt": "A checkout request failed with a database timeout in the last 24 hours. Why did it fail, and did the latest checkout release fix the database timeouts?",
   "max_turns": 16,
   "expect": {
-    "tools": [["triage", "list_failures", "get_failure_context", "list_traces"], ["get_failure_context"], ["verify_fix"]],
-    "forbidden": ["create_annotation", "update_annotation", "create_saved_query", "update_saved_query", "update_failure_status", "delete_record"],
+    "tools": [
+      [
+        "triage",
+        "list_failures",
+        "get_failure_context",
+        "list_traces"
+      ],
+      [
+        "get_failure_context"
+      ],
+      [
+        "verify_fix"
+      ]
+    ],
+    "forbidden": [
+      "create_annotation",
+      "update_annotation",
+      "create_saved_query",
+      "update_saved_query",
+      "update_failure_status",
+      "delete_record"
+    ],
     "argument_checks": [],
-    "must_mention": ["orders-db|orders_db", "timeout", "postgres", "pending|passed"],
-    "rubric": "The answer names the root cause as the orders-db span named db with error.type timeout on postgresql and the message \"database timeout\", and says the checkout errors of type downstream are propagated symptoms, not the cause. It verifies the fix against the latest checkout release, named by its UTC date with the pattern YYYY.MM.DD.2 (the .1 release introduced the failure), and reports verify_fix's verdict as returned: pending with how many more requests and minutes are needed, or passed once healthy traffic has accumulated; it never reports a verdict the tool did not return and never calls the fix failed when the tool said pending. It does not invent ids."
+    "must_mention": [
+      "orders-db|orders_db",
+      "timeout",
+      "postgres",
+      "pending|passed"
+    ],
+    "rubric": "The answer names the root cause as the orders-db span named db with error.type timeout on postgresql and the message \"database timeout\", and says the checkout errors of type downstream are propagated symptoms, not the cause. It verifies the fix against the latest checkout release, named by its UTC date with the pattern YYYY.MM.DD.2 or YYYY.MM.DD.HH.2 (the .1 release introduced the failure), and reports verify_fix's verdict as returned: pending with how many more requests and minutes are needed, or passed once healthy traffic has accumulated; it never reports a verdict the tool did not return and never calls the fix failed when the tool said pending. It does not invent ids."
   }
 }

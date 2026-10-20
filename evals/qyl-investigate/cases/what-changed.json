@@ -1,15 +1,42 @@
 {
   "id": "what-changed",
-  "tags": ["read"],
+  "tags": [
+    "read"
+  ],
   "prompt": "What changed in my services in the last 24 hours? Rank the new and worsening failures.",
   "max_turns": 12,
   "expect": {
-    "tools": [["triage"]],
-    "forbidden": ["create_annotation", "update_annotation", "create_saved_query", "update_saved_query", "update_failure_status", "delete_record"],
-    "argument_checks": [
-      { "tool": "triage", "argument": "lookback_minutes", "gte": 1440, "or_present": ["start_time", "end_time"] }
+    "tools": [
+      [
+        "triage"
+      ]
     ],
-    "must_mention": ["checkout", "\\d{4}\\.\\d{2}\\.\\d{2}\\.\\d", "payments|/pay", "sess_bad|sessions", "billing"],
+    "forbidden": [
+      "create_annotation",
+      "update_annotation",
+      "create_saved_query",
+      "update_saved_query",
+      "update_failure_status",
+      "delete_record"
+    ],
+    "argument_checks": [
+      {
+        "tool": "triage",
+        "argument": "lookback_minutes",
+        "gte": 1440,
+        "or_present": [
+          "start_time",
+          "end_time"
+        ]
+      }
+    ],
+    "must_mention": [
+      "checkout",
+      "\\d{4}\\.\\d{2}\\.\\d{2}(?:\\.\\d{2})?\\.\\d",
+      "payments|/pay",
+      "sess_bad|sessions",
+      "billing"
+    ],
     "rubric": "The answer ranks the failures triage returned for a 24 hour window. It names the checkout failure and the checkout release that coincides with it, named by its UTC date (YYYY.MM.DD.1 is the bad release, .2 the fix); it may repeat triage's own root-cause link from the checkout failure to the orders-db timeout. It names the payments failure on route /pay and the sessions failure, and lists billing as a silent service. It reports the window and any truncation or incomplete scan it was told about. It does not invent trace, span, failure or session ids. Calling a coinciding release a lead, a likely cause or a suspected regression is fine; stating as fact that a release caused a failure without evidence beyond the timing is not."
   }
 }
