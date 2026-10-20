@@ -43,7 +43,7 @@ public sealed class AnswerKeyTests(TestContext context)
         var first = triage.Failures[0];
         Assert.AreEqual(checkout.FailureId, first.FailureId);
         Assert.AreEqual(AnswerKey.Release, first.CoincidingRelease?.Version);
-        Assert.Contains(failure => failure.Count == 2 && failure.Service == "payments", triage.Failures);
+        Assert.Contains(failure => failure is { Count: 2, Service: "payments" }, triage.Failures);
         Assert.Contains(service => service.Service == "billing", triage.SilentServices);
         var session = Assert.ContainsSingle(triage.Failures.Where(failure => failure.Service == "sessions"));
         Assert.AreEqual(3L, session.Count, "Only sess_bad contributes failures.");

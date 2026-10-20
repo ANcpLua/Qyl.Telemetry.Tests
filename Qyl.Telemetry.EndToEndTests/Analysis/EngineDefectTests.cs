@@ -101,7 +101,7 @@ public sealed class EngineDefectTests(TestContext context)
             })));
         Assert.AreEqual(10L, output.SizeA, "Only the occurrences inside the cohort window belong to it.");
         var cohortRegion = Assert.ContainsSingle(output.Discriminators.Where(association => association.Key == "cloud.region"));
-        Assert.AreEqual("eu", cohortRegion.Value?.ToString());
+        Assert.AreEqual("eu", cohortRegion.Value.ToString());
         Assert.AreEqual(1d, cohortRegion.ShareA);
     }
 
@@ -198,7 +198,7 @@ public sealed class EngineDefectTests(TestContext context)
             seen.AddRange(SpanIds(page));
         }
         string[] expected = [root.SpanId, incidents.Keys[$"{service}-child-20"].SpanId, incidents.Keys[$"{service}-child-30"].SpanId, late.SpanId];
-        Assert.AreSequenceEqual(expected.Order().ToArray(), seen.Order().ToArray(), $"A fresh query returned {string.Join(", ", seen)}.");
+        Assert.AreSequenceEqual([.. expected.Order()], [.. seen.Order()], $"A fresh query returned {string.Join(", ", seen)}.");
     }
 
     private static IEnumerable<string> SpanIds(JsonElement page) =>
