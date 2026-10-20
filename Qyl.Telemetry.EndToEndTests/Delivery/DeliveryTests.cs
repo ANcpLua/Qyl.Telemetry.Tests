@@ -95,7 +95,8 @@ public sealed class DeliveryTests(TestContext context)
             .Where(span => span.GetProperty("span_id").GetString() == server.SpanId));
         Assert.AreEqual(server.ParentSpanId, observed.GetProperty("parent_span_id").GetString());
         Assert.AreEqual("GET /capture", observed.GetProperty("name").GetString());
-        Assert.AreEqual("Microsoft.AspNetCore", observed.GetProperty("instrumentation_scope").GetProperty("name").GetString());
+        // The compact span row names the service, not the instrumentation scope (qyl 17.0.4 and later).
+        Assert.IsFalse(string.IsNullOrEmpty(observed.GetProperty("service").GetString()));
         var attributes = observed.GetProperty("attributes").Deserialize<Qyl.Api.Contracts.Common.Attribute[]>();
         Assert.IsNotNull(attributes);
         Assert.That.HasCapturedValues(attributes, CapturedKey, ProbeSignals.RequestId);
