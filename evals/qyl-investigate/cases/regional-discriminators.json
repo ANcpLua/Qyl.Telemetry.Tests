@@ -3,7 +3,7 @@
   "tags": [
     "read"
   ],
-  "prompt": "What distinguishes the failing requests of the regional service from the ones that succeed?",
+  "prompt": "Since the latest regional release, what distinguishes the failing requests of the regional service from the ones that succeed?",
   "max_turns": 12,
   "expect": {
     "tools": [
@@ -26,6 +26,6 @@
       "service\\.version",
       "\\d{4}\\.\\d{2}\\.\\d{2}(?:\\.\\d{2})?\\.3"
     ],
-    "rubric": "The answer names the two leading discriminators compare_groups returned: cloud.region = eu and service.version = the regional release named by its UTC date with the pattern YYYY.MM.DD.3 or YYYY.MM.DD.HH.3, and says every failing request is eu on that version while the succeeding ones span the other region and the previous release (.2). It reports the group sizes or lift it was given rather than inventing numbers, and it does not call a discriminator a cause."
+    "rubric": "The answer scopes itself to the latest regional release (the newest version named by its UTC date and 12-hour slot, pattern YYYY.MM.DD.HH.3) and names the two discriminators compare_groups returned for it: cloud.region = eu and service.version = that latest .3 release, saying every failing request since the release is eu on that version, while the succeeding ones are the other region on the same release and both regions on the previous .2 release. It reports the group sizes or lift it was given rather than inventing numbers, and it does not call a discriminator a cause."
   }
 }
