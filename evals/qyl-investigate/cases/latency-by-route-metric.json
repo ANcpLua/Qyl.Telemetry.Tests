@@ -1,0 +1,41 @@
+{
+  "id": "latency-by-route-metric",
+  "tags": [
+    "variant"
+  ],
+  "prompt": "Using the recorded http.server.request.duration metric, compare the p95 of /checkout and /cart over the last 24 hours.",
+  "max_turns": 12,
+  "expect": {
+    "tools": [
+      [
+        "query_metric"
+      ]
+    ],
+    "forbidden": [
+      "create_annotation",
+      "update_annotation",
+      "create_saved_query",
+      "update_saved_query",
+      "update_failure_status",
+      "delete_record"
+    ],
+    "argument_checks": [
+      {
+        "tool": "query_metric",
+        "argument": "lookback_minutes",
+        "gte": 1440,
+        "or_present": [
+          "start_time",
+          "end_time"
+        ]
+      }
+    ],
+    "must_mention": [
+      "/checkout",
+      "/cart",
+      "1\\.8|18[0-9]{2}",
+      "0\\.2|2[0-9]{2}"
+    ],
+    "rubric": "The answer reads the http.server.request.duration metric with query_metric over 24 hours, grouped by http.route, and gives /checkout a p95 of about 1.8 seconds and /cart about 0.2 seconds, with the unit and a note that the value is approximate when the tool said so. It does not fall back to spans without saying why, does not report empty buckets as an answer, and does not invent routes or numbers."
+  }
+}
