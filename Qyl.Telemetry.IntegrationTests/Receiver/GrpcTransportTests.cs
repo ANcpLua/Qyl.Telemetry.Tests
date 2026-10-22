@@ -219,29 +219,22 @@ public sealed class GrpcTransportTests
     [TestMethod]
     public async Task Disposal_closes_both_listeners_and_wakes_a_pending_evidence_wait()
     {
-        var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        try
-        {
-            using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-            using (var live = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-                       new CallOptions(cancellationToken: TestContext.CancellationToken), []))
-                Assert.IsEmpty(await live.ResponseAsync);
-            var waiting = receiver.AwaitAsync(snapshot => snapshot.Spans.Count > 0, TimeSpan.FromSeconds(10), TestContext.CancellationToken);
-            await receiver.DisposeAsync();
-            await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => waiting);
-            // Verify the closed listener with a fresh connection, independently of how the
-            // previous HTTP/2 connection reports its graceful shutdown.
-            using var disconnected = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-            using var closed = disconnected.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-                new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: TestContext.CancellationToken), []);
-            var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => closed.ResponseAsync);
-            Assert.AreEqual(StatusCode.Unavailable, failure.StatusCode, failure.Status.Detail);
-            await Assert.ThrowsExactlyAsync<HttpRequestException>(() => TelemetryLifecycle.Http.GetAsync(receiver.Endpoint, TestContext.CancellationToken));
-        }
-        finally
-        {
-            await receiver.DisposeAsync();
-        }
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
+        using (var live = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
+                   new CallOptions(cancellationToken: TestContext.CancellationToken), []))
+            Assert.IsEmpty(await live.ResponseAsync);
+        var waiting = receiver.AwaitAsync(snapshot => snapshot.Spans.Count > 0, TimeSpan.FromSeconds(10), TestContext.CancellationToken);
+        await receiver.DisposeAsync();
+        await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => waiting);
+        // Verify the closed listener with a fresh connection, independently of how the
+        // previous HTTP/2 connection reports its graceful shutdown.
+        using var disconnected = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
+        using var closed = disconnected.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
+            new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: TestContext.CancellationToken), []);
+        var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => closed.ResponseAsync);
+        Assert.AreEqual(StatusCode.Unavailable, failure.StatusCode, failure.Status.Detail);
+        await Assert.ThrowsExactlyAsync<HttpRequestException>(() => TelemetryLifecycle.Http.GetAsync(receiver.Endpoint, TestContext.CancellationToken));
     }
 
     private static Method<byte[], byte[]> Export(string signal) => new(MethodType.Unary, signal switch

@@ -273,4 +273,13 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
         Activity.Current = root.GetCustomProperty(AmbientProperty) as Activity;
         Flush();
     }
+
+    /// <summary>Returns a scope that calls <see cref="End" /> for <paramref name="root" /> when it is disposed.</summary>
+    public RootScope Ending(Activity root) => new(this, root);
+
+    /// <summary>Ends one root from <see cref="Begin" /> on disposal.</summary>
+    public sealed class RootScope(TelemetryPipeline pipeline, Activity root) : IDisposable
+    {
+        public void Dispose() => pipeline.End(root);
+    }
 }

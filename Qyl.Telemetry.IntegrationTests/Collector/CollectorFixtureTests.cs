@@ -17,37 +17,24 @@ public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
     [TestMethod]
     public async Task CollectorHasItsOwnEndpointAndCanBeDisposedTwice()
     {
-        const string portSetting = "QYL_PORT";
-        const string endpointSetting = "OTEL_EXPORTER_OTLP_ENDPOINT";
-        var previousPort = Environment.GetEnvironmentVariable(portSetting);
-        var previousEndpoint = Environment.GetEnvironmentVariable(endpointSetting);
-        try
+        using var settings = new EnvironmentScope(("QYL_PORT", "invalid"), ("OTEL_EXPORTER_OTLP_ENDPOINT", "invalid"));
+        var collector = await CollectorFixture.StartAsync(AssemblyPath, cancellationToken: testContext.CancellationToken);
+        await using (collector)
         {
-            Environment.SetEnvironmentVariable(portSetting, "invalid");
-            Environment.SetEnvironmentVariable(endpointSetting, "invalid");
-            var collector = await CollectorFixture.StartAsync(AssemblyPath, cancellationToken: testContext.CancellationToken);
-            await using (collector)
-            {
-                using var health = await _client.GetAsync(new Uri(collector.Address, "health"), testContext.CancellationToken);
-                Assert.AreEqual(HttpStatusCode.OK, health.StatusCode);
-                Assert.IsEmpty(await collector.Client.LogsAsync("00000000000000000000000000000001", testContext.CancellationToken));
-            }
+            using var health = await _client.GetAsync(new Uri(collector.Address, "health"), testContext.CancellationToken);
+            Assert.AreEqual(HttpStatusCode.OK, health.StatusCode);
+            Assert.IsEmpty(await collector.Client.LogsAsync("00000000000000000000000000000001", testContext.CancellationToken));
+        }
 
-            await collector.DisposeAsync();
-            if (!OperatingSystem.IsWindows())
-            {
-                using var shutdown = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(collector.DataDirectory, "shutdown.json"), testContext.CancellationToken));
-                Assert.AreEqual(0, shutdown.RootElement.GetProperty("ExitCode").GetInt32());
-                Assert.IsFalse(shutdown.RootElement.GetProperty("Forced").GetBoolean());
-            }
-            _ = await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() =>
-                collector.Client.LogsAsync("trace", testContext.CancellationToken));
-        }
-        finally
+        await collector.DisposeAsync();
+        if (!OperatingSystem.IsWindows())
         {
-            Environment.SetEnvironmentVariable(portSetting, previousPort);
-            Environment.SetEnvironmentVariable(endpointSetting, previousEndpoint);
+            using var shutdown = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(collector.DataDirectory, "shutdown.json"), testContext.CancellationToken));
+            Assert.AreEqual(0, shutdown.RootElement.GetProperty("ExitCode").GetInt32());
+            Assert.IsFalse(shutdown.RootElement.GetProperty("Forced").GetBoolean());
         }
+        _ = await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() =>
+            collector.Client.LogsAsync("trace", testContext.CancellationToken));
     }
 
     /// <summary>A missing input is rejected before a process or workspace is acquired.</summary>

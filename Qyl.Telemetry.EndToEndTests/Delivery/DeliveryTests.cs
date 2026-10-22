@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using ModelContextProtocol.Client;
@@ -40,7 +39,7 @@ public sealed class DeliveryTests(TestContext context)
             });
         using var root = application.Telemetry.Begin(context.TestName);
         var traceId = root.TraceId.ToHexString();
-        try
+        using (application.Telemetry.Ending(root))
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, "capture");
             request.Headers.Add(ProbeSignals.RequestHeader, ProbeSignals.RequestId);
@@ -49,7 +48,6 @@ public sealed class DeliveryTests(TestContext context)
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.CancellationToken));
             Assert.AreEqual(format == ExecutableFormat.ManagedAssembly, body.RootElement.GetProperty("isDynamicCodeSupported").GetBoolean());
         }
-        finally { application.Telemetry.End(root); }
 
         var capture = await application.Telemetry.AwaitAsync(snapshot => snapshot.Spans.Any(span =>
             span.TraceId == traceId && span is { Kind: SpanKind.Server, Service: "telemetry-probe" }), context.CancellationToken);
@@ -139,8 +137,6 @@ public sealed class DeliveryTests(TestContext context)
         Assert.IsNotNull(_delivery);
         context.AddResultFile(_delivery.ManifestPath);
         var start = _delivery.SemanticProbe.StartInfo();
-        start.RedirectStandardOutput = true;
-        start.RedirectStandardError = true;
         start.ArgumentList.Add(input switch
         {
             RequiredStringInput.String => "\"lookup_stock\"",
@@ -149,21 +145,9 @@ public sealed class DeliveryTests(TestContext context)
             RequiredStringInput.Null => "null",
             _ => throw new ArgumentOutOfRangeException(nameof(input))
         });
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the semantic contract consumer.");
-        var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        var error = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        try { await process.WaitForExitAsync(context.CancellationToken); }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None);
-            }
-            await Task.WhenAll(output, error);
-        }
-        Assert.AreEqual(0, process.ExitCode, await error);
-        return JsonDocument.Parse(await output);
+        var (exitCode, output, error) = await ChildProcess.RunAsync(start, "the semantic contract consumer", context.CancellationToken);
+        Assert.AreEqual(0, exitCode, error);
+        return JsonDocument.Parse(output);
     }
 
     public enum RequiredStringInput { String, Integer, Boolean, Null }

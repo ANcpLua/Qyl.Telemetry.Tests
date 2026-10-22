@@ -112,28 +112,9 @@ public sealed class InvocationContractTests(TestContext context)
     private async Task<(int ExitCode, string Output, string Error)> RunAsync(params string[] arguments)
     {
         Assert.IsTrue(File.Exists(ProbeAssembly), $"MSBuild did not deploy {ProbeAssembly}.");
-        var start = new ProcessStartInfo("dotnet")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
+        var start = new ProcessStartInfo("dotnet");
         start.ArgumentList.Add(ProbeAssembly);
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the native probe.");
-        // Drain redirected output after cancellation has killed and joined the child.
-        var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        var error = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        try { await process.WaitForExitAsync(context.CancellationToken); }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None);
-            }
-            await Task.WhenAll(output, error);
-        }
-        return (process.ExitCode, await output, await error);
+        return await ChildProcess.RunAsync(start, "the native probe", context.CancellationToken);
     }
 }

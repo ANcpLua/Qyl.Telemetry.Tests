@@ -31,33 +31,14 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         using var root = Recorder.Begin(nameof(QylStoresCompletedTestRootAndClient));
         var traceId = root.TraceId.ToHexString();
         var rootId = root.SpanId.ToHexString();
-        try
+        using (Recorder.Ending(root))
         {
             using var response = await _client.GetAsync(new Uri(Recorder.Collector.Address, "health"), testContext.CancellationToken);
             _ = response.EnsureSuccessStatusCode();
         }
-        finally
-        {
-            Recorder.End(root);
-        }
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromSeconds(20));
-        JsonElement trace;
-        while (true)
-        {
-            try
-            {
-                trace = await _client.GetFromJsonAsync<JsonElement>(new Uri(Recorder.Collector.Address, $"api/v1/traces/{traceId}"), deadline.Token);
-                if (trace.GetProperty("spans").EnumerateArray().Any(span => span.GetProperty("span_id").GetString() == rootId))
-                {
-                    break;
-                }
-            }
-            catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
-            {
-            }
-            await Task.Delay(100, deadline.Token);
-        }
+        var trace = await Recorder.Collector.Client.WaitForTraceAsync(traceId,
+            stored => stored.GetProperty("spans").EnumerateArray().Any(span => span.GetProperty("span_id").GetString() == rootId),
+            testContext.CancellationToken);
         var spans = trace.GetProperty("spans").EnumerateArray().ToArray();
         var ids = spans.Select(span => span.GetProperty("span_id").GetString()).ToHashSet();
         Assert.Contains(span => span.GetProperty("span_id").GetString() == rootId
@@ -76,44 +57,23 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         await Recorder.StartAsync(testContext.CancellationToken);
         using var root = Recorder.Begin(nameof(QylStoresExceptionSpanEvents));
         var traceId = root.TraceId.ToHexString();
-        try
+        using (Recorder.Ending(root))
         {
-            throw new InvalidOperationException("payment declined");
-        }
-        catch (InvalidOperationException exception)
-        {
-            _ = root.RecordFailure(exception);
-        }
-        finally
-        {
-            Recorder.End(root);
+            _ = root.RecordFailure(Assert.ThrowsExactly<InvalidOperationException>(() =>
+                throw new InvalidOperationException("payment declined")));
         }
         var original = Assert.ContainsSingle(Assert.ContainsSingle(Recorder.SpansOf(traceId)).Events);
         Assert.AreEqual("exception", original.Name);
         Assert.AreEqual("payment declined", original.Attributes["exception.message"]);
         Assert.IsNotNull(original.Attributes["exception.stacktrace"]);
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromSeconds(20));
-        while (true)
-        {
-            try
-            {
-                var events = await Recorder.Collector.Client.SpanEventsAsync(traceId, deadline.Token);
-                if (events.FirstOrDefault(spanEvent => spanEvent.Name == "exception") is { } exception)
-                {
-                    var attributes = exception.Attributes!.ToDictionary(attribute => attribute.Key, attribute => attribute.Value);
-                    Assert.AreEqual("System.InvalidOperationException", Assert.IsInstanceOfType<AttributeValue.StringValue>(attributes["exception.type"]).Value);
-                    Assert.AreEqual("payment declined", Assert.IsInstanceOfType<AttributeValue.StringValue>(attributes["exception.message"]).Value);
-                    Assert.AreEqual(original.Attributes["exception.stacktrace"], Assert.IsInstanceOfType<AttributeValue.StringValue>(attributes["exception.stacktrace"]).Value);
-                    Assert.IsGreaterThan(0UL, exception.TimeUnixNano);
-                    return;
-                }
-            }
-            catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
-            {
-            }
-            await Task.Delay(100, deadline.Token);
-        }
+        var events = await Recorder.Collector.Client.WaitForSpanEventsAsync(traceId,
+            stored => stored.Any(spanEvent => spanEvent.Name == "exception"), testContext.CancellationToken);
+        var exception = events.First(spanEvent => spanEvent.Name == "exception");
+        var attributes = exception.Attributes!.ToDictionary(attribute => attribute.Key, attribute => attribute.Value);
+        Assert.AreEqual("System.InvalidOperationException", Assert.IsInstanceOfType<AttributeValue.StringValue>(attributes["exception.type"]).Value);
+        Assert.AreEqual("payment declined", Assert.IsInstanceOfType<AttributeValue.StringValue>(attributes["exception.message"]).Value);
+        Assert.AreEqual(original.Attributes["exception.stacktrace"], Assert.IsInstanceOfType<AttributeValue.StringValue>(attributes["exception.stacktrace"]).Value);
+        Assert.IsGreaterThan(0UL, exception.TimeUnixNano);
     }
 
     /// <summary>Stopping twice is safe and restarting creates another owned receiver and SDK.</summary>
@@ -122,17 +82,11 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     {
         await Recorder.StartAsync(testContext.CancellationToken);
         await Recorder.StopAsync();
-        try
-        {
-            await Recorder.StopAsync();
-            _ = Assert.ThrowsExactly<InvalidOperationException>(() => Recorder.ReceiverAddress);
-            _ = Assert.ThrowsExactly<InvalidOperationException>(() => Recorder.Collector);
-            _ = Assert.ThrowsExactly<InvalidOperationException>(() => Recorder.Begin("not-listening"));
-        }
-        finally
-        {
-            await Recorder.StartAsync(testContext.CancellationToken);
-        }
+        await Recorder.StopAsync();
+        _ = Assert.ThrowsExactly<InvalidOperationException>(() => Recorder.ReceiverAddress);
+        _ = Assert.ThrowsExactly<InvalidOperationException>(() => Recorder.Collector);
+        _ = Assert.ThrowsExactly<InvalidOperationException>(() => Recorder.Begin("not-listening"));
+        await Recorder.StartAsync(testContext.CancellationToken);
         var address = Recorder.ReceiverAddress;
         await Recorder.StartAsync(testContext.CancellationToken);
         Assert.AreEqual(address, Recorder.ReceiverAddress);
@@ -146,7 +100,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         await Recorder.StartAsync(testContext.CancellationToken);
         using var root = Recorder.Begin(nameof(SdkCapturePreservesTypedValuesAndOrderedEvents));
         var traceId = root.TraceId.ToHexString();
-        try
+        using (Recorder.Ending(root))
         {
             using (var child = Spans.Work("recording-test"))
             {
@@ -179,10 +133,6 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
             Assert.IsGreaterThan(0UL, captured.StartTimeUnixNano);
             Assert.IsGreaterThanOrEqualTo(captured.StartTimeUnixNano, captured.EndTimeUnixNano);
         }
-        finally
-        {
-            Recorder.End(root);
-        }
         Assert.HasCount(2, Recorder.SpansOf(traceId));
         Assert.IsEmpty(Recorder.SpansOf("unrecorded-trace"));
     }
@@ -193,23 +143,15 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     {
         await Recorder.StartAsync(testContext.CancellationToken);
         using var outer = Recorder.Begin("outer invocation");
-        try
+        using (Recorder.Ending(outer))
         {
             using var inner = Recorder.Begin("inner invocation");
-            try
+            using (Recorder.Ending(inner))
             {
                 Assert.AreNotEqual(outer.TraceId, inner.TraceId);
                 Assert.AreSame(inner, Activity.Current);
             }
-            finally
-            {
-                Recorder.End(inner);
-            }
             Assert.AreSame(outer, Activity.Current);
-        }
-        finally
-        {
-            Recorder.End(outer);
         }
     }
 
@@ -292,17 +234,8 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     {
         using var collector = CollectorClient(HttpStatusCode.OK, []);
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
-        const string setting = "Kestrel__Endpoints__Broken__Url";
-        var previous = Environment.GetEnvironmentVariable(setting);
-        try
-        {
-            Environment.SetEnvironmentVariable(setting, "invalid-listener-address");
-            _ = await Assert.ThrowsAsync<FormatException>(() => OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(setting, previous);
-        }
+        using var setting = new EnvironmentScope(("Kestrel__Endpoints__Broken__Url", "invalid-listener-address"));
+        _ = await Assert.ThrowsAsync<FormatException>(() => OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken));
     }
 
     private static HttpClient CollectorClient(HttpStatusCode status, byte[] bytes) => new(new CollectorHandler(status, bytes))
@@ -330,31 +263,24 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         using var collector = new HttpClient(handler);
         collector.BaseAddress = new Uri("https://collector.test/");
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
-        var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
-        try
-        {
-            using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
-            using var body = new ByteArrayContent([]);
-            body.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-            var send = _client.PostAsync(new Uri(receiver.Address, $"v1/{signal}"), body, cancelled.Token);
-            await handler.Started.Task.WaitAsync(testContext.CancellationToken);
-            await cancelled.CancelAsync();
-            _ = await Assert.ThrowsAsync<OperationCanceledException>(() => send);
-            var stop = receiver.DisposeAsync().AsTask();
-            Assert.IsFalse(stop.IsCompleted, "Shutdown must join the active export.");
-            _ = handler.Complete.TrySetResult();
-            await stop;
-            var delivery = Assert.ContainsSingle(receiver.Deliveries);
-            Assert.AreEqual(200, delivery.CaptureStatus);
-            Assert.AreEqual(200, delivery.CollectorStatus);
-            Assert.IsNull(delivery.Failure);
-            Assert.AreEqual(signal, Assert.ContainsSingle(capture.Snapshot().Requests).Signal);
-        }
-        finally
-        {
-            _ = handler.Complete.TrySetResult();
-            await receiver.DisposeAsync();
-        }
+        await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
+        using var release = handler.Releasing();
+        using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
+        using var body = new ByteArrayContent([]);
+        body.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
+        var send = _client.PostAsync(new Uri(receiver.Address, $"v1/{signal}"), body, cancelled.Token);
+        await handler.Started.Task.WaitAsync(testContext.CancellationToken);
+        await cancelled.CancelAsync();
+        _ = await Assert.ThrowsAsync<OperationCanceledException>(() => send);
+        var stop = receiver.DisposeAsync().AsTask();
+        Assert.IsFalse(stop.IsCompleted, "Shutdown must join the active export.");
+        _ = handler.Complete.TrySetResult();
+        await stop;
+        var delivery = Assert.ContainsSingle(receiver.Deliveries);
+        Assert.AreEqual(200, delivery.CaptureStatus);
+        Assert.AreEqual(200, delivery.CollectorStatus);
+        Assert.IsNull(delivery.Failure);
+        Assert.AreEqual(signal, Assert.ContainsSingle(capture.Snapshot().Requests).Signal);
     }
 
     /// <summary>Transport failures remain visible rather than disappearing from the delivery list.</summary>
@@ -386,6 +312,14 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Complete { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        /// <summary>Completes a pending export on disposal so the relay can join it during cleanup.</summary>
+        public Release Releasing() => new(Complete);
+
+        public sealed class Release(TaskCompletionSource complete) : IDisposable
+        {
+            public void Dispose() => _ = complete.TrySetResult();
+        }
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             _ = Started.TrySetResult();
@@ -398,7 +332,9 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     }
     public async ValueTask DisposeAsync()
     {
-        try { await Recorder.DisposeAsync(); }
-        finally { _client.Dispose(); }
+        using (_client)
+        {
+            await Recorder.DisposeAsync();
+        }
     }
 }

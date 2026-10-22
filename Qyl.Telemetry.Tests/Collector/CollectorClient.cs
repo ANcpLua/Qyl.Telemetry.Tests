@@ -31,6 +31,10 @@ public sealed class CollectorClient(HttpClient client)
         Func<IReadOnlyList<StoredLogRecord>, bool> until, CancellationToken cancellationToken = default) =>
         WaitUntilAsync(token => LogsAsync(traceId, token), until, $"logs for trace '{traceId}'", cancellationToken);
 
+    public Task<IReadOnlyList<SpanEvent>> WaitForSpanEventsAsync(string traceId,
+        Func<IReadOnlyList<SpanEvent>, bool> until, CancellationToken cancellationToken = default) =>
+        WaitUntilAsync(token => SpanEventsAsync(traceId, token), until, $"span events for trace '{traceId}'", cancellationToken);
+
     public Task<MetricQueryResult> WaitForMetricAsync(string name, DateTimeOffset start, DateTimeOffset end,
         Func<MetricQueryResult, bool> until, MetricAggregation aggregation = MetricAggregation.Last,
         CancellationToken cancellationToken = default) =>

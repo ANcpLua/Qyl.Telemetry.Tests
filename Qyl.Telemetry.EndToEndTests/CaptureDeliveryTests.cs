@@ -45,7 +45,7 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
     {
         using var root = Application.Telemetry.Begin(context.TestName);
         var traceId = root.TraceId.ToHexString();
-        try
+        using (Application.Telemetry.Ending(root))
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, route);
             Assert.IsTrue(request.Headers.TryAddWithoutValidation(ProbeSignals.RequestHeader, ProbeSignals.RequestId));
@@ -60,7 +60,6 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
                 Assert.IsTrue(body.RootElement.GetProperty("informationLoggingEnabled").GetBoolean());
             }
         }
-        finally { Application.Telemetry.End(root); }
 
         var capture = await Application.Telemetry.AwaitAsync(
             snapshot => snapshot.Spans.Any(span => span.TraceId == traceId && span is { Service: ProbeService, Kind: SpanKind.Server }), context.CancellationToken);
