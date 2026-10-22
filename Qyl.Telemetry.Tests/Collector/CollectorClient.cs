@@ -32,8 +32,10 @@ public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider
     public Task<JsonElement> ReadTraceAsync(string traceId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(traceId);
-        return ReadAsync<JsonElement>($"api/v1/traces/{Uri.EscapeDataString(traceId)}", cancellationToken);
+        return ReadAsync<JsonElement>(TraceRoute(traceId), cancellationToken);
     }
+
+    private static string TraceRoute(string traceId) => $"api/v1/traces/{Uri.EscapeDataString(traceId)}";
 
     public Task<JsonElement> WaitForTraceAsync(string traceId, Func<JsonElement, bool> until,
         CancellationToken cancellationToken = default) =>
@@ -61,7 +63,7 @@ public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider
         try
         {
             _ = await WaitUntilAsync(async token => stored =
-                    (await ReadAsync<StoredTrace>($"api/v1/traces/{Uri.EscapeDataString(traceId)}", token).ConfigureAwait(false)).Spans,
+                    (await ReadAsync<StoredTrace>(TraceRoute(traceId), token).ConfigureAwait(false)).Spans,
                 spans => spanIds.All(id => spans.Any(span => span.SpanId == id)), $"trace '{traceId}'", cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -150,7 +152,7 @@ public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider
     public async Task<IReadOnlyList<SpanEvent>> SpanEventsAsync(string traceId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(traceId);
-        var trace = await ReadAsync<JsonElement>($"api/v1/traces/{Uri.EscapeDataString(traceId)}", cancellationToken).ConfigureAwait(false);
+        var trace = await ReadAsync<JsonElement>(TraceRoute(traceId), cancellationToken).ConfigureAwait(false);
         return [.. trace.GetProperty("spans").EnumerateArray()
             .Where(span => span.TryGetProperty("events", out var events) && events.ValueKind == JsonValueKind.Array)
             .SelectMany(span => span.GetProperty("events").EnumerateArray())
