@@ -11,6 +11,8 @@ Every test in this repository, and every test an agent writes with this library 
 
 ## 2. One behavior per test
 
+The assertion semantics and the NativeAOT rules are in the repository's root skill, /Users/alexandernachtmann/RiderProjects/Qyl.Telemetry.Tests/SKILL.md; it binds every test.
+
 - A test asserts one behavior. A method that asserts several independent behaviors is split, one test per behavior, even when the count grows a lot.
 - Use the MSTest assertion that states the intent: `Assert.ThrowsExactly` / `ThrowsExactlyAsync` (it returns the exception), `Assert.IsInstanceOfType<T>`, `Assert.ContainsSingle`, `CollectionAssert`, `StringAssert`, `Assert.AreEqual` with a message only when the values alone do not explain the failure. Reference: https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-mstest-writing-tests-assertions
 - No assertion hidden in a private helper. A helper builds data or runs the operation; the test asserts. The exception is a reusable policy or assertion type in the support library.
