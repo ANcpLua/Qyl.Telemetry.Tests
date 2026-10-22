@@ -26,8 +26,7 @@ public sealed class InstrumentedApplicationFixture : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(context);
         context.CancellationToken.ThrowIfCancellationRequested();
-        return StartCoreAsync(PublishedExecutable.Identify(assembly, ExecutableFormat.ManagedAssembly,
-            System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier), null, context, environment);
+        return StartCoreAsync(PublishedExecutable.Managed(assembly), null, context, environment);
     }
 
     public static Task<InstrumentedApplicationFixture> StartAsync(PublishedExecutable application,

@@ -10,6 +10,12 @@ namespace Qyl.Telemetry.Tests.Collector;
 [JetBrains.Annotations.PublicAPI]
 public sealed class CollectorFixture : IAsyncDisposable
 {
+    /// <summary>The exit code and forced-kill flag written to the data directory on disposal.</summary>
+    internal const string ShutdownFile = "shutdown.json";
+
+    /// <summary>The Collector's standard output and error, written to the data directory on disposal.</summary>
+    internal const string LogFile = "collector.log";
+
     private readonly Process _process;
     private readonly HttpClient _client;
     private readonly Task<string> _output;
@@ -33,6 +39,9 @@ public sealed class CollectorFixture : IAsyncDisposable
         Client = new CollectorClient(_client, timeProvider);
     }
 
+    /// <summary>The packaged managed Collector that a project with UsesQylCollector copies next to its test assembly.</summary>
+    public static string DefaultAssembly { get; } = Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll");
+
     public Uri Address { get; }
     public CollectorClient Client { get; }
     public string DataDirectory { get; }
@@ -44,8 +53,7 @@ public sealed class CollectorFixture : IAsyncDisposable
         TimeProvider? timeProvider = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return StartAsync(PublishedExecutable.Identify(assembly, ExecutableFormat.ManagedAssembly,
-            System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier), workspace, timeProvider, cancellationToken);
+        return StartAsync(PublishedExecutable.Managed(assembly), workspace, timeProvider, cancellationToken);
     }
 
     public static Task<CollectorFixture> StartAsync(PublishedExecutable executable, string? workspace = null,
@@ -129,7 +137,7 @@ public sealed class CollectorFixture : IAsyncDisposable
                 }
                 catch (HttpRequestException)
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(100), timeProvider, token).ConfigureAwait(false);
+                    await Task.Delay(CollectorClient.PollingInterval, timeProvider, token).ConfigureAwait(false);
                 }
             }
         }
@@ -172,9 +180,9 @@ public sealed class CollectorFixture : IAsyncDisposable
                     await _process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
                 }
             }
-            await File.WriteAllTextAsync(Path.Combine(DataDirectory, "shutdown.json"),
+            await File.WriteAllTextAsync(Path.Combine(DataDirectory, ShutdownFile),
                 JsonSerializer.Serialize(new { _process.ExitCode, Forced = forced })).ConfigureAwait(false);
-            var log = Path.Combine(DataDirectory, "collector.log");
+            var log = Path.Combine(DataDirectory, LogFile);
             await File.WriteAllTextAsync(log,
                 await _output.ConfigureAwait(false) + await _error.ConfigureAwait(false)).ConfigureAwait(false);
             // A Collector that became ready must finish its final writes and exit cleanly once signalled.

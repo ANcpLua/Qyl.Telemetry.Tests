@@ -20,7 +20,6 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
 {
     private TelemetryPipeline Recorder { get; } = new(testContext);
 
-    private readonly HttpClient _client = new();
     private static readonly string[] Checkpoints = ["first", "second"];
 
     [TestMethod]
@@ -32,7 +31,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         var rootId = root.SpanId.ToHexString();
         using (Recorder.Ending(root))
         {
-            using var response = await _client.GetAsync(new Uri(Recorder.Collector.Address, "health"), testContext.CancellationToken);
+            using var response = await TelemetryLifecycle.Http.GetAsync(new Uri(Recorder.Collector.Address, "health"), testContext.CancellationToken);
             _ = response.EnsureSuccessStatusCode();
         }
         var spans = await Recorder.Collector.Client.WaitForSpansAsync(traceId, [rootId], testContext.CancellationToken);
@@ -298,11 +297,5 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
             public void Dispose() => _ = complete.TrySetResult();
         }
     }
-    public async ValueTask DisposeAsync()
-    {
-        using (_client)
-        {
-            await Recorder.DisposeAsync();
-        }
-    }
+    public ValueTask DisposeAsync() => Recorder.DisposeAsync();
 }

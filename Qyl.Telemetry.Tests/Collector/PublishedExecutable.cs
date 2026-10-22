@@ -10,6 +10,10 @@ public enum ExecutableFormat { ManagedAssembly, NativeAot }
 [JetBrains.Annotations.PublicAPI]
 public sealed record PublishedExecutable(string Path, ExecutableFormat Format, string RuntimeIdentifier, string Sha256)
 {
+    /// <summary>Identifies the managed assembly at <paramref name="path" /> for the current runtime identifier.</summary>
+    public static PublishedExecutable Managed(string path) =>
+        Identify(path, ExecutableFormat.ManagedAssembly, System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
+
     public static PublishedExecutable Identify(string path, ExecutableFormat format, string runtimeIdentifier)
     {
         using var file = File.OpenRead(path);

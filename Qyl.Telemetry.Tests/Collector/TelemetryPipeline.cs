@@ -55,9 +55,7 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
 
             try
             {
-                var executable = collectorExecutable ?? PublishedExecutable.Identify(
-                    Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll"),
-                    ExecutableFormat.ManagedAssembly, System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
+                var executable = collectorExecutable ?? PublishedExecutable.Managed(CollectorFixture.DefaultAssembly);
                 _collector = await CollectorFixture.StartAsync(executable, context.TestTempDirectory, cancellationToken: cancellationToken).ConfigureAwait(false);
                 _capture = await OtlpReceiver.StartAsync(cancellationToken).ConfigureAwait(false);
                 _receiver = await OtlpRelay.StartAsync(_capture, _collector.Client, cancellationToken).ConfigureAwait(false);
@@ -143,7 +141,7 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
                         errors.Add(new InvalidDataException($"Not every captured export completed successfully: {_lastCapture.Requests.Count} captured, {deliveries.Count} delivery records. See {path}."));
                     }
                     errors.AddRange(_lastCapture.Receipts.Where(receipt => receipt.Rejected > 0)
-                        .Select(receipt => new InvalidDataException($"Capture rejected {receipt.Rejected} {receipt.Signal} record(s): {receipt.Error}. See {path}.")));
+                        .Select(receipt => new InvalidDataException($"{Rejection(receipt)} See {path}.")));
                     var sourcesPath = Path.Combine(collector.DataDirectory, "span-sources.txt");
                     var sources = Sources.OrderBy(source => source.Key, StringComparer.Ordinal)
                         .Select(source => $"{source.Value,5}  {source.Key}");
@@ -163,7 +161,7 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
         if (collector is not null)
         {
             await errors.AttemptAsync(collector.DisposeAsync).ConfigureAwait(false);
-            foreach (var name in new[] { "shutdown.json", "collector.log" })
+            foreach (var name in new[] { CollectorFixture.ShutdownFile, CollectorFixture.LogFile })
             {
                 var path = Path.Combine(collector.DataDirectory, name);
                 if (File.Exists(path))
@@ -227,7 +225,7 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
             {
                 var rejected = snapshot.Receipts.FirstOrDefault(receipt => receipt.Rejected > 0);
                 return rejected is null ? until(snapshot)
-                    : throw new InvalidDataException($"Capture rejected {rejected.Rejected} {rejected.Signal} record(s): {rejected.Error}.");
+                    : throw new InvalidDataException(Rejection(rejected));
             }, TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
         }
         catch (TimeoutException error)
@@ -238,6 +236,9 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
                 + $"metrics [{string.Join(", ", capture.Metrics.Select(metric => metric.Name).Distinct())}].", error);
         }
     }
+
+    private static string Rejection(ExportReceipt receipt) =>
+        $"Capture rejected {receipt.Rejected} {receipt.Signal} record(s): {receipt.Error}.";
 
     private void Flush()
     {

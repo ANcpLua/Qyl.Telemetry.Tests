@@ -35,7 +35,7 @@ internal sealed class AnalysisSession : IAsyncDisposable
     internal static async Task<AnalysisSession> StartAsync(TestContext context)
     {
         var entryPoint = await new DeliveryArtifacts(context).InstallMcpAsync();
-        var collector = await CollectorFixture.StartAsync(Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll"),
+        var collector = await CollectorFixture.StartAsync(CollectorFixture.DefaultAssembly,
             timeProvider: TimeProvider.System, cancellationToken: context.CancellationToken);
         try
         {
