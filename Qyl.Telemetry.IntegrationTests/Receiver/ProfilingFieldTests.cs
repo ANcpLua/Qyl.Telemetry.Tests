@@ -21,7 +21,7 @@ public sealed class ProfilingFieldTests
     [DataRow(Signals.Traces)]
     [DataRow(Signals.Logs)]
     [DataRow(Signals.Metrics)]
-    public async Task String_table_values_are_empty_with_visible_non_fatal_warnings(string signal)
+    public async Task Receiver_ProfilingStringTableValueOnSignal_IsEmptyWithAWarningNotLeakedToTheNextExport(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var resource = new Resource
@@ -93,15 +93,14 @@ public sealed class ProfilingFieldTests
         Assert.AreEqual("application/x-protobuf", response.Content.Headers.ContentType?.MediaType);
         Assert.Contains("StringValueStrindex 7", warning);
         Assert.Contains("StringValueStrindex 8", warning);
-        // The next request has its own decoder; diagnostics must not leak between exports.
-        using var clean = await ReceiverTests.PostAsync(receiver.Endpoint, [], TestContext.CancellationToken, signal);
-        clean.EnsureSuccessStatusCode();
+        using var nextExportWithItsOwnDecoder = await ReceiverTests.PostAsync(receiver.Endpoint, [], TestContext.CancellationToken, signal);
+        nextExportWithItsOwnDecoder.EnsureSuccessStatusCode();
         Assert.IsEmpty(receiver.Snapshot().Receipts[1].Warnings);
         Assert.HasCount(1, snapshot.Receipts);
     }
 
     [TestMethod]
-    public async Task Unknown_profile_keys_do_not_replace_literal_attributes()
+    public async Task Receiver_UnknownProfileKeys_DoNotReplaceLiteralAttributes()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var resource = new Resource

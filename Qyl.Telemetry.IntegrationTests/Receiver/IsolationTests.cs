@@ -33,7 +33,7 @@ public sealed class IsolationTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
-    public async Task Native_trace_scope_preserves_each_data_rows_identity(int row)
+    public async Task NativeTraceScope_DataRows_KeepTheirOwnIdentity(int row)
     {
         var root = Activity.Current;
         Assert.IsNotNull(root);
@@ -77,7 +77,7 @@ public sealed class IsolationTests
     }
 
     [TestMethod]
-    public async Task Action_failure_is_preserved_and_the_receiver_is_closed()
+    public async Task NativeTraceScope_ActionFails_KeepsTheFailureAndClosesTheReceiver()
     {
         Uri? endpoint = null;
         var failure = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => TelemetryCapture.TraceAsync(

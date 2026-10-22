@@ -16,7 +16,7 @@ public sealed class NumberAndSessionTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    public async Task Floating_point_numbers_integer_exemplars_and_absent_values_keep_their_discriminators()
+    public async Task OtlpReceiverNumbers_DoublesIntegerExemplarsAndAbsentValues_KeepTheirDiscriminators()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = new ExportMetricsServiceRequest
@@ -70,7 +70,7 @@ public sealed class NumberAndSessionTests
     }
 
     [TestMethod]
-    public async Task Conflicting_observed_sessions_are_exposed_without_aliasing_the_trace_id()
+    public async Task ObservedSessions_Conflicting_AreExposedWithoutAliasingTheTraceId()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var spans = RichSpan();
@@ -123,7 +123,7 @@ public sealed class NumberAndSessionTests
     }
 
     [TestMethod]
-    public async Task Rejected_log_attributes_produce_exact_partial_success_without_discarding_the_valid_record()
+    public async Task OtlpReceiverLogs_RejectedAttributes_ReportExactPartialSuccessAndKeepTheValidRecord()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var valid = new OpenTelemetry.Proto.Logs.V1.LogRecord

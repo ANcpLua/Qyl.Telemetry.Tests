@@ -28,18 +28,16 @@ public sealed class GrpcTransportTests
     [DataRow(Signals.Traces, true)]
     [DataRow(Signals.Logs, true)]
     [DataRow(Signals.Metrics, true)]
-    public async Task Original_grpc_message_survives_unknown_fields_noncanonical_varints_and_gzip(string signal, bool gzip)
+    public async Task GrpcReceiver_UnknownFieldsNoncanonicalVarintsAndGzip_KeepTheOriginalMessage(string signal, bool gzip)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var wire = new WireHeaders();
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint, new GrpcChannelOptions { HttpHandler = wire });
-        // Unknown fields in descending field order, with a non-minimal varint for 1. Parsing
-        // and serializing a generated message would change these authoritative wire bytes.
-        byte[] bytes = [0xf8, 0x07, 0x81, 0x00, 0xf0, 0x07, 0x02];
+        byte[] unknownFieldsDescendingWithNonMinimalVarint1 = [0xf8, 0x07, 0x81, 0x00, 0xf0, 0x07, 0x02];
         var headers = new Metadata();
         if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
         using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
-            new CallOptions(headers, cancellationToken: TestContext.CancellationToken), bytes);
+            new CallOptions(headers, cancellationToken: TestContext.CancellationToken), unknownFieldsDescendingWithNonMinimalVarint1);
         Assert.IsEmpty(await call.ResponseAsync);
         Assert.AreEqual(gzip ? "gzip" : null, wire.Encoding);
         var snapshot = receiver.Snapshot();
@@ -55,14 +53,14 @@ public sealed class GrpcTransportTests
         var original = Assert.ContainsSingle(snapshot.Requests);
         Assert.AreEqual(OtlpTransport.Grpc, original.Transport);
         Assert.AreEqual(signal, original.Signal);
-        Assert.AreSequenceEqual(bytes, original.Payload.ToArray());
+        Assert.AreSequenceEqual(unknownFieldsDescendingWithNonMinimalVarint1, original.Payload.ToArray());
     }
 
     [TestMethod]
     [DataRow(Signals.Traces)]
     [DataRow(Signals.Logs)]
     [DataRow(Signals.Metrics)]
-    public async Task Malformed_grpc_protobuf_returns_invalid_argument_and_retains_original_evidence(string signal)
+    public async Task GrpcReceiver_MalformedProtobuf_ReturnsInvalidArgumentAndKeepsTheOriginal(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
@@ -84,7 +82,7 @@ public sealed class GrpcTransportTests
     [DataRow(Signals.Traces)]
     [DataRow(Signals.Logs)]
     [DataRow(Signals.Metrics)]
-    public async Task Grpc_partial_success_keeps_valid_records_and_reports_exact_rejections(string signal)
+    public async Task GrpcReceiver_PartiallyInvalidExport_KeepsValidRecordsReportsExactRejectionsAndRecovers(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
@@ -102,10 +100,9 @@ public sealed class GrpcTransportTests
         Assert.AreEqual(OtlpTransport.Grpc, receipt.Transport);
         Assert.AreEqual(1, snapshot.Spans.Count + snapshot.Logs.Count + snapshot.Metrics.Count);
         Assert.AreSequenceEqual(bytes, Assert.ContainsSingle(snapshot.Requests).Payload.ToArray());
-        // A rejected export must not poison the next call or its diagnostics.
-        using var next = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
+        using var callAfterRejection = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
             new CallOptions(cancellationToken: TestContext.CancellationToken), []);
-        Assert.IsEmpty(await next.ResponseAsync);
+        Assert.IsEmpty(await callAfterRejection.ResponseAsync);
         Assert.IsNull(receiver.Snapshot().Receipts[1].Error);
         Assert.HasCount(1, snapshot.Receipts);
     }
@@ -114,7 +111,7 @@ public sealed class GrpcTransportTests
     [DataRow(Signals.Traces)]
     [DataRow(Signals.Logs)]
     [DataRow(Signals.Metrics)]
-    public async Task Grpc_warning_acknowledges_a_valid_record_without_inventing_a_rejection(string signal)
+    public async Task GrpcReceiver_ValidRecordWithWarning_IsAcknowledgedWithoutARejection(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
@@ -134,7 +131,7 @@ public sealed class GrpcTransportTests
     [DataRow(1024, true)]
     [DataRow(16 * 1024 * 1024, false)]
     [DataRow(16 * 1024 * 1024, true)]
-    public async Task Grpc_bounds_the_decompressed_message_before_decoding(int limit, bool gzip)
+    public async Task GrpcReceiver_DecompressedMessageOverLimit_IsRejectedBeforeDecoding(int limit, bool gzip)
     {
         await using var receiver = limit == 16 * 1024 * 1024
             ? await OtlpReceiver.StartAsync(TestContext.CancellationToken)
@@ -156,17 +153,19 @@ public sealed class GrpcTransportTests
     [DataRow(1024, true)]
     [DataRow(16 * 1024 * 1024, false)]
     [DataRow(16 * 1024 * 1024, true)]
-    public async Task Grpc_accepts_a_valid_message_exactly_at_the_decompressed_limit(int limit, bool gzip)
+    public async Task GrpcReceiver_MessageExactlyAtDecompressedLimit_IsAccepted(int limit, bool gzip)
     {
         await using var receiver = limit == 16 * 1024 * 1024
             ? await OtlpReceiver.StartAsync(TestContext.CancellationToken)
             : await OtlpReceiver.StartAsync(limit, TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         var bytes = new byte[limit];
-        // Unknown length-delimited field 127: two tag bytes, four length bytes, then data.
-        bytes[0] = 0xfa; bytes[1] = 0x07;
-        var length = bytes.Length - 6;
-        for (var i = 0; i < 4; i++) bytes[2 + i] = (byte)((length >> (7 * i)) | (i < 3 ? 0x80 : 0));
+        byte[] unknownLengthDelimitedField127Tag = [0xfa, 0x07];
+        const int fourByteLengthVarint = 4;
+        unknownLengthDelimitedField127Tag.CopyTo(bytes, 0);
+        var length = bytes.Length - unknownLengthDelimitedField127Tag.Length - fourByteLengthVarint;
+        for (var i = 0; i < fourByteLengthVarint; i++)
+            bytes[unknownLengthDelimitedField127Tag.Length + i] = (byte)((length >> (7 * i)) | (i < fourByteLengthVarint - 1 ? 0x80 : 0));
         var headers = new Metadata();
         if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
         using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
@@ -177,7 +176,7 @@ public sealed class GrpcTransportTests
     }
 
     [TestMethod]
-    public async Task Cancelled_incomplete_grpc_upload_keeps_no_partial_capture_and_receiver_remains_usable()
+    public async Task GrpcReceiver_IncompleteUploadCancelled_KeepsNoPartialCaptureAndStaysUsable()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CancellationToken);
@@ -205,7 +204,7 @@ public sealed class GrpcTransportTests
     }
 
     [TestMethod]
-    public async Task Expired_grpc_deadline_does_not_create_export_evidence()
+    public async Task GrpcReceiver_DeadlineExpired_CreatesNoExportEvidence()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
@@ -217,7 +216,7 @@ public sealed class GrpcTransportTests
     }
 
     [TestMethod]
-    public async Task Disposal_closes_both_listeners_and_wakes_a_pending_evidence_wait()
+    public async Task OtlpReceiver_Disposed_ClosesBothListenersToFreshConnectionsAndWakesAPendingWait()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
@@ -227,10 +226,8 @@ public sealed class GrpcTransportTests
         var waiting = receiver.AwaitAsync(snapshot => snapshot.Spans.Count > 0, TimeSpan.FromSeconds(10), TestContext.CancellationToken);
         await receiver.DisposeAsync();
         await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => waiting);
-        // Verify the closed listener with a fresh connection, independently of how the
-        // previous HTTP/2 connection reports its graceful shutdown.
-        using var disconnected = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        using var closed = disconnected.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
+        using var freshChannelToClosedListener = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
+        using var closed = freshChannelToClosedListener.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
             new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: TestContext.CancellationToken), []);
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => closed.ResponseAsync);
         Assert.AreEqual(StatusCode.Unavailable, failure.StatusCode, failure.Status.Detail);

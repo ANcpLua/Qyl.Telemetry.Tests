@@ -23,12 +23,11 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     private readonly HttpClient _client = new();
     private static readonly string[] Checkpoints = ["first", "second"];
 
-    /// <summary>The completed root and its actual HTTP child reach the published Collector.</summary>
     [TestMethod]
-    public async Task QylStoresCompletedTestRootAndClient()
+    public async Task TelemetryPipeline_CompletedRootWithHttpChild_IsStoredByTheCollector()
     {
         await Recorder.StartAsync(testContext.CancellationToken);
-        using var root = Recorder.Begin(nameof(QylStoresCompletedTestRootAndClient));
+        using var root = Recorder.Begin(nameof(TelemetryPipeline_CompletedRootWithHttpChild_IsStoredByTheCollector));
         var traceId = root.TraceId.ToHexString();
         var rootId = root.SpanId.ToHexString();
         using (Recorder.Ending(root))
@@ -50,12 +49,11 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         testContext.WriteLine(trace.GetRawText());
     }
 
-    /// <summary>Capture keeps exception details; the Collector applies its declared persistence policy.</summary>
     [TestMethod]
-    public async Task QylStoresExceptionSpanEvents()
+    public async Task TelemetryPipeline_RecordedException_IsCapturedAndStoredAsSpanEvent()
     {
         await Recorder.StartAsync(testContext.CancellationToken);
-        using var root = Recorder.Begin(nameof(QylStoresExceptionSpanEvents));
+        using var root = Recorder.Begin(nameof(TelemetryPipeline_RecordedException_IsCapturedAndStoredAsSpanEvent));
         var traceId = root.TraceId.ToHexString();
         using (Recorder.Ending(root))
         {
@@ -76,9 +74,8 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.IsGreaterThan(0UL, exception.TimeUnixNano);
     }
 
-    /// <summary>Stopping twice is safe and restarting creates another owned receiver and SDK.</summary>
     [TestMethod]
-    public async Task RecorderCanStopAndRestart()
+    public async Task TelemetryPipeline_StoppedTwice_RestartsWithAnotherReceiverAndSdk()
     {
         await Recorder.StartAsync(testContext.CancellationToken);
         await Recorder.StopAsync();
@@ -93,12 +90,11 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.IsNotEmpty(Recorder.EvidenceFiles);
     }
 
-    /// <summary>The SDK and canonical decoder preserve typed values, event order, metadata and ended roots.</summary>
     [TestMethod]
-    public async Task SdkCapturePreservesTypedValuesAndOrderedEvents()
+    public async Task TelemetryPipeline_SdkSpan_KeepsTypedValuesOrderedEventsAndMetadata()
     {
         await Recorder.StartAsync(testContext.CancellationToken);
-        using var root = Recorder.Begin(nameof(SdkCapturePreservesTypedValuesAndOrderedEvents));
+        using var root = Recorder.Begin(nameof(TelemetryPipeline_SdkSpan_KeepsTypedValuesOrderedEventsAndMetadata));
         var traceId = root.TraceId.ToHexString();
         using (Recorder.Ending(root))
         {
@@ -137,9 +133,8 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.IsEmpty(Recorder.SpansOf("unrecorded-trace"));
     }
 
-    /// <summary>Each invocation owns a trace while preserving its caller's ambient activity.</summary>
     [TestMethod]
-    public async Task InvocationRootsHaveSeparateTracesAndRestoreTheirAmbientParent()
+    public async Task TelemetryPipeline_NestedInvocationRoots_HaveSeparateTracesAndRestoreTheAmbientParent()
     {
         await Recorder.StartAsync(testContext.CancellationToken);
         using var outer = Recorder.Begin("outer invocation");
@@ -155,11 +150,10 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         }
     }
 
-    /// <summary>Missing listener features remain startup diagnostics.</summary>
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void ReceiverRequiresABoundAddress(bool hasFeature)
+    public void OtlpRelay_MissingListenerAddress_ThrowsAtStartup(bool hasFeature)
     {
         var features = new FeatureCollection();
         if (hasFeature)
@@ -170,9 +164,8 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.AreEqual("The trace receiver has no address.", failure.Message);
     }
 
-    /// <summary>The receiver reports the endpoint Kestrel actually bound.</summary>
     [TestMethod]
-    public void ReceiverUsesTheServersBoundAddress()
+    public void OtlpRelay_KestrelBoundAddress_IsReported()
     {
         var features = new FeatureCollection();
         var addresses = new ServerAddressesFeature();
@@ -181,12 +174,11 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.AreEqual(new Uri("http://127.0.0.1:43210"), OtlpRelay.BoundAddress(features));
     }
 
-    /// <summary>A nonempty zero-rejection acknowledgement is valid for every signal and must be relayed intact.</summary>
     [TestMethod]
     [DataRow(Signals.Traces)]
     [DataRow(Signals.Metrics)]
     [DataRow(Signals.Logs)]
-    public async Task ReceiverRelaysNonemptyAcknowledgements(string signal)
+    public async Task OtlpRelay_NonemptyZeroRejectionAcknowledgement_IsRelayedIntact(string signal)
     {
         var acknowledgement = Convert.FromHexString("0A00");
         using var collector = CollectorClient(HttpStatusCode.OK, acknowledgement);
@@ -202,9 +194,8 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.AreSequenceEqual(acknowledgement, Assert.ContainsSingle(receiver.Deliveries).CollectorResponse);
     }
 
-    /// <summary>Malformed originals and the actual upstream protobuf error stay available.</summary>
     [TestMethod]
-    public async Task ReceiverPreservesRejectedOriginalsAndErrors()
+    public async Task OtlpRelay_MalformedExport_KeepsTheOriginalAndTheUpstreamError()
     {
         var diagnostic = new RpcStatus { Code = 3, Message = "Malformed OTLP request." }.ToByteArray();
         using var collector = CollectorClient(HttpStatusCode.BadRequest, diagnostic);
@@ -228,9 +219,8 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.AreSequenceEqual(diagnostic, delivery.CollectorResponse);
     }
 
-    /// <summary>Invalid listener configuration is cleaned up and reported by Kestrel.</summary>
     [TestMethod]
-    public async Task ReceiverRejectsInvalidListenerConfiguration()
+    public async Task OtlpRelay_InvalidListenerConfiguration_ThrowsFormatException()
     {
         using var collector = CollectorClient(HttpStatusCode.OK, []);
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
@@ -252,12 +242,11 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
             });
     }
 
-    /// <summary>A complete export is still forwarded after its producer disconnects.</summary>
     [TestMethod]
     [DataRow(Signals.Traces)]
     [DataRow(Signals.Logs)]
     [DataRow(Signals.Metrics)]
-    public async Task ReceiverDrainsAcceptedExportAfterProducerDisconnects(string signal)
+    public async Task OtlpRelay_ProducerDisconnectsDuringExport_ForwardsTheAcceptedExport(string signal)
     {
         using var handler = new PendingCollectorHandler();
         using var collector = new HttpClient(handler);
@@ -283,9 +272,8 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.AreEqual(signal, Assert.ContainsSingle(capture.Snapshot().Requests).Signal);
     }
 
-    /// <summary>Transport failures remain visible rather than disappearing from the delivery list.</summary>
     [TestMethod]
-    public async Task ReceiverRetainsTransportFailure()
+    public async Task OtlpRelay_UpstreamTransportFailure_IsRecordedInDeliveries()
     {
         using var handler = new PendingCollectorHandler();
         using var collector = new HttpClient(handler);

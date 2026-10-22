@@ -12,7 +12,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     [TestMethod]
     [NoErrorTelemetry]
     [ExportsCleanly]
-    public async Task Application_event_and_stored_log_retain_the_server_span_and_resource()
+    public async Task ApplicationEvent_StoredAsLog_KeepsTheServerSpanAndResource()
     {
         var evidence = await SendRequestAsync();
         var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
@@ -38,7 +38,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     [TestMethod]
     [NoErrorTelemetry]
     [ExportsCleanly]
-    public async Task Application_counter_is_attributed_by_resource_and_survives_storage()
+    public async Task ApplicationCounter_Stored_IsAttributedByResource()
     {
         var start = DateTimeOffset.UtcNow.AddSeconds(-1);
         var evidence = await SendRequestAsync();
@@ -72,7 +72,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     [DataRow(NativeMetric.ServerDuration)]
     [DataRow(NativeMetric.CpuTime)]
     [DataRow(NativeMetric.WorkingSet)]
-    public async Task Native_metrics_keep_their_type_unit_scope_and_producer(NativeMetric metric)
+    public async Task NativeMetrics_Stored_KeepTypeUnitScopeAndProducer(NativeMetric metric)
     {
         var expected = metric switch
         {
@@ -98,7 +98,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     }
 
     [TestMethod]
-    public async Task Failed_application_request_keeps_error_status_and_exception_evidence()
+    public async Task ApplicationRequest_Failed_KeepsErrorStatusAndExceptionEvidence()
     {
         var evidence = await SendRequestAsync("failure", HttpStatusCode.InternalServerError);
         var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));

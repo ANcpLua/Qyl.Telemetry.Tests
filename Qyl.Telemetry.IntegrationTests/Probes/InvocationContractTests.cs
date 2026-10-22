@@ -12,7 +12,7 @@ public sealed class InvocationContractTests(TestContext context)
 
     [TestMethod]
     [Timeout(60_000, CooperativeCancellation = true)]
-    public async Task Original_executor_rows_failures_and_inconclusive_results_survive_the_trace_scope()
+    public async Task TraceScope_ExecutorRowsFailuresAndInconclusiveResults_SurviveUnchanged()
     {
         var results = await RunReportedAsync("ClassName=Qyl.Telemetry.IntegrationTests.Probes.ProbeCases");
         Assert.HasCount(5, results);
@@ -45,7 +45,7 @@ public sealed class InvocationContractTests(TestContext context)
 
     [TestMethod]
     [Timeout(60_000, CooperativeCancellation = true)]
-    public async Task Declared_policies_fail_violations_and_missing_evidence_but_keep_original_outcomes()
+    public async Task TraceScopePolicies_ViolationsOrMissingEvidence_FailWhileOriginalOutcomesStay()
     {
         var results = await RunReportedAsync("FullyQualifiedName~PolicyCases");
         Assert.HasCount(6, results);
@@ -76,7 +76,7 @@ public sealed class InvocationContractTests(TestContext context)
 
     [TestMethod]
     [Timeout(60_000, CooperativeCancellation = true)]
-    public async Task Discovery_reports_the_original_method_source_for_each_data_row()
+    public async Task Discovery_EachDataRow_ReportsTheOriginalMethodSource()
     {
         var result = await RunAsync("--list-tests", "json");
         Assert.AreEqual(0, result.ExitCode, result.Error);

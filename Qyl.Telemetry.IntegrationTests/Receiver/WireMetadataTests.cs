@@ -13,7 +13,7 @@ public sealed class WireMetadataTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    public async Task Complete_span_resource_scope_events_and_links_survive_in_wire_order()
+    public async Task OtlpReceiverTraces_SpanResourceScopeEventsAndLinks_SurviveInWireOrder()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = RichSpan();
@@ -62,7 +62,7 @@ public sealed class WireMetadataTests
     }
 
     [TestMethod]
-    public async Task Recursive_otlp_values_keep_their_types_without_stringification()
+    public async Task OtlpReceiver_RecursiveAnyValues_KeepTheirTypesWithoutStringification()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = RichSpan();

@@ -32,7 +32,7 @@ public sealed class LogWireTests
     [DataRow(ArrayBody)]
     [DataRow(MapBody)]
     [DataRow(EmptyBody)]
-    public async Task Log_body_types_and_all_log_metadata_survive_the_wire(string bodyKind)
+    public async Task OtlpReceiverLogs_EveryBodyTypeAndMetadata_SurviveTheWire(string bodyKind)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var log = new ProtoLog

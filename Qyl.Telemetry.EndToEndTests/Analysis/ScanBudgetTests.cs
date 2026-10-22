@@ -42,7 +42,7 @@ public sealed class ScanBudgetTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Verify_fix_never_passes_on_an_incomplete_scan(AnalysisPath path)
+    public async Task VerifyFix_IncompleteScan_NeverPasses(AnalysisPath path)
     {
         var output = await Session.AskAsync<VerifyFixOutput>(path, "verify_fix", new JsonObject
         {

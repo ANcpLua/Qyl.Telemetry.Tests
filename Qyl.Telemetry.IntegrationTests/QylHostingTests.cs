@@ -15,7 +15,7 @@ public sealed class QylHostingTests(TestContext context)
     private const string SecondLabel = "second";
 
     [TestMethod]
-    public async Task Public_host_setup_exports_completed_typed_evidence_before_disposal_returns()
+    public async Task QylHosting_PublicHostSetup_ExportsCompletedTypedEvidenceBeforeDisposalReturns()
     {
         await using var receiver = await OtlpReceiver.StartAsync(context.CancellationToken);
         var endpoint = receiver.Endpoint;

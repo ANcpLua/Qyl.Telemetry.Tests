@@ -9,7 +9,7 @@ public sealed class CapturedAttributeAssertionTests
     private const string Key = "http.request.header.x-example";
 
     [TestMethod]
-    public void Preserves_empty_values_duplicates_and_embedded_commas()
+    public void CapturedAttributeAssertion_EmptyValuesDuplicatesAndEmbeddedCommas_ArePreserved()
     {
         string[] expected = ["", "first", "first", "a,b"];
         ContractAttribute[] attributes =
@@ -25,7 +25,7 @@ public sealed class CapturedAttributeAssertionTests
     [DataRow(InvalidCapturedArray.Scalar)]
     [DataRow(InvalidCapturedArray.NonString)]
     [DataRow(InvalidCapturedArray.Reordered)]
-    public void Rejects_missing_ambiguous_or_changed_evidence(InvalidCapturedArray violation)
+    public void CapturedAttributeAssertion_MissingAmbiguousOrChangedEvidence_IsRejected(InvalidCapturedArray violation)
     {
         var valid = new ContractAttribute
         {

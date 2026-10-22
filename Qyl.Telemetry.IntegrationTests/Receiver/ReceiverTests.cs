@@ -23,7 +23,7 @@ public sealed class ReceiverTests
     [DataRow(Signals.Traces)]
     [DataRow(Signals.Logs)]
     [DataRow(Signals.Metrics)]
-    public async Task Malformed_protobuf_returns_bad_request_and_records_the_error(string signal)
+    public async Task HttpReceiver_MalformedProtobuf_ReturnsBadRequestAndRecordsTheError(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var response = await PostAsync(receiver.Endpoint, [0x80], TestContext.CancellationToken, signal);
@@ -41,7 +41,7 @@ public sealed class ReceiverTests
     }
 
     [TestMethod]
-    public async Task Partial_success_keeps_valid_spans_and_reports_the_exact_rejection()
+    public async Task HttpReceiver_PartiallyInvalidTraces_KeepsValidSpansAndReportsTheExactRejection()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = new ExportTraceServiceRequest();
@@ -70,7 +70,7 @@ public sealed class ReceiverTests
     }
 
     [TestMethod]
-    public async Task Awaiting_missing_evidence_times_out_instead_of_passing_on_empty_capture()
+    public async Task OtlpReceiverWait_EvidenceMissing_TimesOutInsteadOfPassingOnEmptyCapture()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         await Assert.ThrowsExactlyAsync<TimeoutException>(() =>
@@ -79,7 +79,7 @@ public sealed class ReceiverTests
     }
 
     [TestMethod]
-    public async Task Cancellation_interrupts_the_pending_condition()
+    public async Task OtlpReceiverWait_Cancelled_InterruptsThePendingCondition()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var cancellation = new CancellationTokenSource();
@@ -91,7 +91,7 @@ public sealed class ReceiverTests
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public async Task Precancelled_wait_does_not_evaluate_the_evidence_condition(bool ready)
+    public async Task OtlpReceiverWait_Precancelled_DoesNotEvaluateTheCondition(bool ready)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var cancellation = new CancellationTokenSource();
@@ -104,7 +104,7 @@ public sealed class ReceiverTests
     }
 
     [TestMethod]
-    public async Task Disposal_wakes_a_pending_condition_and_is_repeatable()
+    public async Task OtlpReceiver_DisposedRepeatedly_WakesAPendingCondition()
     {
         var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var pending = receiver.AwaitAsync(s => s.Spans.Count > 0, TimeSpan.FromSeconds(10),
@@ -115,7 +115,7 @@ public sealed class ReceiverTests
     }
 
     [TestMethod]
-    public async Task Invalid_metric_batch_reports_rejected_data_points_instead_of_metric_count()
+    public async Task HttpReceiver_InvalidMetricBatch_ReportsRejectedDataPointsNotMetricCount()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var metric = MetricWireTests.Fixture(MetricShapes.Gauge);
@@ -145,7 +145,7 @@ public sealed class ReceiverTests
     }
 
     [TestMethod]
-    public async Task Gzip_request_is_decoded_before_protobuf_processing()
+    public async Task HttpReceiver_GzipRequest_IsDecompressedBeforeProtobufParsing()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var output = new MemoryStream();
@@ -172,13 +172,12 @@ public sealed class ReceiverTests
     }
 
     [TestMethod]
-    public async Task Original_export_retains_unknown_fields_and_snapshot_membership()
+    public async Task HttpReceiver_UnknownField127Export_IsKeptAsOriginalButAbsentFromEveryRecord()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var empty = receiver.Snapshot();
-        // Field 127, varint 1: valid unknown OTLP protobuf, absent from every decoded public record.
-        byte[] payload = [0xf8, 0x07, 0x01];
-        using var response = await PostAsync(receiver.Endpoint, payload, TestContext.CancellationToken);
+        byte[] unknownField127Varint1 = [0xf8, 0x07, 0x01];
+        using var response = await PostAsync(receiver.Endpoint, unknownField127Varint1, TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
         Assert.IsEmpty(empty.Requests);
@@ -186,7 +185,7 @@ public sealed class ReceiverTests
         Assert.AreEqual(0L, Assert.ContainsSingle(snapshot.Receipts).Accepted);
         var request = Assert.ContainsSingle(snapshot.Requests);
         Assert.AreEqual(Signals.Traces, request.Signal);
-        Assert.AreSequenceEqual(payload, request.Payload.ToArray());
+        Assert.AreSequenceEqual(unknownField127Varint1, request.Payload.ToArray());
         using var second = await PostAsync(receiver.Endpoint, [], TestContext.CancellationToken);
         second.EnsureSuccessStatusCode();
         Assert.HasCount(1, snapshot.Requests);

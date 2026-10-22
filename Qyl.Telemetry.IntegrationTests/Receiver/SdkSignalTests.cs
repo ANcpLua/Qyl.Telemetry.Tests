@@ -25,7 +25,7 @@ public sealed class SdkSignalTests
     [TestMethod]
     [DataRow(OtlpTransport.HttpProtobuf)]
     [DataRow(OtlpTransport.Grpc)]
-    public async Task Official_sdk_exports_trace_named_log_and_partitioned_counter(OtlpTransport transport)
+    public async Task OfficialSdk_TraceNamedLogAndPartitionedCounter_AreExportedToTheReceiver(OtlpTransport transport)
     {
         var sourceName = "sdk-" + Guid.NewGuid().ToString("N");
         var result = await TelemetryCapture.TraceAsync(test =>

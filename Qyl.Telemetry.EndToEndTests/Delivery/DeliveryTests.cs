@@ -27,7 +27,7 @@ public sealed class DeliveryTests(TestContext context)
     [DataRow(ExecutableFormat.ManagedAssembly)]
     [DataRow(ExecutableFormat.NativeAot)]
     [Timeout(180_000, CooperativeCancellation = true)]
-    public async Task Published_packages_reach_the_native_collector_and_real_mcp(ExecutableFormat format)
+    public async Task PublishedPackages_ManagedOrNativeAotApplication_ReachTheNativeCollectorAndRealMcp(ExecutableFormat format)
     {
         Assert.IsNotNull(_delivery);
         context.AddResultFile(_delivery.ManifestPath);
@@ -93,8 +93,8 @@ public sealed class DeliveryTests(TestContext context)
             .Where(span => span.GetProperty("span_id").GetString() == server.SpanId));
         Assert.AreEqual(server.ParentSpanId, observed.GetProperty("parent_span_id").GetString());
         Assert.AreEqual("GET /capture", observed.GetProperty("name").GetString());
-        // The compact span row names the service, not the instrumentation scope (qyl 17.0.4 and later).
-        Assert.IsFalse(string.IsNullOrEmpty(observed.GetProperty("service").GetString()));
+        var compactRowServiceNotInstrumentationScope = observed.GetProperty("service").GetString();
+        Assert.IsFalse(string.IsNullOrEmpty(compactRowServiceNotInstrumentationScope));
         var attributes = observed.GetProperty("attributes").Deserialize<Qyl.Api.Contracts.Common.Attribute[]>();
         Assert.IsNotNull(attributes);
         Assert.That.HasCapturedValues(attributes, CapturedKey, ProbeSignals.RequestId);
@@ -107,7 +107,7 @@ public sealed class DeliveryTests(TestContext context)
     [DataRow(RequiredStringInput.Integer)]
     [DataRow(RequiredStringInput.Boolean)]
     [DataRow(RequiredStringInput.Null)]
-    public async Task Packaged_typed_view_accepts_a_string_and_rejects_wrong_wire_types(RequiredStringInput input)
+    public async Task PackagedTypedView_RequiredStringInput_AcceptsAStringAndRejectsWrongWireTypes(RequiredStringInput input)
     {
         using var report = await RunSemanticProbeAsync(input);
         var expected = input == RequiredStringInput.String;
@@ -119,7 +119,7 @@ public sealed class DeliveryTests(TestContext context)
     }
 
     [TestMethod]
-    public async Task Packaged_signal_metadata_preserves_phase_sampling_and_registry_ownership()
+    public async Task PackagedSignalMetadata_GenAiMainAgent_KeepsPhaseSamplingAndRegistryOwnership()
     {
         using var report = await RunSemanticProbeAsync(RequiredStringInput.String);
         var value = report.RootElement;

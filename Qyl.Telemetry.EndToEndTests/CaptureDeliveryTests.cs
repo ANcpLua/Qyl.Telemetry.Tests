@@ -97,7 +97,7 @@ public sealed class SelectedHeaderDeliveryTests(TestContext context) : CaptureDe
 
     [TestMethod]
     [CapturesExactly(RequestIdAttribute, UnderscoreAttribute, AuthorizationAttribute, ResponseIdAttribute)]
-    public async Task Selected_arrays_keep_names_values_and_order_through_capture_and_storage()
+    public async Task HeaderCapture_SelectedArrays_KeepNamesValuesAndOrderThroughStorage()
     {
         var evidence = await SendRequestAsync();
         var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
@@ -117,5 +117,5 @@ public sealed class UnconfiguredHeaderDeliveryTests(TestContext context) : Captu
 {
     [TestMethod]
     [CapturesExactly]
-    public async Task Unconfigured_capture_emits_no_request_or_response_header_attributes() => _ = await SendRequestAsync();
+    public async Task HeaderCapture_Unconfigured_EmitsNoRequestOrResponseHeaderAttributes() => _ = await SendRequestAsync();
 }

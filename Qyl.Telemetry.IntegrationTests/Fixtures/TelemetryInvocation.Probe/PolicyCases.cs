@@ -17,12 +17,12 @@ public sealed class PolicyCases(TestContext context)
     [NoDuplicateSpans]
     [DataRow(PolicyContract.FirstRow)]
     [DataRow(PolicyContract.SecondRow)]
-    public Task SatisfiedPoliciesKeepEachRowPassing(string row) =>
+    public Task Policies_SatisfiedOnEachDataRow_KeepTheRowPassing(string row) =>
         ExportAsync(source => source.CreateActivity(row, ActivityKind.Server)?.Start().Dispose());
 
     [TestMethod]
     [NoDuplicateSpans]
-    public Task WrappedOperationFails() => ExportAsync(source =>
+    public Task NoDuplicateSpans_WrappedOperation_Fails() => ExportAsync(source =>
     {
         using var native = source.CreateActivity(PolicyContract.Operation, ActivityKind.Server)?.Start();
         using var wrapper = source.CreateActivity(PolicyContract.Operation, ActivityKind.Server)?.Start();
@@ -30,13 +30,13 @@ public sealed class PolicyCases(TestContext context)
 
     [TestMethod]
     [ConnectedTrace]
-    public void MissingEvidenceFails()
+    public void ConnectedTrace_NoEvidence_Fails()
     {
     }
 
     [TestMethod]
     [ConnectedTrace]
-    public void OriginalFailureIsKept() => Assert.Fail(PolicyContract.OriginalMessage);
+    public void ConnectedTrace_OriginalFailure_IsKept() => Assert.Fail(PolicyContract.OriginalMessage);
 
     private async Task ExportAsync(Action<ActivitySource> operation)
     {
@@ -64,6 +64,6 @@ public sealed class UnverifiedPolicyCases(TestContext context)
 {
     [TestMethod]
     [ConnectedTrace]
-    public async Task PlainTestClassRejectsPolicies() => _ = await TelemetryCapture.TraceAsync(_ => Task.CompletedTask,
+    public async Task PlainTestClass_PolicyAttribute_IsRejected() => _ = await TelemetryCapture.TraceAsync(_ => Task.CompletedTask,
         _ => true, cancellationToken: context.CancellationToken).ConfigureAwait(false);
 }

@@ -35,7 +35,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Triage_ranks_the_release_failure_first_and_keeps_rare_silent_and_session_findings(AnalysisPath path)
+    public async Task Triage_SeededIncidents_RanksReleaseFailureFirstAndKeepsRareSilentAndSessionFindings(AnalysisPath path)
     {
         var triage = await AskAsync<TriageOutput>(path, "triage", Input(("matchers", new JsonArray(Matcher("service.name", "in",
             new JsonArray("checkout", "orders-db", "payments", "billing", "sessions"))))));
@@ -55,7 +55,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Failure_ids_of_one_failing_execution_are_two_and_stable(AnalysisPath path)
+    public async Task FailureIds_OneFailingExecution_AreTwoAndStable(AnalysisPath path)
     {
         var input = new JsonObject
         {
@@ -71,7 +71,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Failure_context_names_the_database_timeout_as_root_cause(AnalysisPath path)
+    public async Task FailureContext_DatabaseTimeoutIncident_NamesTheTimeoutAsRootCause(AnalysisPath path)
     {
         var failure = await AskAsync<GetFailureContextOutput>(path, "get_failure_context", Input(("trace_id", Key["db-root"].TraceId)));
         Assert.AreEqual(Key["db-timeout"].SpanId, failure.Observed.RootCauseSpan?.SpanId);
@@ -80,7 +80,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Failure_context_of_a_new_arrival_is_unsettled(AnalysisPath path)
+    public async Task FailureContext_NewArrival_IsUnsettled(AnalysisPath path)
     {
         var incidents = new OtlpIncidents();
         var arrival = incidents.Span($"arrival-{path}-{Guid.NewGuid():N}", "arrival-test", "arrival",
@@ -94,7 +94,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Error_group_discriminators_are_the_region_and_release(AnalysisPath path)
+    public async Task CompareGroups_ErrorGroup_DiscriminatesByRegionAndRelease(AnalysisPath path)
     {
         var output = await AskAsync<CompareGroupsOutput>(path, "compare_groups", Input(
             ("matchers", new JsonArray(Matcher("service.name", "eq", "regional"))), ("signal", "spans"),
@@ -107,7 +107,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Four_requests_after_a_fix_leave_it_pending_for_ninety_six_more(AnalysisPath path)
+    public async Task VerifyFix_FourRequestsAfterFix_IsPendingForNinetySixMore(AnalysisPath path)
     {
         var checkout = await CheckoutFailureAsync(path);
         var verification = await AskAsync<VerifyFixOutput>(path, "verify_fix",
@@ -119,7 +119,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Insufficient_evidence_never_verifies_a_fix(AnalysisPath path)
+    public async Task VerifyFix_InsufficientEvidence_NeverVerifies(AnalysisPath path)
     {
         var checkout = await CheckoutFailureAsync(path);
         var since = AnswerKey.Iso(Key.Now - Minute);
@@ -138,7 +138,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Histogram_p95_stays_in_seconds_and_is_marked_approximate(AnalysisPath path)
+    public async Task QueryMetric_HistogramP95_StaysInSecondsAndIsApproximate(AnalysisPath path)
     {
         var output = await AskAsync<QueryMetricOutput>(path, "query_metric", Input(("metric_name", "http.server.request.duration"),
             ("aggregation", "p95"), ("group_by", new JsonArray("http.route")), ("step_ms", 3_600_000)));
@@ -154,7 +154,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Cumulative_counter_increase_is_exact(AnalysisPath path)
+    public async Task QueryMetric_CumulativeCounterIncrease_IsExact(AnalysisPath path)
     {
         var output = await AskAsync<QueryMetricOutput>(path, "query_metric", Input(("metric_name", "requests.total"),
             ("function", "increase"), ("step_ms", 3_600_000)));

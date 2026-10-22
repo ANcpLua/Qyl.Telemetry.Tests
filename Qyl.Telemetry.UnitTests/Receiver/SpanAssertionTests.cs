@@ -16,7 +16,7 @@ public sealed class SpanAssertionTests
     [DataRow(OwnershipMismatch.Operation)]
     [DataRow(OwnershipMismatch.Kind)]
     [DataRow(OwnershipMismatch.Duplicate)]
-    public void Native_ownership_checks_detect_substitution_and_duplicate_instrumentation(OwnershipMismatch mismatch)
+    public void SpanAssertions_SubstitutedOrDuplicateInstrumentation_FailsNativeOwnership(OwnershipMismatch mismatch)
     {
         var span = NativeSpan();
         Assert.AreSame(span, Assert.HasSingleNativeSpan([span], Source, Operation, SpanKind.Server));
@@ -31,7 +31,7 @@ public sealed class SpanAssertionTests
     [DataRow(ContextMismatch.Trace)]
     [DataRow(ContextMismatch.Parent)]
     [DataRow(ContextMismatch.ReusedIdentity)]
-    public void Parent_checks_detect_a_disconnected_trace_wrong_parent_or_reused_identity(ContextMismatch mismatch)
+    public void SpanAssertions_DisconnectedTraceWrongParentOrReusedIdentity_FailsParentCheck(ContextMismatch mismatch)
     {
         var parent = new SpanRecord(Trace, Parent, "parent");
         var span = NativeSpan();

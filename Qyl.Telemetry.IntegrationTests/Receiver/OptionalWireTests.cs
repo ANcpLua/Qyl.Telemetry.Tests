@@ -20,7 +20,7 @@ public sealed class OptionalWireTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    public async Task Absent_resource_and_scope_metadata_are_not_fabricated()
+    public async Task OtlpReceiver_AbsentResourceAndScopeMetadata_StayAbsent()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = new ExportTraceServiceRequest
@@ -64,7 +64,7 @@ public sealed class OptionalWireTests
     }
 
     [TestMethod]
-    public async Task Scope_schema_can_exist_without_an_instrumentation_scope_message()
+    public async Task OtlpReceiver_ScopeSchemaWithoutScopeMessage_IsKept()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = RichSpan();
@@ -86,7 +86,7 @@ public sealed class OptionalWireTests
     [TestMethod]
     [DataRow(MetricShapes.Histogram)]
     [DataRow(MetricShapes.Exponential)]
-    public async Task Optional_distribution_fields_remain_absent_instead_of_becoming_zero(string kind)
+    public async Task OtlpReceiverMetrics_OptionalDistributionFieldsAbsent_StayNullInsteadOfZero(string kind)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var metric = MetricWireTests.Fixture(kind);
@@ -137,7 +137,7 @@ public sealed class OptionalWireTests
     }
 
     [TestMethod]
-    public async Task Uncorrelated_log_without_body_or_context_is_kept_in_the_complete_capture()
+    public async Task OtlpReceiverLogs_UncorrelatedWithoutBodyOrContext_IsKeptInTheCapture()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = new ExportLogsServiceRequest
@@ -180,7 +180,7 @@ public sealed class OptionalWireTests
     }
 
     [TestMethod]
-    public async Task Unspecified_metric_data_stays_visible_but_is_never_attributed_as_a_measurement()
+    public async Task OtlpReceiverMetrics_UnspecifiedData_StaysVisibleButIsNeverAMeasurement()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = new ExportMetricsServiceRequest

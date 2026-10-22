@@ -18,7 +18,7 @@ public sealed class TransportTests
     [DataRow(Signals.Traces, null, null, HttpStatusCode.UnsupportedMediaType)]
     [DataRow(Signals.Traces, "application/x-protobuf", "br", HttpStatusCode.UnsupportedMediaType)]
     [DataRow(Signals.Traces, "application/x-protobuf; charset=utf-8", null, HttpStatusCode.OK)]
-    public async Task Receiver_routes_and_media_contract_return_the_exact_status(string signal, string? media,
+    public async Task HttpReceiver_RouteMediaTypeAndEncoding_ReturnTheExactStatus(string signal, string? media,
         string? encoding, HttpStatusCode expected)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -39,7 +39,7 @@ public sealed class TransportTests
     }
 
     [TestMethod]
-    public async Task Decompressed_request_limit_is_enforced_before_protobuf_parsing()
+    public async Task HttpReceiver_DecompressedRequestOverLimit_IsRejectedBeforeProtobufParsing()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var bytes = new MemoryStream();
@@ -62,7 +62,7 @@ public sealed class TransportTests
     }
 
     [TestMethod]
-    public async Task Invalid_gzip_is_reported_as_bad_request_with_its_error_record()
+    public async Task HttpReceiver_InvalidGzip_ReturnsBadRequestWithItsErrorRecord()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var content = new ByteArrayContent([1, 2, 3]);
@@ -81,15 +81,14 @@ public sealed class TransportTests
     }
 
     [TestMethod]
-    public async Task Declared_oversize_request_returns_a_decodable_resource_error()
+    public async Task HttpReceiver_DeclaredOversizeRequest_ReturnsADecodableResourceExhaustedError()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(receiver.Endpoint, "v1/traces"));
         request.Content = new ByteArrayContent(new byte[16 * 1024 * 1024 + 1]);
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        // Negotiate the declared length before upload; an eager HTTP/1.1 client can observe a
-        // broken pipe when Kestrel closes an already-rejected oversized body.
-        request.Headers.ExpectContinue = true;
+        const bool negotiateDeclaredLengthBeforeUploadToAvoidABrokenPipe = true;
+        request.Headers.ExpectContinue = negotiateDeclaredLengthBeforeUploadToAvoidABrokenPipe;
         using var response = await TelemetryLifecycle.Http.SendAsync(request, TestContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
         var error = await ReadErrorAsync(response, TestContext.CancellationToken);

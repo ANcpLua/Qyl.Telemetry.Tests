@@ -33,7 +33,7 @@ public sealed class EngineDefectTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Verify_fix_counts_only_requests_of_the_selected_environment(AnalysisPath path)
+    public async Task VerifyFix_EnvironmentInTheScopeMatchers_CountsOnlyThatEnvironmentsRequests(AnalysisPath path)
     {
         var service = $"env-{path}".ToLowerInvariant();
         var incidents = new OtlpIncidents();
@@ -44,8 +44,6 @@ public sealed class EngineDefectTests(TestContext context)
         await SendAsync(incidents, $"{service}-staging-149");
         var failure = Assert.ContainsSingle((await AskAsync<TriageOutput>(path, "triage",
             Window(("service_name", service), ("environment", "prod"), ("status", "all")))).Failures);
-        // Since 17.0.1 verify_fix scopes requests and failures by one set of matchers (or by a failure_id alone), so the
-        // environment is part of the matchers rather than a separate argument.
         Assert.IsNotNull(failure.FailureId);
         var verification = await AskAsync<VerifyFixOutput>(path, "verify_fix", Window(("matchers", ScopeMatchers(service, "prod")),
             ("since", AnswerKey.Iso(_now - 35 * Minute)), ("min_minutes", 1)));
@@ -56,7 +54,7 @@ public sealed class EngineDefectTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Failure_context_of_a_session_keeps_a_span_id_reused_across_its_traces(AnalysisPath path)
+    public async Task FailureContext_SessionReusingASpanIdAcrossTraces_KeepsEveryReusedSpan(AnalysisPath path)
     {
         var service = $"reuse-{path}".ToLowerInvariant();
         var incidents = new OtlpIncidents();
@@ -75,7 +73,7 @@ public sealed class EngineDefectTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Compare_groups_limits_a_failure_cohort_to_its_window(AnalysisPath path)
+    public async Task CompareGroups_FailureCohort_IsLimitedToItsWindow(AnalysisPath path)
     {
         var service = $"cohort-{path}".ToLowerInvariant();
         var incidents = new OtlpIncidents();
@@ -108,7 +106,7 @@ public sealed class EngineDefectTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Last_takes_the_latest_point_of_each_bucket_across_series(AnalysisPath path)
+    public async Task QueryMetricLast_SeveralSeries_TakesTheLatestPointOfEachBucket(AnalysisPath path)
     {
         var name = $"queue.depth.{path}".ToLowerInvariant();
         var start = Nanoseconds(DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddMinutes(-10).ToUnixTimeSeconds() / 60 * 60));
@@ -133,7 +131,7 @@ public sealed class EngineDefectTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Histogram_percentiles_stay_within_negative_bounds(AnalysisPath path)
+    public async Task QueryMetric_HistogramWithNegativeBounds_KeepsPercentilesWithinThem(AnalysisPath path)
     {
         var name = $"temperature.change.{path}".ToLowerInvariant();
         var incidents = new OtlpIncidents();
@@ -163,7 +161,7 @@ public sealed class EngineDefectTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Trace_paging_rejects_a_stale_cursor_and_a_fresh_query_includes_the_late_span(AnalysisPath path)
+    public async Task GetTracePaging_SpanSortedAheadOfIssuedCursor_RefusesTheStaleCursorAndAFreshQueryIncludesIt(AnalysisPath path)
     {
         var service = $"paging-{path}".ToLowerInvariant();
         var start = _now - 5 * Minute;
@@ -179,7 +177,6 @@ public sealed class EngineDefectTests(TestContext context)
         var late = incidents.Span($"{service}-late", service, "late", start + 5_000 * Millisecond, 1, parent: root.SpanId, trace: root.TraceId);
         await SendAsync(incidents, $"{service}-late");
 
-        // A span that sorts ahead of the issued cursor invalidates it: since qyl 17.0.3 the continuation is refused with cursor.stale.
         var stale = input.DeepClone().AsObject();
         stale["cursor"] = page.GetProperty("next_cursor").GetString();
         var (status, error) = await Session.AskErrorAsync(path, "get_trace", stale, context.CancellationToken);

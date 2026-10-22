@@ -6,7 +6,7 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 public sealed class RegistryConformanceTests
 {
     [TestMethod]
-    public void Empty_capture_is_not_evidence_and_null_capture_is_rejected()
+    public void RegistryAudit_EmptyOrNullCapture_IsNotEvidence()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => RegistryConformance.Check(null!));
         var report = RegistryConformance.Check(new TelemetrySnapshot([], [], [], []));
@@ -18,7 +18,7 @@ public sealed class RegistryConformanceTests
     }
 
     [TestMethod]
-    public void Custom_names_and_open_enum_values_are_valid_and_remain_visible()
+    public void RegistryAudit_CustomNamesAndOpenEnumValues_AreValidAndVisible()
     {
         var span = new SpanRecord("trace", "span", "custom")
         {
@@ -35,7 +35,7 @@ public sealed class RegistryConformanceTests
     }
 
     [TestMethod]
-    public void Audit_reaches_span_log_resource_scope_event_and_link_attributes()
+    public void RegistryAudit_SpanLogResourceScopeEventAndLinkAttributes_AreReachedButTheLogBodyMapIsNot()
     {
         var invalid = Attributes(("http.response.status_code", "500"));
         var scope = new InstrumentationScopeRecord { Attributes = invalid };
@@ -59,12 +59,12 @@ public sealed class RegistryConformanceTests
         ], report.Issues.Select(i => i.Location));
         Assert.IsTrue(report.Issues.All(i => i is
             { Name: "http.response.status_code", Message: "Expected Integer.", Level: RegistryIssueLevel.Violation }));
-        Assert.AreSame(invalid, capture.Logs[0].Body); // A log body map is not an attribute collection.
+        Assert.AreSame(invalid, capture.Logs[0].Body);
         Assert.AreEqual(0UL, capture.Logs[0].TimeUnixNano);
     }
 
     [TestMethod]
-    public void Audit_reaches_every_point_shape_and_filtered_exemplar_attributes()
+    public void RegistryAudit_EveryPointShapeAndFilteredExemplarAttributes_AreReached()
     {
         var invalid = Attributes(("http.response.status_code", "500"));
         var exemplar = new ExemplarRecord(invalid, 1, 3L, "trace", "span");
@@ -95,7 +95,7 @@ public sealed class RegistryConformanceTests
     }
 
     [TestMethod]
-    public void Registered_units_and_deprecations_are_reported_without_inferring_an_sdk_instrument()
+    public void RegistryAudit_RegisteredUnitsAndDeprecations_AreReportedWithoutInferringAnSdkInstrument()
     {
         var span = new SpanRecord("trace", "span", "custom") { Attributes = Attributes(("db.system", "postgresql")) };
         MetricRecord[] metrics =
@@ -115,7 +115,7 @@ public sealed class RegistryConformanceTests
     }
 
     [TestMethod]
-    public void Deprecation_is_visible_advice_without_a_false_protocol_failure()
+    public void RegistryAudit_Deprecation_IsVisibleAdviceNotAProtocolFailure()
     {
         var span = new SpanRecord("trace", "span", "custom") { Attributes = Attributes(("db.system", "postgresql")) };
         var report = RegistryConformance.Check(new TelemetrySnapshot([span], [], [], []));
@@ -128,7 +128,7 @@ public sealed class RegistryConformanceTests
     }
 
     [TestMethod]
-    public void Template_attributes_use_their_declared_array_kind_without_rejecting_custom_neighbors()
+    public void RegistryAudit_TemplateAttributes_UseDeclaredArrayKindAndAcceptCustomNeighbors()
     {
         var span = new SpanRecord("trace", "span", "custom")
         {
@@ -145,7 +145,7 @@ public sealed class RegistryConformanceTests
 
     [TestMethod]
     [DynamicData(nameof(ValueCases))]
-    public void Registry_value_kinds_preserve_otlp_types(RegistryAttributeValueKind kind, object? value, bool expected)
+    public void RegistryAudit_ValueKinds_PreserveOtlpTypes(RegistryAttributeValueKind kind, object? value, bool expected)
     {
         Assert.AreEqual(expected, RegistryConformance.Matches(kind, value));
     }

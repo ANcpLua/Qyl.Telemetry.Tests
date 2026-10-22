@@ -15,7 +15,7 @@ public sealed class DuplicateAttributeTests
     [DataRow(AttributeShape.Integer)]
     [DataRow(AttributeShape.Array)]
     [DataRow(AttributeShape.Bytes)]
-    public void Identical_typed_duplicates_are_coalesced_without_mutating_the_wire_evidence(AttributeShape shape)
+    public void DuplicateAttributes_IdenticalTypedValues_AreCoalescedWithoutMutatingWireEvidence(AttributeShape shape)
     {
         var value = Value(shape);
         var input = new ProtoLog
@@ -54,7 +54,7 @@ public sealed class DuplicateAttributeTests
     [DataRow(AttributeShape.Integer)]
     [DataRow(AttributeShape.Array)]
     [DataRow(AttributeShape.Bytes)]
-    public void Conflicting_typed_duplicates_remain_invalid(AttributeShape shape)
+    public void DuplicateAttributes_ConflictingTypedValues_RemainInvalid(AttributeShape shape)
     {
         var input = new ProtoLog
         {

@@ -13,9 +13,8 @@ public sealed class CollectorClientTests(TestContext testContext)
 {
     private const string Repeated = "repeated";
 
-    /// <summary>Every log page is read and cursors and trace IDs are safely encoded.</summary>
     [TestMethod]
-    public async Task LogsFollowContinuationCursors()
+    public async Task CollectorClientLogs_ContinuationCursorAndTraceIdWithReservedCharacters_ReadsEveryPageEncoded()
     {
         var requests = new List<string>();
         using var client = Client(request =>
@@ -32,12 +31,11 @@ public sealed class CollectorClientTests(TestContext testContext)
         Assert.Contains("cursor=next%20%2B%26", requests[1]);
     }
 
-    /// <summary>A missing, empty or repeated continuation cannot silently truncate the result.</summary>
     [TestMethod]
     [DataRow(null)]
     [DataRow("")]
     [DataRow(Repeated)]
-    public async Task InvalidLogContinuationFails(string? cursor)
+    public async Task CollectorClientLogs_MissingEmptyOrRepeatedContinuation_ThrowsInsteadOfTruncating(string? cursor)
     {
         using var client = Client(_ => Json(JsonSerializer.Serialize(new { items = Array.Empty<object>(), has_more = true, next_cursor = cursor })));
         var failure = await Assert.ThrowsExactlyAsync<InvalidDataException>(() =>
@@ -45,9 +43,8 @@ public sealed class CollectorClientTests(TestContext testContext)
         Assert.Contains("continuation cursor", failure.Message);
     }
 
-    /// <summary>HTTP errors and empty JSON stay visible to the caller.</summary>
     [TestMethod]
-    public async Task QueryErrorsAreNotConvertedToEmptyResults()
+    public async Task CollectorClientLogs_HttpErrorOrNullJson_ThrowsInsteadOfReturningEmpty()
     {
         using var failed = Client(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
         _ = await Assert.ThrowsExactlyAsync<HttpRequestException>(() => new CollectorClient(failed).LogsAsync("trace", testContext.CancellationToken));
@@ -55,9 +52,8 @@ public sealed class CollectorClientTests(TestContext testContext)
         _ = await Assert.ThrowsExactlyAsync<InvalidDataException>(() => new CollectorClient(empty).LogsAsync("trace", testContext.CancellationToken));
     }
 
-    /// <summary>Metric queries preserve their explicit UTC window, aggregation and response metadata.</summary>
     [TestMethod]
-    public async Task MetricQueriesPreserveWindowAndAggregation()
+    public async Task CollectorClientMetricQuery_ExplicitUtcWindowAndAggregation_ArePreservedWithResponseMetadata()
     {
         var start = new DateTimeOffset(2026, 10, 16, 12, 0, 0, TimeSpan.FromHours(2));
         var expected = new MetricQueryResult
@@ -89,9 +85,8 @@ public sealed class CollectorClientTests(TestContext testContext)
         _ = await Assert.ThrowsExactlyAsync<ArgumentException>(() => telemetry.QueryMetricAsync(" ", start, start, cancellationToken: testContext.CancellationToken));
     }
 
-    /// <summary>Forwarding preserves the protocol reply, including a valid nonempty acknowledgement or HTTP error.</summary>
     [TestMethod]
-    public async Task TraceForwardingPreservesTheActualAcknowledgement()
+    public async Task CollectorClientExport_NonemptyAcknowledgementOrHttpError_IsForwardedUnchanged()
     {
         using var accepted = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([]) });
         using var acceptedReply = await new CollectorClient(accepted).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);

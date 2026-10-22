@@ -20,7 +20,7 @@ public sealed class MetricWireTests
     [DataRow(MetricShapes.Histogram)]
     [DataRow(MetricShapes.Exponential)]
     [DataRow(MetricShapes.Summary)]
-    public async Task Every_metric_shape_retains_its_identity_metadata_and_distribution(string shape)
+    public async Task OtlpReceiverMetrics_EveryShape_KeepsIdentityMetadataAndArchivedDistribution(string shape)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var metric = Fixture(shape);
@@ -59,11 +59,10 @@ public sealed class MetricWireTests
         Assert.AreEqual("scope-schema", observed.Scope?.SchemaUrl);
         Assert.AreEqual("original", observed.Metadata["metadata"]);
         CheckShape(shape, observed.Data);
-        // The diagnostic archive must contain the distribution, not an empty abstract base object.
         using var archive = JsonSerializer.SerializeToDocument(receiver.Snapshot());
-        var archived = archive.RootElement.GetProperty("Metrics")[0].GetProperty("Data");
-        Assert.AreEqual(shape, archived.GetProperty("kind").GetString());
-        Assert.AreEqual(1, archived.GetProperty("Points").GetArrayLength());
+        var archivedDistribution = archive.RootElement.GetProperty("Metrics")[0].GetProperty("Data");
+        Assert.AreEqual(shape, archivedDistribution.GetProperty("kind").GetString());
+        Assert.AreEqual(1, archivedDistribution.GetProperty("Points").GetArrayLength());
         var payload = archive.RootElement.GetProperty("Requests")[0];
         Assert.AreEqual(Signals.Metrics, payload.GetProperty("Signal").GetString());
         Assert.AreSequenceEqual(request.ToByteArray(), payload.GetProperty("Payload").GetBytesFromBase64());
@@ -78,7 +77,7 @@ public sealed class MetricWireTests
     }
 
     [TestMethod]
-    public async Task Metric_attribution_requires_matching_resource_partition_or_exemplar_point()
+    public async Task MetricAttribution_ResourcePartitionOrExemplarPoint_MustMatch()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = new ExportMetricsServiceRequest();

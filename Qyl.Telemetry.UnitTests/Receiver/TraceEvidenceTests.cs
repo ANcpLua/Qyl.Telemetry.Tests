@@ -6,9 +6,8 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 [TestClass]
 public sealed class TraceEvidenceTests
 {
-    /// <summary>A selected trace retains access to the complete original capture.</summary>
     [TestMethod]
-    public void SelectingATracePreservesOtherCapturedTraces()
+    public void TraceEvidence_SelectedTrace_KeepsTheCompleteOriginalCapture()
     {
         var selected = TestSpan.Create("orders", "selected");
         var unrelated = new SpanRecord("ffeeddccbbaa99887766554433221100", "unrelated", "other operation");
@@ -20,9 +19,8 @@ public sealed class TraceEvidenceTests
         Assert.AreSame(selected, Assert.ContainsSingle(trace.Spans));
     }
 
-    /// <summary>A repeated export is one call, and only a cross-service client/server parent chain is a call.</summary>
     [TestMethod]
-    public void CallsRequireACrossServiceClientParent()
+    public void TraceEvidenceCalls_RepeatedExportOrMissingCrossServiceClientParent_IsNoExtraCall()
     {
         var client = TestSpan.Create("orders", "client", SpanKind.Client);
         var server = TestSpan.Create("payments", "server", SpanKind.Server, "client");
@@ -38,9 +36,8 @@ public sealed class TraceEvidenceTests
         Assert.HasCount(8, trace.Spans);
     }
 
-    /// <summary>Service names are ordered while complete database identities remain distinct.</summary>
     [TestMethod]
-    public void ServicesAndStoresKeepTheirIdentities()
+    public void TraceEvidence_ServicesAndDatabaseStores_AreOrderedAndKeepCompleteIdentities()
     {
         var trace = TestSpan.Trace(TestSpan.Create("z", "1", store: "second"),
             TestSpan.Create("a", "2", store: "first"), TestSpan.Create("a", "3", store: "first"),
@@ -50,9 +47,8 @@ public sealed class TraceEvidenceTests
         Assert.IsEmpty(trace.StoresOf("missing"));
     }
 
-    /// <summary>Databases sharing a namespace on different servers must not become the same store.</summary>
     [TestMethod]
-    public void StoreIdentityIncludesTheServer()
+    public void TraceEvidenceStores_SameNamespaceOnDifferentServers_AreDistinct()
     {
         var trace = TestSpan.Trace(TestSpan.Create("orders", "1", store: "orders", server: "db-a"),
             TestSpan.Create("orders", "2", store: "orders", server: "db-b"));

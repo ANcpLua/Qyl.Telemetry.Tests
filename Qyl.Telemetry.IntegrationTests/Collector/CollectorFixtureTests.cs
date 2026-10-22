@@ -13,9 +13,8 @@ public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
     private readonly HttpClient _client = new();
     private static string AssemblyPath => Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll");
 
-    /// <summary>Ambient qyl and OTLP settings cannot redirect the isolated collector.</summary>
     [TestMethod]
-    public async Task CollectorHasItsOwnEndpointAndCanBeDisposedTwice()
+    public async Task CollectorFixture_AmbientQylAndOtlpSettings_KeepsItsOwnEndpointAndDisposesTwice()
     {
         using var settings = new EnvironmentScope(("QYL_PORT", "invalid"), ("OTEL_EXPORTER_OTLP_ENDPOINT", "invalid"));
         var collector = await CollectorFixture.StartAsync(AssemblyPath, cancellationToken: testContext.CancellationToken);
@@ -37,9 +36,8 @@ public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
             collector.Client.LogsAsync("trace", testContext.CancellationToken));
     }
 
-    /// <summary>A missing input is rejected before a process or workspace is acquired.</summary>
     [TestMethod]
-    public async Task MissingCollectorArtifactDoesNotCreateAWorkspace()
+    public async Task CollectorFixture_MissingArtifact_ThrowsBeforeCreatingAWorkspace()
     {
         var assembly = Path.Combine(AppContext.BaseDirectory, "missing-qyl-collector.dll");
         var workspace = Path.Combine(testContext.TestTempDirectory!, "not-created");
@@ -49,9 +47,8 @@ public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
         Assert.IsFalse(Directory.Exists(workspace));
     }
 
-    /// <summary>An early process exit reports its original output and is reaped.</summary>
     [TestMethod]
-    public async Task InvalidCollectorAssemblyReportsItsExit()
+    public async Task CollectorFixture_InvalidAssembly_ReportsItsEarlyExitAndIsReaped()
     {
         var assembly = Path.Combine(testContext.TestTempDirectory!, "invalid-qyl-collector.dll");
         await File.WriteAllTextAsync(assembly, "not a managed executable", testContext.CancellationToken);
@@ -64,9 +61,8 @@ public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
         Assert.IsFalse(shutdown.RootElement.GetProperty("Forced").GetBoolean());
     }
 
-    /// <summary>Cancelling startup terminates and joins the process instead of leaking it.</summary>
     [TestMethod]
-    public async Task CollectorStartupHonoursCancellation()
+    public async Task CollectorFixture_StartupCancelled_TerminatesAndJoinsTheProcess()
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
         await cancellation.CancelAsync();

@@ -13,7 +13,7 @@ public sealed class TraceModelTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    public async Task Service_calls_and_store_identity_are_derived_from_the_actual_parent_chain()
+    public async Task TraceModel_ActualParentChain_DerivesServiceCallsAndStoreIdentity()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = RichSpan();
@@ -64,7 +64,7 @@ public sealed class TraceModelTests
     }
 
     [TestMethod]
-    public async Task Repeated_exports_preserve_raw_observations_without_inventing_service_calls()
+    public async Task TraceModel_RepeatedExports_KeepRawObservationsWithoutInventingCalls()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = RichSpan();

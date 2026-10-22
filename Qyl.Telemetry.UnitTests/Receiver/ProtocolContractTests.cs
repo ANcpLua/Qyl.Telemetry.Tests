@@ -19,7 +19,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace, ResourceSpans)]
     [DataRow(Logs, ResourceLogs)]
     [DataRow(Metrics, ResourceMetrics)]
-    public void Internal_generated_protocol_matches_the_official_export_service_contract(string signal,
+    public void GeneratedProtocol_ExportServiceOfEachSignal_MatchesTheOfficialContract(string signal,
         string resourceField)
     {
         var descriptor = Descriptor(signal);

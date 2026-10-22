@@ -32,7 +32,7 @@ public sealed class RestartTests(TestContext context)
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
     [Timeout(180_000, CooperativeCancellation = true)]
-    public async Task Exact_values_ids_and_a_failure_cursor_survive_a_restart(AnalysisPath path)
+    public async Task Collector_Restart_KeepsExactValuesIdsAndAFailureCursor(AnalysisPath path)
     {
         var now = Nanoseconds(DateTimeOffset.UtcNow);
         var incidents = new OtlpIncidents();

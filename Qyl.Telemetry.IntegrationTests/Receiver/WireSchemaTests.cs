@@ -15,18 +15,20 @@ public sealed class WireSchemaTests
 {
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
+    private const string MisleadingSchemaUrlAttribute = "https://attribute.invalid/";
+
     [TestMethod]
     [DataRow(null)]
     [DataRow("https://opentelemetry.io/schemas/1.44.0")]
-    public async Task Resource_schema_survives_the_official_sdk_and_protobuf_wire(string? schemaUrl)
+    public async Task OfficialSdkResourceSchema_MisleadingSchemaAttribute_DoesNotReplaceTheWireSchemaUrl(string? schemaUrl)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var source = new ActivitySource("wire-" + Guid.NewGuid().ToString("N"), "1.2.3");
         var sourceName = source.Name;
-#pragma warning disable QYL0006 // Deliberately misleading attribute must not replace the actual resource schema URL.
+#pragma warning disable QYL0006
         var resource = ResourceBuilder.CreateEmpty().AddAttributes(
             new Dictionary<string, object>
-                { [ServiceAttributes.Name] = "schema-producer", ["telemetry.schema_url"] = "https://attribute.invalid/" },
+                { [ServiceAttributes.Name] = "schema-producer", ["telemetry.schema_url"] = MisleadingSchemaUrlAttribute },
             schemaUrl);
 #pragma warning restore QYL0006
         var endpoint = new Uri(receiver.Endpoint, "v1/traces");

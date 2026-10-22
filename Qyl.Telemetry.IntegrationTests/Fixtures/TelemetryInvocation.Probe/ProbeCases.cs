@@ -13,7 +13,7 @@ public sealed class ProbeCases(TestContext context)
     [ProbeMethod]
     [DataRow(ProbeContract.FirstRow)]
     [DataRow(ProbeContract.SecondRow)]
-    public void RowsKeepTheirTraceAndOriginalExecutor(string value)
+    public void ProbeRows_EachDataRow_KeepsItsTraceAndOriginalExecutor(string value)
     {
         var activity = Activity.Current;
         Assert.IsNotNull(activity);
@@ -22,13 +22,13 @@ public sealed class ProbeCases(TestContext context)
     }
 
     [TestMethod]
-    public void OriginalAssertionFailure() => Assert.Fail(ProbeContract.AssertionMessage);
+    public void Probe_AssertFail_KeepsTheOriginalAssertion() => Assert.Fail(ProbeContract.AssertionMessage);
 
     [TestMethod]
-    public void OriginalExceptionFailure() => throw new InvalidOperationException(ProbeContract.ExceptionMessage);
+    public void Probe_Throw_KeepsTheOriginalException() => throw new InvalidOperationException(ProbeContract.ExceptionMessage);
 
     [TestMethod]
-    public void OriginalInconclusiveResult() => Assert.Inconclusive(ProbeContract.InconclusiveMessage);
+    public void Probe_Inconclusive_KeepsTheOriginalResult() => Assert.Inconclusive(ProbeContract.InconclusiveMessage);
 }
 
 [AttributeUsage(AttributeTargets.Method)]

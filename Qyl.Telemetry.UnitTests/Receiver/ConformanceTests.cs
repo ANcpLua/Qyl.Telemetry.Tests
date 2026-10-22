@@ -8,7 +8,7 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 public sealed class ConformanceTests
 {
     [TestMethod]
-    public void Empty_selection_is_a_conformance_failure_and_never_a_green_empty_loop()
+    public void Conformance_EmptySelection_FailsInsteadOfPassingAnEmptyLoop()
     {
         var trace = new TraceEvidence("trace", new TelemetrySnapshot([], [], [], []));
         var report = trace.Conformance(Definition("string"), _ => true);
@@ -72,7 +72,7 @@ public sealed class ConformanceTests
     [DataRow("unknown", "string", false)]
     [DataRow("any", "string", true)]
     [DataRow("template", "string", true)]
-    public void Definition_scoped_conformance_checks_the_declared_attribute_type(string type, string valueType,
+    public void Conformance_DefinitionScopedAttribute_IsCheckedAgainstItsDeclaredType(string type, string valueType,
         bool expected)
     {
         var span = Model(new Dictionary<string, object?> { ["field"] = Literal(valueType) });
@@ -87,7 +87,7 @@ public sealed class ConformanceTests
     }
 
     [TestMethod]
-    public void Missing_required_deprecated_and_unknown_conditions_are_visible()
+    public void Conformance_MissingRequiredDeprecatedOrUnknownConditions_AreReported()
     {
         var attributes = new AttributeRef[]
         {
@@ -110,7 +110,7 @@ public sealed class ConformanceTests
     }
 
     [TestMethod]
-    public void Wrong_span_kind_is_reported_against_the_selected_definition()
+    public void Conformance_WrongSpanKind_IsReportedAgainstTheSelectedDefinition()
     {
         var span = new SpanRecord("11111111111111111111111111111111", "2222222222222222", "operation")
             { Kind = SpanKind.Client, Attributes = new Dictionary<string, object?> { ["field"] = "value" } };
@@ -127,7 +127,7 @@ public sealed class ConformanceTests
     [DataRow(RequirementLevel.Unspecified)]
     [DataRow(RequirementLevel.Recommended)]
     [DataRow(RequirementLevel.OptIn)]
-    public void Absent_non_required_attributes_do_not_fail_conformance(RequirementLevel level)
+    public void Conformance_AbsentNonRequiredAttributes_Pass(RequirementLevel level)
     {
         var definition = new SpanDefinition<Server>("optional.server", "optional.server", "Optional field contract",
             Stability.Stable,
@@ -146,7 +146,7 @@ public sealed class ConformanceTests
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void Undefined_public_requirement_level_is_rejected(bool present)
+    public void Conformance_UndefinedPublicRequirementLevel_IsRejected(bool present)
     {
         var attributes = new Dictionary<string, object?>();
         if (present) attributes["field"] = "value";
@@ -163,7 +163,7 @@ public sealed class ConformanceTests
     }
 
     [TestMethod]
-    public void Present_conditional_attribute_has_no_unresolved_requirement()
+    public void Conformance_PresentConditionalAttribute_LeavesNoUnresolvedRequirement()
     {
         var definition = new SpanDefinition<Server>("conditional.server", "conditional.server",
             "Conditional field contract", Stability.Stable,
@@ -182,7 +182,7 @@ public sealed class ConformanceTests
     }
 
     [TestMethod]
-    public void Generated_http_server_definition_retains_unresolved_conditions()
+    public void Conformance_GeneratedHttpServerDefinition_RetainsUnresolvedConditions()
     {
         var span = Model(new Dictionary<string, object?>
         {

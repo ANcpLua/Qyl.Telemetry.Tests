@@ -23,7 +23,7 @@ public sealed class TelemetryPolicyTests
     private const string Selected = "http.request.header.x-request-id";
 
     [TestMethod]
-    public void Every_policy_fails_when_no_trace_was_published()
+    public void TelemetryPolicy_NoTracePublished_FailsEveryPolicy()
     {
         TelemetryPolicyAttribute[] policies =
         [
@@ -37,13 +37,13 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Connected_trace_accepts_spans_under_captured_parents_or_the_test_root()
+    public void ConnectedTrace_SpansUnderCapturedParentsOrTheTestRoot_Pass()
     {
         Assert.IsEmpty(Violations(new ConnectedTraceAttribute(), Span(Server, Root), Span(Client, Server, SpanKind.Client)));
     }
 
     [TestMethod]
-    public void Connected_trace_names_a_lost_parent_a_second_root_and_an_empty_trace()
+    public void ConnectedTrace_LostParentSecondRootOrEmptyTrace_IsNamedInTheFailure()
     {
         var empty = new PublishedTrace(new TraceEvidence(Trace, new TelemetrySnapshot([], [], [], [])), Root);
         Assert.AreSequenceEqual(
@@ -57,7 +57,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Duplicate_spans_name_a_repeated_export_a_wrapped_operation_and_a_concurrent_second_scope()
+    public void NoDuplicateSpans_RepeatedExportWrappedOperationOrConcurrentSecondScope_IsNamedInTheFailure()
     {
         var wrapped = Span(Client, Server, scope: "Contrib.AspNetCore");
         var mirrored = Span("0000000000000004", Root, scope: "Contrib.AspNetCore");
@@ -72,7 +72,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Parallel_calls_of_one_scope_and_layered_protocols_are_not_duplicates()
+    public void NoDuplicateSpans_ParallelCallsOfOneScopeOrLayeredProtocols_Pass()
     {
         var grpc = Span(Client, Root, SpanKind.Client, "orders.Orders/Create");
         var http = Span("0000000000000004", Client, SpanKind.Client, "POST");
@@ -82,7 +82,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Capture_selection_reports_lost_unselected_and_invalid_fields()
+    public void CapturesExactly_LostUnselectedOrInvalidFields_AreReported()
     {
         var server = Span(Server, Root, attributes: new Dictionary<string, object?>
         {
@@ -99,7 +99,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Capture_selection_accepts_the_exact_selection_and_an_empty_one_without_fields()
+    public void CapturesExactly_ExactSelectionOrEmptySelectionWithoutFields_Passes()
     {
         var selected = Span(Server, Root, attributes: new Dictionary<string, object?> { [Selected] = new object?[] { "request-1" } });
         Assert.IsEmpty(Violations(new CapturesExactlyAttribute(Selected), selected));
@@ -107,7 +107,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Semantic_conventions_locate_type_violations_and_deprecations_unless_deprecations_are_allowed()
+    public void ConformsToSemanticConventions_TypeViolationsAndDeprecations_AreLocatedUnlessDeprecationsAreAllowed()
     {
         var server = Span(Server, Root, attributes: new Dictionary<string, object?>
         {
@@ -130,7 +130,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Error_telemetry_covers_trace_spans_and_every_error_log_but_not_fixture_spans_of_other_traces()
+    public void NoErrorTelemetry_ErrorSpansOfTheTraceOrAnyErrorLog_FailButFixtureSpansOfOtherTracesDoNot()
     {
         var failed = new SpanRecord(Trace, Server, "GET /orders")
         {
@@ -167,7 +167,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Clean_exports_reject_rejections_errors_and_receiver_warnings()
+    public void ExportsCleanly_RejectionsErrorsOrReceiverWarnings_Fail()
     {
         ExportReceipt[] receipts =
         [
@@ -186,7 +186,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Collector_preservation_accepts_identical_storage_and_withholds_policy_denied_keys()
+    public void PreservedByCollector_IdenticalStorageWithPolicyDeniedKeysWithheld_Passes()
     {
         var captured = Span(Server, Root, attributes: new Dictionary<string, object?>
         {
@@ -201,7 +201,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Collector_preservation_names_missing_spans_changed_values_and_policy_breaches()
+    public void PreservedByCollector_MissingSpansChangedValuesOrPolicyBreaches_AreNamedInTheFailure()
     {
         var captured = Span(Server, Root, attributes: new Dictionary<string, object?>
         {
@@ -236,7 +236,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void A_violation_fails_each_passing_result_with_the_trace_outline_and_an_evidence_file()
+    public void TelemetryPolicy_Violation_FailsEachPassingResultWithTraceOutlineAndEvidenceFile()
     {
         using var invocation = TelemetryInvocation.Begin([new ConnectedTraceAttribute()]);
         TelemetryInvocation.Publish(Published(Span(Server, Missing)));
@@ -257,7 +257,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Satisfied_policies_leave_every_result_unchanged()
+    public void TelemetryPolicy_AllSatisfied_LeavesEveryResultUnchanged()
     {
         using var invocation = TelemetryInvocation.Begin([new ConnectedTraceAttribute()]);
         TelemetryInvocation.Publish(Published(Span(Server, Root)));
@@ -268,7 +268,7 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void Method_policies_replace_class_policies_of_the_same_type_and_keep_the_others()
+    public void TelemetryPolicy_MethodAndClassPolicyOfOneType_MethodReplacesClassAndOthersStay()
     {
         var policies = TelemetryPolicyAttribute.DeclaredOn(typeof(DeclaringCases).GetMethod(nameof(DeclaringCases.Overrides))!);
         Assert.AreSequenceEqual(["CapturesExactly", "ConnectedTrace", "NoErrorTelemetry"],
@@ -345,7 +345,7 @@ public sealed class UnverifiedPolicyTests
 {
     [TestMethod]
     [ConnectedTrace]
-    public void Publishing_evidence_from_a_plain_test_class_with_policies_fails()
+    public void TelemetryPolicy_EvidenceFromPlainTestClassWithPolicies_Fails()
     {
         var trace = new PublishedTrace(new TraceEvidence("00112233445566778899aabbccddeeff", new TelemetrySnapshot([], [], [], [])), "0000000000000001");
         var error = Assert.ThrowsExactly<InvalidOperationException>(() => TelemetryInvocation.Publish(trace));

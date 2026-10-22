@@ -7,10 +7,10 @@ internal static class ProbeContract
 {
     internal const string FirstRow = "first";
     internal const string SecondRow = "second";
-    internal const string RowMethod = "RowsKeepTheirTraceAndOriginalExecutor";
-    internal const string AssertionMethod = "OriginalAssertionFailure";
-    internal const string ExceptionMethod = "OriginalExceptionFailure";
-    internal const string InconclusiveMethod = "OriginalInconclusiveResult";
+    internal const string RowMethod = "ProbeRows_EachDataRow_KeepsItsTraceAndOriginalExecutor";
+    internal const string AssertionMethod = "Probe_AssertFail_KeepsTheOriginalAssertion";
+    internal const string ExceptionMethod = "Probe_Throw_KeepsTheOriginalException";
+    internal const string InconclusiveMethod = "Probe_Inconclusive_KeepsTheOriginalResult";
     internal const string AssertionMessage = "probe original assertion";
     internal const string ExceptionMessage = "probe original exception";
     internal const string InconclusiveMessage = "probe original inconclusive";
@@ -30,9 +30,9 @@ internal static class PolicyContract
     internal const string SecondRow = "second.row";
     internal const string Operation = "GET /probe";
     internal const string OriginalMessage = "probe original policy failure";
-    internal const string SatisfiedMethod = "SatisfiedPoliciesKeepEachRowPassing";
-    internal const string WrappedMethod = "WrappedOperationFails";
-    internal const string MissingMethod = "MissingEvidenceFails";
-    internal const string OriginalMethod = "OriginalFailureIsKept";
-    internal const string UnverifiedMethod = "PlainTestClassRejectsPolicies";
+    internal const string SatisfiedMethod = "Policies_SatisfiedOnEachDataRow_KeepTheRowPassing";
+    internal const string WrappedMethod = "NoDuplicateSpans_WrappedOperation_Fails";
+    internal const string MissingMethod = "ConnectedTrace_NoEvidence_Fails";
+    internal const string OriginalMethod = "ConnectedTrace_OriginalFailure_IsKept";
+    internal const string UnverifiedMethod = "PlainTestClass_PolicyAttribute_IsRejected";
 }

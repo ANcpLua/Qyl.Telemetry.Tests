@@ -15,7 +15,7 @@ public sealed class PayloadLimitTests
     [TestMethod]
     [DataRow(0)]
     [DataRow(-1)]
-    public async Task Nonpositive_limits_are_rejected_before_opening_listeners(int limit)
+    public async Task OtlpReceiver_NonpositiveLimit_IsRejectedBeforeListenersOpen(int limit)
     {
         var failure = await Assert.ThrowsExactlyAsync<ArgumentOutOfRangeException>(() =>
             OtlpReceiver.StartAsync(limit, TestContext.CancellationToken));
@@ -29,7 +29,7 @@ public sealed class PayloadLimitTests
     [DataRow(1024, false, false)]
     [DataRow(1024, true, false)]
     [DataRow(1024, true, true)]
-    public async Task Http_enforces_the_default_or_configured_limit_with_and_without_content_length(
+    public async Task HttpReceiver_DefaultOrConfiguredLimit_IsEnforcedWithAndWithoutContentLength(
         int limit, bool gzip, bool chunked)
     {
         await using var receiver = limit == 16 * 1024 * 1024
@@ -42,8 +42,8 @@ public sealed class PayloadLimitTests
             if (chunked) Assert.IsNull(content.Headers.ContentLength);
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(receiver.Endpoint, "v1/traces"));
             request.Content = content;
-            // Let the declared-size rejection return its OTLP error before a large eager upload.
-            request.Headers.ExpectContinue = !chunked;
+            var awaitDeclaredSizeVerdictBeforeUpload = !chunked;
+            request.Headers.ExpectContinue = awaitDeclaredSizeVerdictBeforeUpload;
             using var response = await TelemetryLifecycle.Http.SendAsync(request, TestContext.CancellationToken);
             Assert.AreEqual(size > limit ? HttpStatusCode.RequestEntityTooLarge : HttpStatusCode.OK, response.StatusCode, $"Payload size: {size}; gzip: {gzip}; chunked: {chunked}.");
             if (size <= limit)
@@ -67,20 +67,19 @@ public sealed class PayloadLimitTests
     }
 
     [TestMethod]
-    public async Task Chunked_identity_requests_enforce_the_native_wire_budget()
+    public async Task HttpReceiver_ChunkedIdentityRequest_IsHeldToTheKestrelWireBudget()
     {
         await using var receiver = await OtlpReceiver.StartAsync(1024, TestContext.CancellationToken);
-        // Kestrel counts chunk framing against its wire budget. Leave room for that framing
-        // in the accepted request; the rejected payload exceeds the budget by itself.
-        // https://github.com/dotnet/aspnetcore/blob/v10.0.0/src/Servers/Kestrel/Core/src/Internal/Http/Http1ChunkedEncodingMessageBody.cs
-        foreach (var size in new[] { 992, 1025 })
+        const int acceptedSizeLeavingRoomForKestrelChunkFraming = 992;
+        const int rejectedSizeAboveTheWireBudgetByItself = 1025;
+        foreach (var size in new[] { acceptedSizeLeavingRoomForKestrelChunkFraming, rejectedSizeAboveTheWireBudgetByItself })
         {
             using var content = Content(UnknownFieldPayload(size), false, true);
             Assert.IsNull(content.Headers.ContentLength);
             using var response = await TelemetryLifecycle.Http.PostAsync(new Uri(receiver.Endpoint, "v1/metrics"),
                 content, TestContext.CancellationToken);
-            Assert.AreEqual(size == 992 ? HttpStatusCode.OK : HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
-            if (size == 992) continue;
+            Assert.AreEqual(size == acceptedSizeLeavingRoomForKestrelChunkFraming ? HttpStatusCode.OK : HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+            if (size == acceptedSizeLeavingRoomForKestrelChunkFraming) continue;
             var error = await TransportTests.ReadErrorAsync(response, TestContext.CancellationToken);
             Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
             Assert.Contains("1024-byte", error.Message);
@@ -91,13 +90,14 @@ public sealed class PayloadLimitTests
     }
 
     [TestMethod]
-    public async Task Compressed_wire_overflow_without_content_length_returns_an_otlp_error()
+    public async Task HttpReceiver_CompressedWireOverflowWithoutContentLength_ReturnsAnOtlpError()
     {
         await using var receiver = await OtlpReceiver.StartAsync(1024, TestContext.CancellationToken);
         var gzip = Compress([0xfa, 0x07, 0x00]);
         var body = new byte[gzip.Length + 1026];
         gzip.AsSpan(0, 10).CopyTo(body);
-        body[3] |= 0x08; // FNAME: a NUL-terminated header that emits no decoded bytes.
+        const byte gzipFileNameFlagEmittingNoDecodedBytes = 0x08;
+        body[3] |= gzipFileNameFlagEmittingNoDecodedBytes;
         body.AsSpan(10, 1025).Fill((byte)'x');
         gzip.AsSpan(10).CopyTo(body.AsSpan(1036));
         using var content = Content(body, true, true);
@@ -113,7 +113,7 @@ public sealed class PayloadLimitTests
     }
 
     [TestMethod]
-    public async Task Trace_capture_applies_the_configured_limit_to_both_transports()
+    public async Task TraceCapture_ConfiguredLimit_AppliesToHttpAndGrpc()
     {
         var trace = await TelemetryCapture.TraceAsync(async capture =>
         {

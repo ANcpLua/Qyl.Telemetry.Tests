@@ -15,7 +15,7 @@ public sealed class NumericFidelityTests
     [DataRow(9007199254740993L)]
     [DataRow(long.MinValue)]
     [DataRow(long.MaxValue)]
-    public async Task Signed_integer_points_and_exemplars_retain_all_64_bits(long expected)
+    public async Task OtlpReceiverMetrics_SignedIntegerPointsAndExemplars_KeepAll64Bits(long expected)
     {
         var point = new NumberDataPoint { AsInt = expected, Exemplars = { new Exemplar { AsInt = expected } } };
         var metrics = await CaptureAsync(
@@ -46,7 +46,7 @@ public sealed class NumericFidelityTests
     [DataRow("positive-infinity", double.PositiveInfinity)]
     [DataRow("negative-infinity", double.NegativeInfinity)]
     [DataRow("negative-zero", -0.0)]
-    public async Task Named_non_finite_and_signed_zero_doubles_keep_their_wire_bits(string name, double expected)
+    public async Task OtlpReceiverMetrics_NonFiniteAndSignedZeroDoubles_KeepTheirWireBits(string name, double expected)
     {
         var metrics = await CaptureAsync(new Metric
         {
@@ -68,7 +68,7 @@ public sealed class NumericFidelityTests
     }
 
     [TestMethod]
-    public async Task Unsigned_counts_and_bucket_counts_preserve_uint64_maximum()
+    public async Task OtlpReceiverMetrics_CountsAndBucketCounts_PreserveUInt64Maximum()
     {
         var metrics = await CaptureAsync(
             new Metric

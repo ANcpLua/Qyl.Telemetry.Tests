@@ -12,7 +12,7 @@ public sealed class RawActivityCaptureTests
     private const string Key = "http.request.header.x-example";
 
     [TestMethod]
-    public void Snapshot_owns_the_original_array_and_operation_path()
+    public void RawActivityCapture_Snapshot_OwnsTheOriginalArrayAndOperationPath()
     {
         string[] values = ["first", "first", "", "comma,kept"];
         using var activity = new Activity("http").SetTag(UrlAttributes.Full, "https://example.invalid/ok?ignored=true")
@@ -34,7 +34,7 @@ public sealed class RawActivityCaptureTests
     [DataRow(RawViolation.List)]
     [DataRow(RawViolation.Reordered)]
     [DataRow(RawViolation.DuplicateLost)]
-    public void Exact_values_reject_wrong_CLR_types_and_changed_sequences(RawViolation violation)
+    public void RawActivityCapture_WrongClrTypeOrChangedSequence_FailsExactValues(RawViolation violation)
     {
         var tags = new Dictionary<string, object?>();
         if (violation != RawViolation.Missing)
@@ -57,7 +57,7 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void Parent_check_rejects_a_different_trace_even_when_parent_span_matches()
+    public void RawActivityCapture_MatchingParentSpanInDifferentTrace_FailsParentCheck()
     {
         using var parent = new Activity("parent").SetIdFormat(ActivityIdFormat.W3C).Start();
         using var child = new Activity("child").Start();
@@ -72,7 +72,7 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void Duplicate_span_identity_is_rejected()
+    public void RawActivityCapture_DuplicateSpanIdentity_IsRejected()
     {
         using var activity = new Activity("operation").SetIdFormat(ActivityIdFormat.W3C).Start();
         var snapshot = ActivitySnapshot.Capture(activity);
@@ -82,7 +82,7 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void Report_uses_one_schema_for_http_and_grpc_and_preserves_array_values()
+    public void RawActivityCaptureReport_HttpAndGrpc_ShareOneSchemaAndPreserveArrayValues()
     {
         string[] httpValues = ["", "a,b"];
         string[] grpcValues = ["AAH/"];
@@ -109,7 +109,7 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void Report_cannot_turn_a_string_list_into_passing_CLR_array_evidence()
+    public void RawActivityCaptureReport_StringListForClrArray_DoesNotPass()
     {
         List<string> invalidValues = ["value"];
         using var activity = new Activity("wrong-clr-type").SetTag(Key, invalidValues).Start();
@@ -119,7 +119,7 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void Disposal_check_requires_a_native_span_and_rejects_leftover_capture()
+    public void RawActivityCaptureDisposal_MissingNativeSpanOrLeftoverCapture_Fails()
     {
         using var activity = new Activity("after-disposal").SetIdFormat(ActivityIdFormat.W3C).Start();
         var snapshot = ActivitySnapshot.Capture(activity) with { Source = "System.Net.Http" };

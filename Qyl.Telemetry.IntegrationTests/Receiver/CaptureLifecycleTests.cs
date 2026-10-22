@@ -12,7 +12,7 @@ public sealed class CaptureLifecycleTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    public async Task Concurrent_capture_invocations_have_distinct_roots_and_keep_unrelated_wire_records_visible()
+    public async Task TelemetryCapture_ConcurrentInvocations_HaveDistinctRootsAndKeepUnrelatedRecordsVisible()
     {
         var previous = Activity.Current;
         var results = await Task.WhenAll(CaptureAsync(1), CaptureAsync(2));
@@ -32,7 +32,7 @@ public sealed class CaptureLifecycleTests
     }
 
     [TestMethod]
-    public async Task Multiple_waiters_are_notified_by_the_same_real_export()
+    public async Task TelemetryCapture_MultipleWaiters_AreNotifiedByOneRealExport()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var first = receiver.AwaitAsync(s => s.Spans.Count == 1, TimeSpan.FromSeconds(10),
@@ -56,7 +56,7 @@ public sealed class CaptureLifecycleTests
     }
 
     [TestMethod]
-    public async Task Canceled_startup_preserves_cancellation_instead_of_returning_a_live_receiver()
+    public async Task TelemetryCapture_StartupCanceled_ThrowsCancellationInsteadOfReturningAReceiver()
     {
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
@@ -64,7 +64,7 @@ public sealed class CaptureLifecycleTests
     }
 
     [TestMethod]
-    public async Task Capture_timeout_fails_instead_of_accepting_missing_evidence()
+    public async Task TelemetryCapture_EvidenceMissingAtTimeout_Fails()
     {
         var previous = Activity.Current;
         await Assert.ThrowsExactlyAsync<TimeoutException>(() => TelemetryCapture.TraceAsync(_ => Task.CompletedTask,
