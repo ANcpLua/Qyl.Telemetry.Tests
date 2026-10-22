@@ -70,26 +70,9 @@ public sealed class ProfilingFieldTests
         var array = Assert.IsInstanceOfType<IReadOnlyList<object?>>(map["array"]);
         Assert.AreEqual(string.Empty, Assert.ContainsSingle(array));
         var reply = await response.Content.ReadAsByteArrayAsync(TestContext.CancellationToken);
-        long rejected;
-        string warning;
-        switch (signal)
-        {
-            case Signals.Traces:
-                var traces = ExportTraceServiceResponse.Parser.ParseFrom(reply).PartialSuccess;
-                rejected = traces.RejectedSpans;
-                warning = traces.ErrorMessage;
-                break;
-            case Signals.Logs:
-                var logs = ExportLogsServiceResponse.Parser.ParseFrom(reply).PartialSuccess;
-                rejected = logs.RejectedLogRecords;
-                warning = logs.ErrorMessage;
-                break;
-            default:
-                var metrics = ExportMetricsServiceResponse.Parser.ParseFrom(reply).PartialSuccess;
-                rejected = metrics.RejectedDataPoints;
-                warning = metrics.ErrorMessage;
-                break;
-        }
+        var acknowledgement = Signals.PartialSuccess(signal, reply);
+        Assert.IsNotNull(acknowledgement);
+        var (rejected, warning) = acknowledgement.Value;
         Assert.AreEqual(0L, rejected);
         Assert.AreEqual("application/x-protobuf", response.Content.Headers.ContentType?.MediaType);
         Assert.Contains("StringValueStrindex 7", warning);

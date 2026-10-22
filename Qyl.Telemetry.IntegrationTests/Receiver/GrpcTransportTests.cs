@@ -91,7 +91,9 @@ public sealed class GrpcTransportTests
         var bytes = Request(signal, true, false).ToByteArray();
         using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
             new CallOptions(cancellationToken: TestContext.CancellationToken), bytes);
-        var (rejected, message) = Ack(signal, await call.ResponseAsync);
+        var acknowledgement = Signals.PartialSuccess(signal, await call.ResponseAsync);
+        Assert.IsNotNull(acknowledgement);
+        var (rejected, message) = acknowledgement.Value;
         Assert.AreEqual(1L, rejected);
         Assert.IsFalse(string.IsNullOrWhiteSpace(message));
         var snapshot = receiver.Snapshot();
@@ -119,7 +121,9 @@ public sealed class GrpcTransportTests
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
             new CallOptions(cancellationToken: TestContext.CancellationToken), Request(signal, false, true).ToByteArray());
-        var (rejected, message) = Ack(signal, await call.ResponseAsync);
+        var acknowledgement = Signals.PartialSuccess(signal, await call.ResponseAsync);
+        Assert.IsNotNull(acknowledgement);
+        var (rejected, message) = acknowledgement.Value;
         Assert.AreEqual(0L, rejected);
         Assert.Contains("StringValueStrindex 7", message);
         var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
@@ -244,25 +248,6 @@ public sealed class GrpcTransportTests
         }, "Export",
         Marshallers.Create<byte[]>(static (bytes, context) => context.Complete(bytes), static context => context.PayloadAsNewBuffer()),
         Marshallers.Create<byte[]>(static (bytes, context) => context.Complete(bytes), static context => context.PayloadAsNewBuffer()));
-
-    private static (long Rejected, string Message) Ack(string signal, byte[] bytes)
-    {
-        switch (signal)
-        {
-            case Signals.Traces:
-                var traces = ExportTraceServiceResponse.Parser.ParseFrom(bytes).PartialSuccess;
-                Assert.IsNotNull(traces);
-                return (traces.RejectedSpans, traces.ErrorMessage);
-            case Signals.Logs:
-                var logs = ExportLogsServiceResponse.Parser.ParseFrom(bytes).PartialSuccess;
-                Assert.IsNotNull(logs);
-                return (logs.RejectedLogRecords, logs.ErrorMessage);
-            default:
-                var metrics = ExportMetricsServiceResponse.Parser.ParseFrom(bytes).PartialSuccess;
-                Assert.IsNotNull(metrics);
-                return (metrics.RejectedDataPoints, metrics.ErrorMessage);
-        }
-    }
 
     private static IMessage Request(string signal, bool invalid, bool warning)
     {
