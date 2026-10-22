@@ -164,21 +164,19 @@ internal static class SpanConformance
         return new ConformanceReport(definition.Id, selected.Length, issues.AsReadOnly(), unevaluated.AsReadOnly());
     }
 
-    private static bool TypeMatches(string type, object? value)
-    {
-        return type switch
+    private static bool TypeMatches(string type, object? value) => type == "enum"
+        ? value is string or long
+        : RegistryConformance.Matches(type switch
         {
-            "string" => value is string,
-            "int" => value is long,
-            "double" => value is double,
-            "boolean" => value is bool,
-            "string[]" => value is IReadOnlyList<object?> strings && strings.All(v => v is string),
-            "int[]" => value is IReadOnlyList<object?> ints && ints.All(v => v is long),
-            "double[]" => value is IReadOnlyList<object?> doubles && doubles.All(v => v is double),
-            "boolean[]" => value is IReadOnlyList<object?> bools && bools.All(v => v is bool),
-            "enum" => value is string or long,
-            "any" or "template" => true,
-            _ => false
-        };
-    }
+            "string" => RegistryAttributeValueKind.String,
+            "int" => RegistryAttributeValueKind.Integer,
+            "double" => RegistryAttributeValueKind.Double,
+            "boolean" => RegistryAttributeValueKind.Boolean,
+            "string[]" => RegistryAttributeValueKind.StringArray,
+            "int[]" => RegistryAttributeValueKind.IntegerArray,
+            "double[]" => RegistryAttributeValueKind.DoubleArray,
+            "boolean[]" => RegistryAttributeValueKind.BooleanArray,
+            "any" or "template" => RegistryAttributeValueKind.Any,
+            _ => RegistryAttributeValueKind.Unknown
+        }, value);
 }
