@@ -80,10 +80,9 @@ public sealed class MetricWireTests
     public async Task MetricAttribution_ResourcePartitionOrExemplarPoint_MustMatch()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var request = new ExportMetricsServiceRequest();
-        var resource = new ResourceMetrics { ScopeMetrics = { new ScopeMetrics { Metrics = { Fixture(MetricShapes.Gauge) } } } };
-        resource.ScopeMetrics[0].Metrics[0].Gauge.DataPoints.Add(new NumberDataPoint { AsInt = 99 });
-        request.ResourceMetrics.Add(resource);
+        var metric = Fixture(MetricShapes.Gauge);
+        metric.Gauge.DataPoints.Add(new NumberDataPoint { AsInt = 99 });
+        var request = Metrics(null, metric);
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();

@@ -7,7 +7,6 @@ using JetBrains.Annotations;
 using OpenTelemetry.Proto.Common.V1;
 using OpenTelemetry.Proto.Collector.Metrics.V1;
 using OpenTelemetry.Proto.Collector.Trace.V1;
-using OpenTelemetry.Proto.Metrics.V1;
 using OpenTelemetry.Proto.Trace.V1;
 using Qyl.Telemetry.SemanticConventions;
 using Qyl.Telemetry.Tests.Evidence;
@@ -44,15 +43,13 @@ public sealed class ReceiverTests
     public async Task HttpReceiver_PartiallyInvalidTraces_KeepsValidSpansAndReportsTheExactRejection()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var request = new ExportTraceServiceRequest();
-        var scope = new ScopeSpans();
-        scope.Spans.Add(new Span
-        {
-            TraceId = OtlpEvidence.Id("11111111111111111111111111111111"),
-            SpanId = OtlpEvidence.Id("2222222222222222"), Name = "valid"
-        });
-        scope.Spans.Add(new Span { Name = "invalid" });
-        request.ResourceSpans.Add(new ResourceSpans { ScopeSpans = { scope } });
+        var request = OtlpEvidence.Traces(null,
+            new Span
+            {
+                TraceId = OtlpEvidence.Id("11111111111111111111111111111111"),
+                SpanId = OtlpEvidence.Id("2222222222222222"), Name = "valid"
+            },
+            new Span { Name = "invalid" });
         using var response = await PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         var result =
@@ -123,14 +120,7 @@ public sealed class ReceiverTests
         var conflicting = metric.Gauge.DataPoints[0].Attributes[0].Clone();
         conflicting.Value = new AnyValue { StringValue = "conflicting" };
         metric.Gauge.DataPoints[0].Attributes.Add(conflicting);
-        var request = new ExportMetricsServiceRequest
-        {
-            ResourceMetrics =
-            {
-                new ResourceMetrics
-                    { ScopeMetrics = { new ScopeMetrics { Metrics = { metric } } } }
-            }
-        };
+        var request = OtlpEvidence.Metrics(null, metric);
         using var response = await PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken,
             Signals.Metrics);
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);

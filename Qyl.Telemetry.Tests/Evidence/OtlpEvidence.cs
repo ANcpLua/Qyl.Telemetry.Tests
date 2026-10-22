@@ -1,8 +1,13 @@
 using Google.Protobuf;
+using OpenTelemetry.Proto.Collector.Logs.V1;
+using OpenTelemetry.Proto.Collector.Metrics.V1;
 using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Common.V1;
+using OpenTelemetry.Proto.Logs.V1;
+using OpenTelemetry.Proto.Metrics.V1;
 using OpenTelemetry.Proto.Trace.V1;
 using EntityRef = OpenTelemetry.Proto.Common.V1.EntityRef;
+using ProtoLog = OpenTelemetry.Proto.Logs.V1.LogRecord;
 using ProtoResource = OpenTelemetry.Proto.Resource.V1.Resource;
 
 namespace Qyl.Telemetry.Tests.Evidence;
@@ -70,6 +75,38 @@ internal static class OtlpEvidence
                 { new ResourceSpans { Resource = resource, SchemaUrl = "resource-schema", ScopeSpans = { scope } } }
         };
     }
+
+    /// <summary>One trace export of <paramref name="spans" /> in a single scope without scope metadata.</summary>
+    internal static ExportTraceServiceRequest Traces(ProtoResource? resource, params IEnumerable<Span> spans) =>
+        Traces(resource, new ScopeSpans { Spans = { spans } });
+
+    /// <summary>One trace export of <paramref name="spans" /> in the single scope <paramref name="scope" />.</summary>
+    internal static ExportTraceServiceRequest Traces(ProtoResource? resource, InstrumentationScope scope,
+        params IEnumerable<Span> spans) =>
+        Traces(resource, new ScopeSpans { Scope = scope, Spans = { spans } });
+
+    /// <summary>One log export of <paramref name="records" /> in a single scope without scope metadata.</summary>
+    internal static ExportLogsServiceRequest Logs(ProtoResource? resource, params IEnumerable<ProtoLog> records) =>
+        Logs(resource, new ScopeLogs { LogRecords = { records } });
+
+    /// <summary>One log export of <paramref name="records" /> in the single scope <paramref name="scope" />.</summary>
+    internal static ExportLogsServiceRequest Logs(ProtoResource? resource, InstrumentationScope scope,
+        params IEnumerable<ProtoLog> records) =>
+        Logs(resource, new ScopeLogs { Scope = scope, LogRecords = { records } });
+
+    /// <summary>One metric export of <paramref name="metrics" /> in a single scope without scope metadata.</summary>
+    internal static ExportMetricsServiceRequest Metrics(ProtoResource? resource, params IEnumerable<Metric> metrics) =>
+        new()
+        {
+            ResourceMetrics =
+                { new ResourceMetrics { Resource = resource, ScopeMetrics = { new ScopeMetrics { Metrics = { metrics } } } } }
+        };
+
+    private static ExportTraceServiceRequest Traces(ProtoResource? resource, ScopeSpans scope) =>
+        new() { ResourceSpans = { new ResourceSpans { Resource = resource, ScopeSpans = { scope } } } };
+
+    private static ExportLogsServiceRequest Logs(ProtoResource? resource, ScopeLogs scope) =>
+        new() { ResourceLogs = { new ResourceLogs { Resource = resource, ScopeLogs = { scope } } } };
 
     internal static KeyValue Pair(string key, AnyValue value)
     {

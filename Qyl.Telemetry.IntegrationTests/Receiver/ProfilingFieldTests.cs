@@ -1,11 +1,6 @@
 using Google.Protobuf;
 using JetBrains.Annotations;
-using OpenTelemetry.Proto.Collector.Logs.V1;
-using OpenTelemetry.Proto.Collector.Metrics.V1;
-using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Common.V1;
-using OpenTelemetry.Proto.Logs.V1;
-using OpenTelemetry.Proto.Metrics.V1;
 using OpenTelemetry.Proto.Resource.V1;
 using OpenTelemetry.Proto.Trace.V1;
 using Qyl.Telemetry.Tests.Evidence;
@@ -115,14 +110,8 @@ public sealed class ProfilingFieldTests
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var resource = new Resource { Attributes = { new KeyValue { KeyStrindex = 3, Value = new AnyValue { StringValue = "unknown key" } } } };
-        var twoLogsOfOneResource = new ExportLogsServiceRequest
-        {
-            ResourceLogs = { new ResourceLogs { Resource = resource, ScopeLogs = { new ScopeLogs { LogRecords =
-            {
-                new ProtoLog { Body = new AnyValue { IntValue = 1 } },
-                new ProtoLog { Body = new AnyValue { IntValue = 2 } }
-            } } } } }
-        };
+        var twoLogsOfOneResource = OtlpEvidence.Logs(resource,
+            new ProtoLog { Body = new AnyValue { IntValue = 1 } }, new ProtoLog { Body = new AnyValue { IntValue = 2 } });
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, twoLogsOfOneResource.ToByteArray(),
             TestContext.CancellationToken, Signals.Logs);
         response.EnsureSuccessStatusCode();
@@ -131,27 +120,13 @@ public sealed class ProfilingFieldTests
 
     private static IMessage Request(string signal, Resource resource) => signal switch
     {
-        Signals.Traces => new ExportTraceServiceRequest
+        Signals.Traces => OtlpEvidence.Traces(resource, new Span
         {
-            ResourceSpans = { new ResourceSpans { Resource = resource, ScopeSpans = { new ScopeSpans
-            {
-                Spans = { new Span
-                {
-                    TraceId = OtlpEvidence.Id("11111111111111111111111111111111"),
-                    SpanId = OtlpEvidence.Id("2222222222222222"), Name = "preserved"
-                } }
-            } } } }
-        },
-        Signals.Logs => new ExportLogsServiceRequest
-        {
-            ResourceLogs = { new ResourceLogs { Resource = resource,
-                ScopeLogs = { new ScopeLogs { LogRecords = { new ProtoLog { Body = new AnyValue { IntValue = 42 } } } } } } }
-        },
-        Signals.Metrics => new ExportMetricsServiceRequest
-        {
-            ResourceMetrics = { new ResourceMetrics { Resource = resource,
-                ScopeMetrics = { new ScopeMetrics { Metrics = { MetricWireTests.Fixture(MetricShapes.Gauge) } } } } }
-        },
+            TraceId = OtlpEvidence.Id("11111111111111111111111111111111"), SpanId = OtlpEvidence.Id("2222222222222222"),
+            Name = "preserved"
+        }),
+        Signals.Logs => OtlpEvidence.Logs(resource, new ProtoLog { Body = new AnyValue { IntValue = 42 } }),
+        Signals.Metrics => OtlpEvidence.Metrics(resource, MetricWireTests.Fixture(MetricShapes.Gauge)),
         _ => throw new ArgumentOutOfRangeException(nameof(signal))
     };
 }

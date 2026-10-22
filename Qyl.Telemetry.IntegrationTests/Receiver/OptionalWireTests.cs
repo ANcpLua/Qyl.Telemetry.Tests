@@ -1,9 +1,6 @@
 using System.Diagnostics;
 using Google.Protobuf;
 using JetBrains.Annotations;
-using OpenTelemetry.Proto.Collector.Logs.V1;
-using OpenTelemetry.Proto.Collector.Metrics.V1;
-using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Common.V1;
 using OpenTelemetry.Proto.Logs.V1;
 using OpenTelemetry.Proto.Metrics.V1;
@@ -23,29 +20,8 @@ public sealed class OptionalWireTests
     public async Task OtlpReceiver_AbsentResourceAndScopeMetadata_StayAbsent()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var request = new ExportTraceServiceRequest
-        {
-            ResourceSpans =
-            {
-                new ResourceSpans
-                {
-                    ScopeSpans =
-                    {
-                        new ScopeSpans
-                        {
-                            Spans =
-                            {
-                                new Span
-                                {
-                                    Name = "minimal", TraceId = Id("11111111111111111111111111111111"),
-                                    SpanId = Id("2222222222222222")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        };
+        var request = Traces(null,
+            new Span { Name = "minimal", TraceId = Id("11111111111111111111111111111111"), SpanId = Id("2222222222222222") });
         using var response =
             await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
@@ -107,10 +83,7 @@ public sealed class OptionalWireTests
             p.Negative = null;
         }
 
-        var request = new ExportMetricsServiceRequest
-        {
-            ResourceMetrics = { new ResourceMetrics { ScopeMetrics = { new ScopeMetrics { Metrics = { metric } } } } }
-        };
+        var request = Metrics(null, metric);
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
@@ -140,27 +113,8 @@ public sealed class OptionalWireTests
     public async Task OtlpReceiverLogs_UncorrelatedWithoutBodyOrContext_IsKeptInTheCapture()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var request = new ExportLogsServiceRequest
-        {
-            ResourceLogs =
-            {
-                new ResourceLogs
-                {
-                    ScopeLogs =
-                    {
-                        new ScopeLogs
-                        {
-                            Scope = new InstrumentationScope { Name = "background" },
-                            LogRecords =
-                            {
-                                new OpenTelemetry.Proto.Logs.V1.LogRecord
-                                    { EventName = "BackgroundError", SeverityNumber = SeverityNumber.Error }
-                            }
-                        }
-                    }
-                }
-            }
-        };
+        var request = Logs(null, new InstrumentationScope { Name = "background" },
+            new OpenTelemetry.Proto.Logs.V1.LogRecord { EventName = "BackgroundError", SeverityNumber = SeverityNumber.Error });
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Logs);
         response.EnsureSuccessStatusCode();
@@ -183,18 +137,8 @@ public sealed class OptionalWireTests
     public async Task OtlpReceiverMetrics_UnspecifiedData_StaysVisibleButIsNeverAMeasurement()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var request = new ExportMetricsServiceRequest
-        {
-            ResourceMetrics =
-            {
-                new ResourceMetrics
-                {
-                    Resource = new Resource
-                        { Attributes = { Pair("qyl.test.id", new AnyValue { StringValue = "partition" }) } },
-                    ScopeMetrics = { new ScopeMetrics { Metrics = { new Metric { Name = "unspecified" } } } }
-                }
-            }
-        };
+        var request = Metrics(new Resource { Attributes = { Pair("qyl.test.id", new AnyValue { StringValue = "partition" }) } },
+            new Metric { Name = "unspecified" });
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();

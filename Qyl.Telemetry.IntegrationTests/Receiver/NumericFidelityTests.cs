@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Google.Protobuf;
 using JetBrains.Annotations;
-using OpenTelemetry.Proto.Collector.Metrics.V1;
 using OpenTelemetry.Proto.Metrics.V1;
+using Qyl.Telemetry.Tests.Evidence;
 
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
 
@@ -126,10 +126,7 @@ public sealed class NumericFidelityTests
     private async Task<IReadOnlyList<MetricRecord>> CaptureAsync(params Metric[] metrics)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var scope = new ScopeMetrics();
-        scope.Metrics.AddRange(metrics);
-        var request = new ExportMetricsServiceRequest
-            { ResourceMetrics = { new ResourceMetrics { ScopeMetrics = { scope } } } };
+        var request = OtlpEvidence.Metrics(null, metrics);
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();

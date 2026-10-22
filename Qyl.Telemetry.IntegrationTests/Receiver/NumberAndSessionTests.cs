@@ -1,7 +1,6 @@
 using Google.Protobuf;
 using JetBrains.Annotations;
 using OpenTelemetry.Proto.Collector.Logs.V1;
-using OpenTelemetry.Proto.Collector.Metrics.V1;
 using OpenTelemetry.Proto.Common.V1;
 using OpenTelemetry.Proto.Logs.V1;
 using OpenTelemetry.Proto.Metrics.V1;
@@ -19,39 +18,17 @@ public sealed class NumberAndSessionTests
     public async Task OtlpReceiverNumbers_DoublesIntegerExemplarsAndAbsentValues_KeepTheirDiscriminators()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var request = new ExportMetricsServiceRequest
+        var request = Metrics(null, new Metric
         {
-            ResourceMetrics =
+            Name = "numeric-types", Gauge = new Gauge
             {
-                new ResourceMetrics
+                DataPoints =
                 {
-                    ScopeMetrics =
-                    {
-                        new ScopeMetrics
-                        {
-                            Metrics =
-                            {
-                                new Metric
-                                {
-                                    Name = "numeric-types", Gauge = new Gauge
-                                    {
-                                        DataPoints =
-                                        {
-                                            new NumberDataPoint
-                                            {
-                                                AsDouble = 0.125,
-                                                Exemplars = { new Exemplar { AsInt = -42 }, new Exemplar() }
-                                            },
-                                            new NumberDataPoint { Flags = 1 }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    new NumberDataPoint { AsDouble = 0.125, Exemplars = { new Exemplar { AsInt = -42 }, new Exemplar() } },
+                    new NumberDataPoint { Flags = 1 }
                 }
             }
-        };
+        });
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, "metrics");
         response.EnsureSuccessStatusCode();
@@ -81,32 +58,14 @@ public sealed class NumberAndSessionTests
         using var first =
             await ReceiverTests.PostAsync(receiver.Endpoint, spans.ToByteArray(), TestContext.CancellationToken);
         first.EnsureSuccessStatusCode();
-        var logs = new ExportLogsServiceRequest
-        {
-            ResourceLogs =
+        var logs = Logs(new Resource { Attributes = { Pair("session.id", new AnyValue { StringValue = "log-resource-session" }) } },
+            new InstrumentationScope { Name = "session-scope" },
+            new OpenTelemetry.Proto.Logs.V1.LogRecord
             {
-                new ResourceLogs
-                {
-                    Resource = new Resource
-                        { Attributes = { Pair("session.id", new AnyValue { StringValue = "log-resource-session" }) } },
-                    ScopeLogs =
-                    {
-                        new ScopeLogs
-                        {
-                            Scope = new InstrumentationScope { Name = "session-scope" }, LogRecords =
-                            {
-                                new OpenTelemetry.Proto.Logs.V1.LogRecord
-                                {
-                                    TraceId = Id("11111111111111111111111111111111"), EventName = "SessionObserved",
-                                    SeverityNumber = SeverityNumber.Info,
-                                    Attributes = { Pair("session.id", new AnyValue { StringValue = "log-session" }) }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        };
+                TraceId = Id("11111111111111111111111111111111"), EventName = "SessionObserved",
+                SeverityNumber = SeverityNumber.Info,
+                Attributes = { Pair("session.id", new AnyValue { StringValue = "log-session" }) }
+            });
         using var second = await ReceiverTests.PostAsync(receiver.Endpoint, logs.ToByteArray(),
             TestContext.CancellationToken, "logs");
         second.EnsureSuccessStatusCode();
@@ -132,22 +91,7 @@ public sealed class NumberAndSessionTests
         {
             EventName = "Invalid", Attributes = { Pair("duplicate", new AnyValue { StringValue = "first" }), Pair("duplicate", new AnyValue { StringValue = "second" }) }
         };
-        var request = new ExportLogsServiceRequest
-        {
-            ResourceLogs =
-            {
-                new ResourceLogs
-                {
-                    ScopeLogs =
-                    {
-                        new ScopeLogs
-                        {
-                            Scope = new InstrumentationScope { Name = "partial-scope" }, LogRecords = { valid, invalid }
-                        }
-                    }
-                }
-            }
-        };
+        var request = Logs(null, new InstrumentationScope { Name = "partial-scope" }, valid, invalid);
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, "logs");
         response.EnsureSuccessStatusCode();

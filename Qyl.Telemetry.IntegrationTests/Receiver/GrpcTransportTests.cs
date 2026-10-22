@@ -4,14 +4,11 @@ using Google.Protobuf;
 using Grpc.Core;
 using Grpc.Net.Client;
 using JetBrains.Annotations;
-using OpenTelemetry.Proto.Collector.Logs.V1;
-using OpenTelemetry.Proto.Collector.Metrics.V1;
-using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Common.V1;
-using OpenTelemetry.Proto.Logs.V1;
 using OpenTelemetry.Proto.Metrics.V1;
 using OpenTelemetry.Proto.Resource.V1;
 using OpenTelemetry.Proto.Trace.V1;
+using Qyl.Telemetry.Tests.Evidence;
 using ProtoLog = OpenTelemetry.Proto.Logs.V1.LogRecord;
 
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
@@ -256,24 +253,23 @@ public sealed class GrpcTransportTests
         switch (signal)
         {
             case Signals.Traces:
-                var spans = new ScopeSpans { Scope = new InstrumentationScope { Name = "grpc.trace" } };
-                spans.Spans.Add(new Span { TraceId = ByteString.CopyFrom(Enumerable.Repeat((byte)1, 16).ToArray()),
-                    SpanId = ByteString.CopyFrom(Enumerable.Repeat((byte)2, 8).ToArray()), Name = "preserved" });
-                if (invalid) spans.Spans.Add(new Span { Name = "bad-identity" });
-                return new ExportTraceServiceRequest { ResourceSpans = { new ResourceSpans { Resource = resource, ScopeSpans = { spans } } } };
+                List<Span> spans = [new() { TraceId = ByteString.CopyFrom(Enumerable.Repeat((byte)1, 16).ToArray()),
+                    SpanId = ByteString.CopyFrom(Enumerable.Repeat((byte)2, 8).ToArray()), Name = "preserved" }];
+                if (invalid) spans.Add(new Span { Name = "bad-identity" });
+                return OtlpEvidence.Traces(resource, new InstrumentationScope { Name = "grpc.trace" }, spans);
             case Signals.Logs:
-                var logs = new ScopeLogs { LogRecords = { new ProtoLog { Body = new AnyValue { BoolValue = false } } } };
-                if (invalid) logs.LogRecords.Add(new ProtoLog { TraceId = ByteString.CopyFrom([1]) });
-                return new ExportLogsServiceRequest { ResourceLogs = { new ResourceLogs { Resource = resource, ScopeLogs = { logs } } } };
+                List<ProtoLog> logs = [new() { Body = new AnyValue { BoolValue = false } }];
+                if (invalid) logs.Add(new ProtoLog { TraceId = ByteString.CopyFrom([1]) });
+                return OtlpEvidence.Logs(resource, logs);
             default:
-                var metrics = new ScopeMetrics { Metrics = { new Metric { Name = "grpc.counter", Sum = new Sum
+                List<Metric> metrics = [new() { Name = "grpc.counter", Sum = new Sum
                     { IsMonotonic = true, AggregationTemporality = AggregationTemporality.Delta,
-                        DataPoints = { new NumberDataPoint { TimeUnixNano = 10, AsInt = 7 } } } } } };
-                if (invalid) metrics.Metrics.Add(new Metric { Name = "bad-attributes", Gauge = new Gauge
+                        DataPoints = { new NumberDataPoint { TimeUnixNano = 10, AsInt = 7 } } } }];
+                if (invalid) metrics.Add(new Metric { Name = "bad-attributes", Gauge = new Gauge
                     { DataPoints = { new NumberDataPoint { TimeUnixNano = 10, AsInt = 9, Attributes =
                         { new KeyValue { Key = "same", Value = new AnyValue { IntValue = 1 } },
                             new KeyValue { Key = "same", Value = new AnyValue { IntValue = 2 } } } } } } });
-                return new ExportMetricsServiceRequest { ResourceMetrics = { new ResourceMetrics { Resource = resource, ScopeMetrics = { metrics } } } };
+                return OtlpEvidence.Metrics(resource, metrics);
         }
     }
 
