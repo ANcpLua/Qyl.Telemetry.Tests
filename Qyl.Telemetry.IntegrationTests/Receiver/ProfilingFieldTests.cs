@@ -126,6 +126,25 @@ public sealed class ProfilingFieldTests
         Assert.Contains("KeyStrindex 4", receipt.Warnings[1]);
     }
 
+    [TestMethod]
+    public async Task Receiver_ProfilingKeyOnResourceSharedByTwoLogs_IsWarnedOncePerWireField()
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var resource = new Resource { Attributes = { new KeyValue { KeyStrindex = 3, Value = new AnyValue { StringValue = "unknown key" } } } };
+        var twoLogsOfOneResource = new ExportLogsServiceRequest
+        {
+            ResourceLogs = { new ResourceLogs { Resource = resource, ScopeLogs = { new ScopeLogs { LogRecords =
+            {
+                new ProtoLog { Body = new AnyValue { IntValue = 1 } },
+                new ProtoLog { Body = new AnyValue { IntValue = 2 } }
+            } } } } }
+        };
+        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, twoLogsOfOneResource.ToByteArray(),
+            TestContext.CancellationToken, Signals.Logs);
+        response.EnsureSuccessStatusCode();
+        Assert.HasCount(1, Assert.ContainsSingle(receiver.Snapshot().Receipts).Warnings);
+    }
+
     private static IMessage Request(string signal, Resource resource) => signal switch
     {
         Signals.Traces => new ExportTraceServiceRequest
