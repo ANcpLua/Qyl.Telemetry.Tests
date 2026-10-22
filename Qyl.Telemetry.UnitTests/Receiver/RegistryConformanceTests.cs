@@ -80,13 +80,13 @@ public sealed class RegistryConformanceTests
     [TestMethod]
     public void RegistryAudit_InvalidAttributesOnEveryRecordPart_AreNotConformant()
     {
-        Assert.IsFalse(Audit(EveryRecordPartCapture()).IsConformant);
+        Assert.IsFalse(RegistryConformance.Check(EveryRecordPartCapture()).IsConformant);
     }
 
     [TestMethod]
     public void RegistryAudit_LogBodyMap_IsNotCountedAsAnAttributeCollection()
     {
-        Assert.AreEqual(8, Audit(EveryRecordPartCapture()).AttributesChecked);
+        Assert.AreEqual(8, RegistryConformance.Check(EveryRecordPartCapture()).AttributesChecked);
     }
 
     [TestMethod]
@@ -96,13 +96,13 @@ public sealed class RegistryConformanceTests
         [
             "spans[0].resource", "spans[0].scope", "spans[0]", "spans[0].events[0]", "spans[0].links[0]",
             "logs[0].resource", "logs[0].scope", "logs[0]"
-        ], Audit(EveryRecordPartCapture()).Issues.Select(i => i.Location));
+        ], RegistryConformance.Check(EveryRecordPartCapture()).Issues.Select(i => i.Location));
     }
 
     [TestMethod]
     public void RegistryAudit_StringStatusCodeOnEveryRecordPart_IsAnIntegerTypeViolation()
     {
-        Assert.IsTrue(Audit(EveryRecordPartCapture()).Issues.All(i => i is
+        Assert.IsTrue(RegistryConformance.Check(EveryRecordPartCapture()).Issues.All(i => i is
             { Name: "http.response.status_code", Message: "Expected Integer.", Level: RegistryIssueLevel.Violation }));
     }
 
@@ -111,7 +111,7 @@ public sealed class RegistryConformanceTests
     {
         var capture = EveryRecordPartCapture();
         var body = capture.Logs[0].Body;
-        _ = Audit(capture);
+        _ = RegistryConformance.Check(capture);
         Assert.AreSame(body, capture.Logs[0].Body);
     }
 
@@ -119,20 +119,20 @@ public sealed class RegistryConformanceTests
     public void RegistryAudit_LogWithoutTimestamp_KeepsZeroTime()
     {
         var capture = EveryRecordPartCapture();
-        _ = Audit(capture);
+        _ = RegistryConformance.Check(capture);
         Assert.AreEqual(0UL, capture.Logs[0].TimeUnixNano);
     }
 
     [TestMethod]
     public void RegistryAudit_InvalidPointAttributes_AreNotConformant()
     {
-        Assert.IsFalse(Audit(EveryPointShapeCapture()).IsConformant);
+        Assert.IsFalse(RegistryConformance.Check(EveryPointShapeCapture()).IsConformant);
     }
 
     [TestMethod]
     public void RegistryAudit_EveryPointShapeAndFilteredExemplar_AreCheckedAsAttributes()
     {
-        Assert.AreEqual(9, Audit(EveryPointShapeCapture()).AttributesChecked);
+        Assert.AreEqual(9, RegistryConformance.Check(EveryPointShapeCapture()).AttributesChecked);
     }
 
     [TestMethod]
@@ -145,7 +145,7 @@ public sealed class RegistryConformanceTests
                 "metrics[2].points[0]", "metrics[2].points[0].exemplars[0]", "metrics[3].points[0]",
                 "metrics[3].points[0].exemplars[0]", "metrics[4].points[0]"
             ],
-            Audit(EveryPointShapeCapture()).Issues.Select(i => i.Location));
+            RegistryConformance.Check(EveryPointShapeCapture()).Issues.Select(i => i.Location));
     }
 
     [TestMethod]
@@ -267,9 +267,7 @@ public sealed class RegistryConformanceTests
         }
     }
 
-    private static RegistryReport Audit(TelemetrySnapshot capture) => RegistryConformance.Check(capture);
-
-    private static RegistryReport EmptyReport() => Audit(TestSpan.Only());
+    private static RegistryReport EmptyReport() => RegistryConformance.Check(TestSpan.Only());
 
     private static RegistryReport CustomReport()
     {
@@ -278,7 +276,7 @@ public sealed class RegistryConformanceTests
             Attributes = Attributes(("error.type", "application-specific"), ("custom.payload", new byte[] { 1, 2 }))
         };
         var metric = Metric("custom.metric", "widget", new UnspecifiedMetricData());
-        return Audit(new TelemetrySnapshot([span], [], [metric], []));
+        return RegistryConformance.Check(new TelemetrySnapshot([span], [], [metric], []));
     }
 
     private static TelemetrySnapshot EveryRecordPartCapture()
@@ -324,13 +322,13 @@ public sealed class RegistryConformanceTests
             Metric("http.server.request.duration", "ms", new GaugeData([])),
             Metric("container.memory.paging.faults", "{fault}", new SumData([], 2, true))
         ];
-        return Audit(new TelemetrySnapshot([span], [], metrics, []));
+        return RegistryConformance.Check(new TelemetrySnapshot([span], [], metrics, []));
     }
 
     private static RegistryReport DeprecationReport()
     {
         var span = new SpanRecord("trace", "span", "custom") { Attributes = Attributes(("db.system", "postgresql")) };
-        return Audit(TestSpan.Only(span));
+        return RegistryConformance.Check(TestSpan.Only(span));
     }
 
     private static RegistryReport TemplateReport()
@@ -342,7 +340,7 @@ public sealed class RegistryConformanceTests
                 ("pprof.scope.sample_type_order", new object?[] { 1L }),
                 ("feature_flag.result.value", new Dictionary<string, object?>()))
         };
-        return Audit(TestSpan.Only(span));
+        return RegistryConformance.Check(TestSpan.Only(span));
     }
 
     private static MetricRecord Metric(string name, string unit, MetricData data)

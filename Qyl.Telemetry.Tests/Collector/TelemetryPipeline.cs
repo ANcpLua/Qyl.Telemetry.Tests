@@ -33,7 +33,7 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
     private TracerProvider? _provider;
     private int _disposed;
 
-    public TelemetrySnapshot Capture => _capture?.Snapshot() ?? _lastCapture;
+    private TelemetrySnapshot Capture => _capture?.Snapshot() ?? _lastCapture;
     public IReadOnlyList<string> EvidenceFiles => [.. _evidence];
     private IReadOnlyDictionary<string, int> Sources => Capture.Spans
         .GroupBy(span => span.Scope?.Name ?? "<unnamed>", StringComparer.Ordinal)
@@ -239,7 +239,7 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
         }
     }
 
-    public void Flush()
+    private void Flush()
     {
         if (_provider?.ForceFlush(10_000) != true)
         {
