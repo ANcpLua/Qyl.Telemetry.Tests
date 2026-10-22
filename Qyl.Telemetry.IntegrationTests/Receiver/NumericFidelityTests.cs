@@ -131,7 +131,7 @@ public sealed class NumericFidelityTests
         var request = new ExportMetricsServiceRequest
             { ResourceMetrics = { new ResourceMetrics { ScopeMetrics = { scope } } } };
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
-            TestContext.CancellationToken, "metrics");
+            TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
         Assert.AreEqual(0L, receipt.Rejected);

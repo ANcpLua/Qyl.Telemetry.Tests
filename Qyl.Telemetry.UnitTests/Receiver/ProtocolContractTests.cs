@@ -8,10 +8,17 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 [TestClass]
 public sealed class ProtocolContractTests
 {
+    private const string Trace = "trace";
+    private const string Logs = "logs";
+    private const string Metrics = "metrics";
+    private const string ResourceSpans = "resource_spans";
+    private const string ResourceLogs = "resource_logs";
+    private const string ResourceMetrics = "resource_metrics";
+
     [TestMethod]
-    [DataRow("trace", "resource_spans")]
-    [DataRow("logs", "resource_logs")]
-    [DataRow("metrics", "resource_metrics")]
+    [DataRow(Trace, ResourceSpans)]
+    [DataRow(Logs, ResourceLogs)]
+    [DataRow(Metrics, ResourceMetrics)]
     public void Internal_generated_protocol_matches_the_official_export_service_contract(string signal,
         string resourceField)
     {
@@ -39,8 +46,8 @@ public sealed class ProtocolContractTests
     {
         return signal switch
         {
-            "trace" => TraceServiceReflection.Descriptor, "logs" => LogsServiceReflection.Descriptor,
-            "metrics" => MetricsServiceReflection.Descriptor,
+            Trace => TraceServiceReflection.Descriptor, Logs => LogsServiceReflection.Descriptor,
+            Metrics => MetricsServiceReflection.Descriptor,
             _ => throw new ArgumentOutOfRangeException(nameof(signal))
         };
     }
@@ -49,7 +56,7 @@ public sealed class ProtocolContractTests
     {
         return signal switch
         {
-            "trace" => "Trace", "logs" => "Logs", "metrics" => "Metrics",
+            Trace => "Trace", Logs => "Logs", Metrics => "Metrics",
             _ => throw new ArgumentOutOfRangeException(nameof(signal))
         };
     }

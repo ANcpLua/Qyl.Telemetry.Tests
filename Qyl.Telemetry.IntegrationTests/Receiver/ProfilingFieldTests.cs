@@ -18,9 +18,9 @@ public sealed class ProfilingFieldTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow("traces")]
-    [DataRow("logs")]
-    [DataRow("metrics")]
+    [DataRow(Signals.Traces)]
+    [DataRow(Signals.Logs)]
+    [DataRow(Signals.Metrics)]
     public async Task String_table_values_are_empty_with_visible_non_fatal_warnings(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -59,8 +59,8 @@ public sealed class ProfilingFieldTests
         Assert.AreSequenceEqual(bytes, Assert.ContainsSingle(snapshot.Requests).Payload.ToArray());
         var observed = signal switch
         {
-            "traces" => Assert.ContainsSingle(snapshot.Spans).Resource,
-            "logs" => Assert.ContainsSingle(snapshot.Logs).Resource,
+            Signals.Traces => Assert.ContainsSingle(snapshot.Spans).Resource,
+            Signals.Logs => Assert.ContainsSingle(snapshot.Logs).Resource,
             _ => Assert.ContainsSingle(snapshot.Metrics).Resource
         };
         Assert.AreEqual(string.Empty, observed.Attributes["profile.value"]);
@@ -73,12 +73,12 @@ public sealed class ProfilingFieldTests
         string warning;
         switch (signal)
         {
-            case "traces":
+            case Signals.Traces:
                 var traces = ExportTraceServiceResponse.Parser.ParseFrom(reply).PartialSuccess;
                 rejected = traces.RejectedSpans;
                 warning = traces.ErrorMessage;
                 break;
-            case "logs":
+            case Signals.Logs:
                 var logs = ExportLogsServiceResponse.Parser.ParseFrom(reply).PartialSuccess;
                 rejected = logs.RejectedLogRecords;
                 warning = logs.ErrorMessage;
@@ -112,8 +112,8 @@ public sealed class ProfilingFieldTests
                 new KeyValue { Key = "known", KeyStrindex = 4, Value = new AnyValue { StringValue = "literal" } }
             }
         };
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, Request("logs", resource).ToByteArray(),
-            TestContext.CancellationToken, "logs");
+        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, Request(Signals.Logs, resource).ToByteArray(),
+            TestContext.CancellationToken, Signals.Logs);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
         var log = Assert.ContainsSingle(snapshot.Logs);
@@ -129,7 +129,7 @@ public sealed class ProfilingFieldTests
 
     private static IMessage Request(string signal, Resource resource) => signal switch
     {
-        "traces" => new ExportTraceServiceRequest
+        Signals.Traces => new ExportTraceServiceRequest
         {
             ResourceSpans = { new ResourceSpans { Resource = resource, ScopeSpans = { new ScopeSpans
             {
@@ -140,15 +140,15 @@ public sealed class ProfilingFieldTests
                 } }
             } } } }
         },
-        "logs" => new ExportLogsServiceRequest
+        Signals.Logs => new ExportLogsServiceRequest
         {
             ResourceLogs = { new ResourceLogs { Resource = resource,
                 ScopeLogs = { new ScopeLogs { LogRecords = { new ProtoLog { Body = new AnyValue { IntValue = 42 } } } } } } }
         },
-        "metrics" => new ExportMetricsServiceRequest
+        Signals.Metrics => new ExportMetricsServiceRequest
         {
             ResourceMetrics = { new ResourceMetrics { Resource = resource,
-                ScopeMetrics = { new ScopeMetrics { Metrics = { MetricWireTests.Fixture("gauge") } } } } }
+                ScopeMetrics = { new ScopeMetrics { Metrics = { MetricWireTests.Fixture(MetricShapes.Gauge) } } } } }
         },
         _ => throw new ArgumentOutOfRangeException(nameof(signal))
     };

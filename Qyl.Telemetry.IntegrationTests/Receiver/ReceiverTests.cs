@@ -20,9 +20,9 @@ public sealed class ReceiverTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow("traces")]
-    [DataRow("logs")]
-    [DataRow("metrics")]
+    [DataRow(Signals.Traces)]
+    [DataRow(Signals.Logs)]
+    [DataRow(Signals.Metrics)]
     public async Task Malformed_protobuf_returns_bad_request_and_records_the_error(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -118,7 +118,7 @@ public sealed class ReceiverTests
     public async Task Invalid_metric_batch_reports_rejected_data_points_instead_of_metric_count()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var metric = MetricWireTests.Fixture("gauge");
+        var metric = MetricWireTests.Fixture(MetricShapes.Gauge);
         metric.Gauge.DataPoints.Add(metric.Gauge.DataPoints[0].Clone());
         var conflicting = metric.Gauge.DataPoints[0].Attributes[0].Clone();
         conflicting.Value = new AnyValue { StringValue = "conflicting" };
@@ -132,7 +132,7 @@ public sealed class ReceiverTests
             }
         };
         using var response = await PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken,
-            "metrics");
+            Signals.Metrics);
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         var result = ExportMetricsServiceResponse.Parser.ParseFrom(
             await response.Content.ReadAsByteArrayAsync(TestContext.CancellationToken));
@@ -185,7 +185,7 @@ public sealed class ReceiverTests
         Assert.IsEmpty(snapshot.Spans);
         Assert.AreEqual(0L, Assert.ContainsSingle(snapshot.Receipts).Accepted);
         var request = Assert.ContainsSingle(snapshot.Requests);
-        Assert.AreEqual("traces", request.Signal);
+        Assert.AreEqual(Signals.Traces, request.Signal);
         Assert.AreSequenceEqual(payload, request.Payload.ToArray());
         using var second = await PostAsync(receiver.Endpoint, [], TestContext.CancellationToken);
         second.EnsureSuccessStatusCode();
@@ -194,7 +194,7 @@ public sealed class ReceiverTests
     }
 
     internal static async Task<HttpResponseMessage> PostAsync(Uri endpoint, byte[] bytes,
-        CancellationToken cancellationToken, string signal = "traces")
+        CancellationToken cancellationToken, string signal = Signals.Traces)
     {
         var client = TelemetryLifecycle.Http;
         using var content = new ByteArrayContent(bytes);

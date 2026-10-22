@@ -22,12 +22,12 @@ public sealed class GrpcTransportTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow("traces", false)]
-    [DataRow("logs", false)]
-    [DataRow("metrics", false)]
-    [DataRow("traces", true)]
-    [DataRow("logs", true)]
-    [DataRow("metrics", true)]
+    [DataRow(Signals.Traces, false)]
+    [DataRow(Signals.Logs, false)]
+    [DataRow(Signals.Metrics, false)]
+    [DataRow(Signals.Traces, true)]
+    [DataRow(Signals.Logs, true)]
+    [DataRow(Signals.Metrics, true)]
     public async Task Original_grpc_message_survives_unknown_fields_noncanonical_varints_and_gzip(string signal, bool gzip)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -59,9 +59,9 @@ public sealed class GrpcTransportTests
     }
 
     [TestMethod]
-    [DataRow("traces")]
-    [DataRow("logs")]
-    [DataRow("metrics")]
+    [DataRow(Signals.Traces)]
+    [DataRow(Signals.Logs)]
+    [DataRow(Signals.Metrics)]
     public async Task Malformed_grpc_protobuf_returns_invalid_argument_and_retains_original_evidence(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -81,9 +81,9 @@ public sealed class GrpcTransportTests
     }
 
     [TestMethod]
-    [DataRow("traces")]
-    [DataRow("logs")]
-    [DataRow("metrics")]
+    [DataRow(Signals.Traces)]
+    [DataRow(Signals.Logs)]
+    [DataRow(Signals.Metrics)]
     public async Task Grpc_partial_success_keeps_valid_records_and_reports_exact_rejections(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -111,9 +111,9 @@ public sealed class GrpcTransportTests
     }
 
     [TestMethod]
-    [DataRow("traces")]
-    [DataRow("logs")]
-    [DataRow("metrics")]
+    [DataRow(Signals.Traces)]
+    [DataRow(Signals.Logs)]
+    [DataRow(Signals.Metrics)]
     public async Task Grpc_warning_acknowledges_a_valid_record_without_inventing_a_rejection(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -142,7 +142,7 @@ public sealed class GrpcTransportTests
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         var headers = new Metadata();
         if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export("traces"), null,
+        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
             new CallOptions(headers, cancellationToken: TestContext.CancellationToken), new byte[limit + 1]);
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => call.ResponseAsync);
         Assert.AreEqual(StatusCode.ResourceExhausted, failure.StatusCode, failure.Status.Detail);
@@ -169,7 +169,7 @@ public sealed class GrpcTransportTests
         for (var i = 0; i < 4; i++) bytes[2 + i] = (byte)((length >> (7 * i)) | (i < 3 ? 0x80 : 0));
         var headers = new Metadata();
         if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export("traces"), null,
+        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
             new CallOptions(headers, cancellationToken: TestContext.CancellationToken), bytes);
         Assert.IsEmpty(await call.ResponseAsync);
         Assert.AreSequenceEqual(bytes, Assert.ContainsSingle(receiver.Snapshot().Requests).Payload.ToArray());
@@ -197,7 +197,7 @@ public sealed class GrpcTransportTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => sending);
         Assert.IsTrue(wasSuspended);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        using var next = channel.CreateCallInvoker().AsyncUnaryCall(Export("traces"), null,
+        using var next = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
             new CallOptions(cancellationToken: TestContext.CancellationToken), []);
         Assert.IsEmpty(await next.ResponseAsync);
         Assert.IsEmpty(Assert.ContainsSingle(receiver.Snapshot().Requests).Payload.ToArray());
@@ -209,7 +209,7 @@ public sealed class GrpcTransportTests
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export("traces"), null,
+        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
             new CallOptions(deadline: DateTime.UtcNow.AddSeconds(-1), cancellationToken: TestContext.CancellationToken), []);
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => call.ResponseAsync);
         Assert.AreEqual(StatusCode.DeadlineExceeded, failure.StatusCode);
@@ -223,7 +223,7 @@ public sealed class GrpcTransportTests
         try
         {
             using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-            using (var live = channel.CreateCallInvoker().AsyncUnaryCall(Export("traces"), null,
+            using (var live = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
                        new CallOptions(cancellationToken: TestContext.CancellationToken), []))
                 Assert.IsEmpty(await live.ResponseAsync);
             var waiting = receiver.AwaitAsync(snapshot => snapshot.Spans.Count > 0, TimeSpan.FromSeconds(10), TestContext.CancellationToken);
@@ -232,7 +232,7 @@ public sealed class GrpcTransportTests
             // Verify the closed listener with a fresh connection, independently of how the
             // previous HTTP/2 connection reports its graceful shutdown.
             using var disconnected = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-            using var closed = disconnected.CreateCallInvoker().AsyncUnaryCall(Export("traces"), null,
+            using var closed = disconnected.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
                 new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: TestContext.CancellationToken), []);
             var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => closed.ResponseAsync);
             Assert.AreEqual(StatusCode.Unavailable, failure.StatusCode, failure.Status.Detail);
@@ -246,8 +246,8 @@ public sealed class GrpcTransportTests
 
     private static Method<byte[], byte[]> Export(string signal) => new(MethodType.Unary, signal switch
         {
-            "traces" => "opentelemetry.proto.collector.trace.v1.TraceService",
-            "logs" => "opentelemetry.proto.collector.logs.v1.LogsService",
+            Signals.Traces => "opentelemetry.proto.collector.trace.v1.TraceService",
+            Signals.Logs => "opentelemetry.proto.collector.logs.v1.LogsService",
             _ => "opentelemetry.proto.collector.metrics.v1.MetricsService"
         }, "Export",
         Marshallers.Create<byte[]>(static (bytes, context) => context.Complete(bytes), static context => context.PayloadAsNewBuffer()),
@@ -257,11 +257,11 @@ public sealed class GrpcTransportTests
     {
         switch (signal)
         {
-            case "traces":
+            case Signals.Traces:
                 var traces = ExportTraceServiceResponse.Parser.ParseFrom(bytes).PartialSuccess;
                 Assert.IsNotNull(traces);
                 return (traces.RejectedSpans, traces.ErrorMessage);
-            case "logs":
+            case Signals.Logs:
                 var logs = ExportLogsServiceResponse.Parser.ParseFrom(bytes).PartialSuccess;
                 Assert.IsNotNull(logs);
                 return (logs.RejectedLogRecords, logs.ErrorMessage);
@@ -278,13 +278,13 @@ public sealed class GrpcTransportTests
             ? new AnyValue { StringValueStrindex = 7 } : new AnyValue { IntValue = 9_007_199_254_740_993L } } } };
         switch (signal)
         {
-            case "traces":
+            case Signals.Traces:
                 var spans = new ScopeSpans { Scope = new InstrumentationScope { Name = "grpc.trace" } };
                 spans.Spans.Add(new Span { TraceId = ByteString.CopyFrom(Enumerable.Repeat((byte)1, 16).ToArray()),
                     SpanId = ByteString.CopyFrom(Enumerable.Repeat((byte)2, 8).ToArray()), Name = "preserved" });
                 if (invalid) spans.Spans.Add(new Span { Name = "bad-identity" });
                 return new ExportTraceServiceRequest { ResourceSpans = { new ResourceSpans { Resource = resource, ScopeSpans = { spans } } } };
-            case "logs":
+            case Signals.Logs:
                 var logs = new ScopeLogs { LogRecords = { new ProtoLog { Body = new AnyValue { BoolValue = false } } } };
                 if (invalid) logs.LogRecords.Add(new ProtoLog { TraceId = ByteString.CopyFrom([1]) });
                 return new ExportLogsServiceRequest { ResourceLogs = { new ResourceLogs { Resource = resource, ScopeLogs = { logs } } } };

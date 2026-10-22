@@ -12,17 +12,26 @@ namespace Qyl.Telemetry.IntegrationTests.Receiver;
 [TestClass]
 public sealed class LogWireTests
 {
+    private const string TextBody = "text";
+    private const string IntegerBody = "integer";
+    private const string DoubleBody = "double";
+    private const string BooleanBody = "boolean";
+    private const string BytesBody = "bytes";
+    private const string ArrayBody = "array";
+    private const string MapBody = "map";
+    private const string EmptyBody = "empty";
+
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow("text")]
-    [DataRow("integer")]
-    [DataRow("double")]
-    [DataRow("boolean")]
-    [DataRow("bytes")]
-    [DataRow("array")]
-    [DataRow("map")]
-    [DataRow("empty")]
+    [DataRow(TextBody)]
+    [DataRow(IntegerBody)]
+    [DataRow(DoubleBody)]
+    [DataRow(BooleanBody)]
+    [DataRow(BytesBody)]
+    [DataRow(ArrayBody)]
+    [DataRow(MapBody)]
+    [DataRow(EmptyBody)]
     public async Task Log_body_types_and_all_log_metadata_survive_the_wire(string bodyKind)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -62,7 +71,7 @@ public sealed class LogWireTests
             }
         };
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
-            TestContext.CancellationToken, "logs");
+            TestContext.CancellationToken, Signals.Logs);
         response.EnsureSuccessStatusCode();
         var observed = Assert.ContainsSingle(receiver.Snapshot().Logs);
         Assert.AreEqual("OrderFailed", observed.EventName);
@@ -89,17 +98,17 @@ public sealed class LogWireTests
     {
         return kind switch
         {
-            "text" => new AnyValue { StringValue = "message" }, "integer" => new AnyValue { IntValue = -42 },
-            "double" => new AnyValue { DoubleValue = 0.25 }, "boolean" => new AnyValue { BoolValue = true },
-            "bytes" => new AnyValue { BytesValue = ByteString.CopyFrom([0, 255]) },
-            "array" => new AnyValue
+            TextBody => new AnyValue { StringValue = "message" }, IntegerBody => new AnyValue { IntValue = -42 },
+            DoubleBody => new AnyValue { DoubleValue = 0.25 }, BooleanBody => new AnyValue { BoolValue = true },
+            BytesBody => new AnyValue { BytesValue = ByteString.CopyFrom([0, 255]) },
+            ArrayBody => new AnyValue
             {
                 ArrayValue = new ArrayValue
                     { Values = { new AnyValue { StringValue = "item" }, new AnyValue { IntValue = 7 } } }
             },
-            "map" => new AnyValue
+            MapBody => new AnyValue
                 { KvlistValue = new KeyValueList { Values = { Pair("key", new AnyValue { BoolValue = false }) } } },
-            "empty" => new AnyValue(), _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            EmptyBody => new AnyValue(), _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
     }
 
@@ -107,19 +116,19 @@ public sealed class LogWireTests
     {
         switch (kind)
         {
-            case "text": Assert.AreEqual("message", body); break;
-            case "integer": Assert.AreEqual(-42L, body); break;
-            case "double": Assert.AreEqual(0.25, body); break;
-            case "boolean": Assert.IsTrue(Assert.IsInstanceOfType<bool>(body)); break;
-            case "bytes": Assert.AreSequenceEqual(new byte[] { 0, 255 }, Assert.IsInstanceOfType<byte[]>(body)); break;
-            case "array":
+            case TextBody: Assert.AreEqual("message", body); break;
+            case IntegerBody: Assert.AreEqual(-42L, body); break;
+            case DoubleBody: Assert.AreEqual(0.25, body); break;
+            case BooleanBody: Assert.IsTrue(Assert.IsInstanceOfType<bool>(body)); break;
+            case BytesBody: Assert.AreSequenceEqual(new byte[] { 0, 255 }, Assert.IsInstanceOfType<byte[]>(body)); break;
+            case ArrayBody:
                 Assert.AreSequenceEqual(["item", 7L],
                     Assert.IsInstanceOfType<IReadOnlyList<object?>>(body)); break;
-            case "map":
+            case MapBody:
                 Assert.IsFalse(
                     Assert.IsInstanceOfType<bool>(
                         Assert.IsInstanceOfType<IReadOnlyDictionary<string, object?>>(body)["key"])); break;
-            case "empty": Assert.IsNull(body); break;
+            case EmptyBody: Assert.IsNull(body); break;
         }
     }
 }

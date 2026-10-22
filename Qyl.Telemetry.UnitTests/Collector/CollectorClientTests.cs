@@ -11,6 +11,8 @@ namespace Qyl.Telemetry.UnitTests.Collector;
 [TestClass]
 public sealed class CollectorClientTests(TestContext testContext)
 {
+    private const string Repeated = "repeated";
+
     /// <summary>Every log page is read and cursors and trace IDs are safely encoded.</summary>
     [TestMethod]
     public async Task LogsFollowContinuationCursors()
@@ -34,7 +36,7 @@ public sealed class CollectorClientTests(TestContext testContext)
     [TestMethod]
     [DataRow(null)]
     [DataRow("")]
-    [DataRow("repeated")]
+    [DataRow(Repeated)]
     public async Task InvalidLogContinuationFails(string? cursor)
     {
         using var client = Client(_ => Json(JsonSerializer.Serialize(new { items = Array.Empty<object>(), has_more = true, next_cursor = cursor })));

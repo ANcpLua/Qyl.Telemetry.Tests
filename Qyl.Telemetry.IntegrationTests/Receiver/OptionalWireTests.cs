@@ -84,13 +84,13 @@ public sealed class OptionalWireTests
     }
 
     [TestMethod]
-    [DataRow("histogram")]
-    [DataRow("exponential")]
+    [DataRow(MetricShapes.Histogram)]
+    [DataRow(MetricShapes.Exponential)]
     public async Task Optional_distribution_fields_remain_absent_instead_of_becoming_zero(string kind)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var metric = MetricWireTests.Fixture(kind);
-        if (kind == "histogram")
+        if (kind == MetricShapes.Histogram)
         {
             var p = metric.Histogram.DataPoints[0];
             p.ClearSum();
@@ -112,13 +112,13 @@ public sealed class OptionalWireTests
             ResourceMetrics = { new ResourceMetrics { ScopeMetrics = { new ScopeMetrics { Metrics = { metric } } } } }
         };
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
-            TestContext.CancellationToken, "metrics");
+            TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var observed = Assert.ContainsSingle(receiver.Snapshot().Metrics);
         Assert.AreEqual("metric." + kind, observed.Name);
         Assert.IsNull(observed.Resource.SchemaUrl);
         Assert.IsNull(observed.Scope);
-        if (kind == "histogram")
+        if (kind == MetricShapes.Histogram)
         {
             var p = Assert.ContainsSingle(Assert.IsInstanceOfType<HistogramData>(observed.Data).Points);
             Assert.IsNull(p.Sum);
@@ -162,7 +162,7 @@ public sealed class OptionalWireTests
             }
         };
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
-            TestContext.CancellationToken, "logs");
+            TestContext.CancellationToken, Signals.Logs);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
         var log = Assert.ContainsSingle(snapshot.Logs);
@@ -196,7 +196,7 @@ public sealed class OptionalWireTests
             }
         };
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
-            TestContext.CancellationToken, "metrics");
+            TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
         var metric = Assert.ContainsSingle(snapshot.Metrics);

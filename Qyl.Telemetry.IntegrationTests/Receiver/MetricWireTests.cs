@@ -15,11 +15,11 @@ public sealed class MetricWireTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow("gauge")]
-    [DataRow("sum")]
-    [DataRow("histogram")]
-    [DataRow("exponential")]
-    [DataRow("summary")]
+    [DataRow(MetricShapes.Gauge)]
+    [DataRow(MetricShapes.Sum)]
+    [DataRow(MetricShapes.Histogram)]
+    [DataRow(MetricShapes.Exponential)]
+    [DataRow(MetricShapes.Summary)]
     public async Task Every_metric_shape_retains_its_identity_metadata_and_distribution(string shape)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -46,7 +46,7 @@ public sealed class MetricWireTests
             }
         };
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
-            TestContext.CancellationToken, "metrics");
+            TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var observed = Assert.ContainsSingle(receiver.Snapshot().Metrics);
         Assert.AreEqual("metric." + shape, observed.Name);
@@ -65,7 +65,7 @@ public sealed class MetricWireTests
         Assert.AreEqual(shape, archived.GetProperty("kind").GetString());
         Assert.AreEqual(1, archived.GetProperty("Points").GetArrayLength());
         var payload = archive.RootElement.GetProperty("Requests")[0];
-        Assert.AreEqual("metrics", payload.GetProperty("Signal").GetString());
+        Assert.AreEqual(Signals.Metrics, payload.GetProperty("Signal").GetString());
         Assert.AreSequenceEqual(request.ToByteArray(), payload.GetProperty("Payload").GetBytesFromBase64());
         var partitioned = new TraceEvidence("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", receiver.Snapshot(),
             new MetricPartition("service.name", "metric-service"));
@@ -82,11 +82,11 @@ public sealed class MetricWireTests
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = new ExportMetricsServiceRequest();
-        var resource = new ResourceMetrics { ScopeMetrics = { new ScopeMetrics { Metrics = { Fixture("gauge") } } } };
+        var resource = new ResourceMetrics { ScopeMetrics = { new ScopeMetrics { Metrics = { Fixture(MetricShapes.Gauge) } } } };
         resource.ScopeMetrics[0].Metrics[0].Gauge.DataPoints.Add(new NumberDataPoint { AsInt = 99 });
         request.ResourceMetrics.Add(resource);
         using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
-            TestContext.CancellationToken, "metrics");
+            TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
         var unrelated = new TraceEvidence("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", snapshot);
@@ -123,13 +123,13 @@ public sealed class MetricWireTests
         };
         switch (shape)
         {
-            case "gauge": metric.Gauge = new Gauge { DataPoints = { point } }; break;
-            case "sum":
+            case MetricShapes.Gauge: metric.Gauge = new Gauge { DataPoints = { point } }; break;
+            case MetricShapes.Sum:
                 metric.Sum = new Sum
                 {
                     AggregationTemporality = AggregationTemporality.Delta, IsMonotonic = false, DataPoints = { point }
                 }; break;
-            case "histogram":
+            case MetricShapes.Histogram:
                 metric.Histogram = new Histogram
                 {
                     AggregationTemporality = AggregationTemporality.Cumulative,
@@ -142,7 +142,7 @@ public sealed class MetricWireTests
                         }
                     }
                 }; break;
-            case "exponential":
+            case MetricShapes.Exponential:
                 metric.ExponentialHistogram = new ExponentialHistogram
                 {
                     AggregationTemporality = AggregationTemporality.Delta,
@@ -160,7 +160,7 @@ public sealed class MetricWireTests
                         }
                     }
                 }; break;
-            case "summary":
+            case MetricShapes.Summary:
                 metric.Summary = new Summary
                 {
                     DataPoints =
@@ -183,15 +183,15 @@ public sealed class MetricWireTests
     {
         switch (shape)
         {
-            case "gauge":
+            case MetricShapes.Gauge:
                 CheckNumber(Assert.ContainsSingle(Assert.IsInstanceOfType<GaugeData>(observed).Points)); break;
-            case "sum":
+            case MetricShapes.Sum:
                 var sum = Assert.IsInstanceOfType<SumData>(observed);
                 Assert.AreEqual(1, sum.AggregationTemporality);
                 Assert.IsFalse(sum.IsMonotonic);
                 CheckNumber(Assert.ContainsSingle(sum.Points));
                 break;
-            case "histogram":
+            case MetricShapes.Histogram:
                 var histogram = Assert.IsInstanceOfType<HistogramData>(observed);
                 Assert.AreEqual(2, histogram.AggregationTemporality);
                 var h = Assert.ContainsSingle(histogram.Points);
@@ -206,7 +206,7 @@ public sealed class MetricWireTests
                 Assert.AreEqual(3u, h.Flags);
                 CheckExemplar(h.Exemplars);
                 break;
-            case "exponential":
+            case MetricShapes.Exponential:
                 var exponential = Assert.IsInstanceOfType<ExponentialHistogramData>(observed);
                 Assert.AreEqual(1, exponential.AggregationTemporality);
                 var e = Assert.ContainsSingle(exponential.Points);
@@ -226,7 +226,7 @@ public sealed class MetricWireTests
                 Assert.AreEqual(5u, e.Flags);
                 CheckExemplar(e.Exemplars);
                 break;
-            case "summary":
+            case MetricShapes.Summary:
                 var summary = Assert.ContainsSingle(Assert.IsInstanceOfType<SummaryData>(observed).Points);
                 Assert.AreEqual(3UL, summary.Count);
                 Assert.AreEqual(6.5, summary.Sum);

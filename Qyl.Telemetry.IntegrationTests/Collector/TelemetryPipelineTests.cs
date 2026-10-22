@@ -241,9 +241,9 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
 
     /// <summary>A nonempty zero-rejection acknowledgement is valid for every signal and must be relayed intact.</summary>
     [TestMethod]
-    [DataRow("traces")]
-    [DataRow("metrics")]
-    [DataRow("logs")]
+    [DataRow(Signals.Traces)]
+    [DataRow(Signals.Metrics)]
+    [DataRow(Signals.Logs)]
     public async Task ReceiverRelaysNonemptyAcknowledgements(string signal)
     {
         var acknowledgement = Convert.FromHexString("0A00");
@@ -277,7 +277,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.IsEmpty(snapshot.Spans);
         Assert.AreSequenceEqual((byte[])[0x0b], Assert.ContainsSingle(snapshot.Requests).Payload.ToArray());
         var delivery = Assert.ContainsSingle(receiver.Deliveries);
-        Assert.AreEqual("traces", delivery.Signal);
+        Assert.AreEqual(Signals.Traces, delivery.Signal);
         Assert.AreEqual(400, delivery.CaptureStatus);
         var captureError = RpcStatus.Parser.ParseFrom(delivery.CaptureResponse);
         Assert.AreEqual(3, captureError.Code);
@@ -321,9 +321,9 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
 
     /// <summary>A complete export is still forwarded after its producer disconnects.</summary>
     [TestMethod]
-    [DataRow("traces")]
-    [DataRow("logs")]
-    [DataRow("metrics")]
+    [DataRow(Signals.Traces)]
+    [DataRow(Signals.Logs)]
+    [DataRow(Signals.Metrics)]
     public async Task ReceiverDrainsAcceptedExportAfterProducerDisconnects(string signal)
     {
         using var handler = new PendingCollectorHandler();
@@ -378,7 +378,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.AreEqual(200, delivery.CaptureStatus);
         Assert.IsNull(delivery.CollectorStatus);
         Assert.AreEqual(nameof(HttpRequestException), delivery.Failure);
-        Assert.AreEqual("logs", Assert.ContainsSingle(capture.Snapshot().Requests).Signal);
+        Assert.AreEqual(Signals.Logs, Assert.ContainsSingle(capture.Snapshot().Requests).Signal);
     }
 
     private sealed class PendingCollectorHandler : HttpMessageHandler

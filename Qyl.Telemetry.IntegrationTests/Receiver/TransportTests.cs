@@ -14,10 +14,10 @@ public sealed class TransportTests
 
     [TestMethod]
     [DataRow("unknown", "application/x-protobuf", null, HttpStatusCode.NotFound)]
-    [DataRow("traces", "application/json", null, HttpStatusCode.UnsupportedMediaType)]
-    [DataRow("traces", null, null, HttpStatusCode.UnsupportedMediaType)]
-    [DataRow("traces", "application/x-protobuf", "br", HttpStatusCode.UnsupportedMediaType)]
-    [DataRow("traces", "application/x-protobuf; charset=utf-8", null, HttpStatusCode.OK)]
+    [DataRow(Signals.Traces, "application/json", null, HttpStatusCode.UnsupportedMediaType)]
+    [DataRow(Signals.Traces, null, null, HttpStatusCode.UnsupportedMediaType)]
+    [DataRow(Signals.Traces, "application/x-protobuf", "br", HttpStatusCode.UnsupportedMediaType)]
+    [DataRow(Signals.Traces, "application/x-protobuf; charset=utf-8", null, HttpStatusCode.OK)]
     public async Task Receiver_routes_and_media_contract_return_the_exact_status(string signal, string? media,
         string? encoding, HttpStatusCode expected)
     {
@@ -72,7 +72,7 @@ public sealed class TransportTests
             TestContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
-        Assert.AreEqual("logs", receipt.Signal);
+        Assert.AreEqual(Signals.Logs, receipt.Signal);
         Assert.IsFalse(string.IsNullOrEmpty(receipt.Error));
         Assert.AreEqual(0L, receipt.Accepted);
         var error = await ReadErrorAsync(response, TestContext.CancellationToken);
