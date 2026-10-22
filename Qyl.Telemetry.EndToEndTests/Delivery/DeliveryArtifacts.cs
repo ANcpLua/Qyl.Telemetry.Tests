@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -176,28 +175,13 @@ internal sealed class DeliveryArtifacts(TestContext context)
         context.WriteLine($"{label}: {logPath}");
         var start = new ProcessStartInfo(command)
         {
-            WorkingDirectory = directory, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
-            Environment = { ["DOTNET_PROCESSOR_COUNT"] = "4" }
+            WorkingDirectory = directory, Environment = { ["DOTNET_PROCESSOR_COUNT"] = "4" }
         };
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {command}.");
-        var stdout = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        var stderr = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        Exception? failure = null;
-        try { await process.WaitForExitAsync(_cancellation); }
-        catch (Exception error) { failure = error; }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None);
-            }
-            await Task.WhenAll(stdout, stderr);
-            await File.WriteAllTextAsync(logPath, await stdout + await stderr, CancellationToken.None);
-        }
-        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException($"{label} exited {process.ExitCode}. See {logPath}\n{string.Join('\n', (await stdout + await stderr).Split('\n').TakeLast(20))}");
+        var (exitCode, output, error) = await ChildProcess.RunAsync(start, command, _cancellation);
+        var log = output + error;
+        await File.WriteAllTextAsync(logPath, log, CancellationToken.None);
+        if (exitCode != 0)
+            throw new InvalidOperationException($"{label} exited {exitCode}. See {logPath}\n{string.Join('\n', log.Split('\n').TakeLast(20))}");
     }
 }
