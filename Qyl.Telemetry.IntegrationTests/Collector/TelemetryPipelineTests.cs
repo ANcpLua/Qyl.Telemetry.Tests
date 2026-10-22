@@ -220,6 +220,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     }
 
     [TestMethod]
+    [ResourceLock(WellKnownResources.EnvironmentVariables)]
     public async Task OtlpRelay_InvalidListenerConfiguration_ThrowsFormatException()
     {
         using var collector = CollectorClient(HttpStatusCode.OK, []);

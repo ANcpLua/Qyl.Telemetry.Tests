@@ -14,6 +14,7 @@ public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
     private static string AssemblyPath => Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll");
 
     [TestMethod]
+    [ResourceLock(WellKnownResources.EnvironmentVariables)]
     public async Task CollectorFixture_AmbientQylAndOtlpSettings_KeepsItsOwnEndpointAndDisposesTwice()
     {
         using var settings = new EnvironmentScope(("QYL_PORT", "invalid"), ("OTEL_EXPORTER_OTLP_ENDPOINT", "invalid"));
