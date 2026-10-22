@@ -11,6 +11,7 @@ public sealed class RawActivityCaptureTests
 {
     private const string Key = "http.request.header.x-example";
     private const string DeprecatedGrpcMetadata = "rpc.grpc.request.metadata.authorization";
+    private const string RepeatedKey = "probe.repeated";
 
     [TestMethod]
     public void RawActivityCaptureSnapshot_UrlWithQuery_KeepsOnlyThePath()
@@ -22,6 +23,13 @@ public sealed class RawActivityCaptureTests
     public void RawActivityCaptureSnapshot_ArrayMutatedOrReplacedAfterCapture_KeepsTheOriginalValues()
     {
         CapturedActivityAssertions.RequireStringValues(MutatedAfterCapture().Tags, Key, "first", "first", "", "comma,kept");
+    }
+
+    [TestMethod]
+    public void RawActivityCaptureSnapshot_TagKeyAddedTwice_KeepsTheValueTheActivityReports()
+    {
+        using var activity = new Activity("repeated-tag").AddTag(RepeatedKey, "first").AddTag(RepeatedKey, "second").Start();
+        Assert.AreEqual(activity.GetTagItem(RepeatedKey), ActivitySnapshot.Capture(activity).Tags[RepeatedKey]);
     }
 
     [TestMethod]

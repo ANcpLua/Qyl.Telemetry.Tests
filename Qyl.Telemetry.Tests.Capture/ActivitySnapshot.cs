@@ -13,8 +13,9 @@ public sealed record ActivitySnapshot(string Source, string Operation, ActivityK
     public static ActivitySnapshot Capture(Activity activity)
     {
         ArgumentNullException.ThrowIfNull(activity);
-        var tags = activity.TagObjects.ToDictionary(static tag => tag.Key,
-            static tag => tag.Value is string[] values ? values.ToArray() : tag.Value, StringComparer.Ordinal);
+        var tags = activity.TagObjects.DistinctBy(static tag => tag.Key, StringComparer.Ordinal)
+            .ToDictionary(static tag => tag.Key,
+                static tag => tag.Value is string[] values ? values.ToArray() : tag.Value, StringComparer.Ordinal);
         return new ActivitySnapshot(activity.Source.Name, activity.OperationName, activity.Kind, activity.Status,
             activity.TraceId, activity.SpanId, activity.ParentSpanId, new ReadOnlyDictionary<string, object?>(tags));
     }
