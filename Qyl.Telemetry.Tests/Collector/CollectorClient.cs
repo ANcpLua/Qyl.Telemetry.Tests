@@ -55,23 +55,40 @@ public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider
         WaitUntilAsync(token => QueryMetricAsync(name, start, end, aggregation, token), until,
             $"metric '{name}'", cancellationToken);
 
+    /// <summary>Polls until the trace stores every span in <paramref name="spanIds" /> and returns its stored spans.</summary>
+    /// <exception cref="TimeoutException">A span is still not stored at the deadline.</exception>
+    public Task<IReadOnlyList<StoredSpan>> WaitForSpansAsync(string traceId, IReadOnlyCollection<string> spanIds,
+        CancellationToken cancellationToken = default) =>
+        WaitForSpansAsync(traceId, spanIds, static _ => { }, cancellationToken);
+
     /// <summary>Polls until every expected span is stored or the deadline passes, returning the last stored spans.</summary>
-    internal async Task<IReadOnlyList<StoredSpan>> AwaitStoredSpansAsync(string traceId, IReadOnlySet<string> spanIds,
+    internal async Task<IReadOnlyList<StoredSpan>> AwaitStoredSpansAsync(string traceId, IReadOnlyCollection<string> spanIds,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<StoredSpan> stored = [];
         try
         {
-            _ = await WaitUntilAsync(async token => stored =
-                    (await ReadAsync<StoredTrace>(TraceRoute(traceId), token).ConfigureAwait(false)).Spans,
-                spans => spanIds.All(id => spans.Any(span => span.SpanId == id)), $"trace '{traceId}'", cancellationToken)
-                .ConfigureAwait(false);
+            return await WaitForSpansAsync(traceId, spanIds, spans => stored = spans, cancellationToken).ConfigureAwait(false);
         }
         catch (TimeoutException)
         {
             // The policy reports each captured span the Collector did not store.
         }
         return stored;
+    }
+
+    private Task<IReadOnlyList<StoredSpan>> WaitForSpansAsync(string traceId, IReadOnlyCollection<string> spanIds,
+        Action<IReadOnlyList<StoredSpan>> observe, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(traceId);
+        ArgumentNullException.ThrowIfNull(spanIds);
+        return WaitUntilAsync(async token =>
+            {
+                var spans = (await ReadAsync<StoredTrace>(TraceRoute(traceId), token).ConfigureAwait(false)).Spans;
+                observe(spans);
+                return spans;
+            },
+            spans => spanIds.All(id => spans.Any(span => span.SpanId == id)), $"trace '{traceId}'", cancellationToken);
     }
 
     private async Task<T> WaitUntilAsync<T>(Func<CancellationToken, Task<T>> read, Func<T, bool> until,

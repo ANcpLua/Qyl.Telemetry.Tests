@@ -67,6 +67,16 @@ internal sealed class OtlpIncidents
     private static IEnumerable<KeyValue> Attributes(IReadOnlyDictionary<string, object>? attributes) =>
         (attributes ?? new Dictionary<string, object>()).Select(pair => OtlpEvidence.Pair(pair.Key, pair.Value));
 
+    /// <summary>Sends every pending signal, then waits until the Collector stores every span of <paramref name="key" />'s trace.</summary>
+    internal async Task SendAndWaitAsync(CollectorClient client, string key, CancellationToken cancellationToken)
+    {
+        var traceId = _keys[key].TraceId;
+        var spanIds = _keys.Values.Where(identity => identity.TraceId == traceId).Select(identity => identity.SpanId)
+            .ToHashSet(StringComparer.Ordinal);
+        await SendAsync(client, cancellationToken);
+        _ = await client.WaitForSpansAsync(traceId, spanIds, cancellationToken);
+    }
+
     /// <summary>Sends every pending signal and requires each export to be accepted completely.</summary>
     internal async Task SendAsync(CollectorClient client, CancellationToken cancellationToken)
     {

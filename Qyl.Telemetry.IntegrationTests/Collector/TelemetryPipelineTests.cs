@@ -1,11 +1,13 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using Qyl.Telemetry.Tests.Collector;
 using Google.Protobuf;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http.Features;
 using Qyl.Api.Contracts.Common;
+using ContractKind = Qyl.Api.Contracts.OTel.Enums.SpanKind;
 using RpcStatus = Google.Rpc.Status;
 
 namespace Qyl.Telemetry.IntegrationTests.Collector;
@@ -33,18 +35,12 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
             using var response = await _client.GetAsync(new Uri(Recorder.Collector.Address, "health"), testContext.CancellationToken);
             _ = response.EnsureSuccessStatusCode();
         }
-        var trace = await Recorder.Collector.Client.WaitForTraceAsync(traceId,
-            stored => stored.GetProperty("spans").EnumerateArray().Any(span => span.GetProperty("span_id").GetString() == rootId),
-            testContext.CancellationToken);
-        var spans = trace.GetProperty("spans").EnumerateArray().ToArray();
-        var ids = spans.Select(span => span.GetProperty("span_id").GetString()).ToHashSet();
-        Assert.Contains(span => span.GetProperty("span_id").GetString() == rootId
-            && span.GetProperty("name").GetString() == TracePerTestAttribute.ActivityName, spans);
-        Assert.Contains(span => span.GetProperty("kind").GetInt32() == 3
-            && span.GetProperty("parent_span_id").GetString() == rootId, spans);
-        Assert.IsTrue(spans.All(span => !span.TryGetProperty("parent_span_id", out var parent)
-            || parent.GetString() is null or "" || ids.Contains(parent.GetString())));
-        testContext.WriteLine(trace.GetRawText());
+        var spans = await Recorder.Collector.Client.WaitForSpansAsync(traceId, [rootId], testContext.CancellationToken);
+        var ids = spans.Select(span => span.SpanId).ToHashSet();
+        Assert.Contains(span => span.SpanId == rootId && span.Name == TracePerTestAttribute.ActivityName, spans);
+        Assert.Contains(span => span.Kind == ContractKind.Client && span.ParentSpanId == rootId, spans);
+        Assert.IsTrue(spans.All(span => string.IsNullOrEmpty(span.ParentSpanId) || ids.Contains(span.ParentSpanId)));
+        testContext.WriteLine(JsonSerializer.Serialize(spans));
     }
 
     [TestMethod]

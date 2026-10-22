@@ -58,9 +58,7 @@ public sealed class DeliveryTests(TestContext context)
         Assert.HasParentContext(server, client);
         Assert.HasParentContext(client, root.Context);
         Assert.AreSequenceEqual([ProbeSignals.RequestId], server.GetStrings(CapturedKey)!);
-        _ = await application.Telemetry.Collector.Client.WaitForTraceAsync(traceId,
-            stored => stored.GetProperty("spans").EnumerateArray().Any(span => span.GetProperty("span_id").GetString() == server.SpanId),
-            context.CancellationToken);
+        _ = await application.Telemetry.Collector.Client.WaitForSpansAsync(traceId, [server.SpanId], context.CancellationToken);
 
         await using var mcp = await PublishedMcp.ConnectAsync(_delivery.McpEntryPoint, application.Telemetry.Collector.Address,
             line => context.WriteLine("MCP: " + line), context.CancellationToken);

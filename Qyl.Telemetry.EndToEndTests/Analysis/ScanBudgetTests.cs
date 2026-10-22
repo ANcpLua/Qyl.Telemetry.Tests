@@ -11,33 +11,30 @@ public sealed class ScanBudgetTests(TestContext context)
 {
     private const string Service = "coverage-checkout";
     private const int Requests = 25_001;
-    private static AnalysisSession? _session;
+    private static readonly SharedAnalysisSession Shared = new();
     private static ulong _since;
 
-    private static AnalysisSession Session => _session ?? throw new InvalidOperationException("The Collector has not started.");
+    private static AnalysisSession Session => Shared.Session;
 
     [ClassInitialize]
     [Timeout(600_000, CooperativeCancellation = true)]
     public static async Task SeedAsync(TestContext context)
     {
-        _session = await AnalysisSession.StartAsync(context);
-        _since = Nanoseconds(_session.TimeProvider.GetUtcNow()) - 40 * Minute;
+        var session = await Shared.StartAsync(context);
+        _since = Nanoseconds(session.TimeProvider.GetUtcNow()) - 40 * Minute;
         var incidents = new OtlpIncidents();
         incidents.Span("coverage-recurrence", Service, "checkout", _since + Minute, error: true,
             attributes: new Dictionary<string, object> { ["error.type"] = "coverage" });
         for (var i = 0; i < Requests; i++)
         {
             incidents.Span($"coverage-request-{i}", Service, "checkout", _since + 2 * Minute + (ulong)i * Millisecond);
-            if (i % 5_000 == 4_999) await incidents.SendAsync(_session.Client, context.CancellationToken);
+            if (i % 5_000 == 4_999) await incidents.SendAsync(session.Client, context.CancellationToken);
         }
-        await incidents.SendAsync(_session.Client, context.CancellationToken);
+        await incidents.SendAsync(session.Client, context.CancellationToken);
     }
 
     [ClassCleanup]
-    public static async Task StopAsync()
-    {
-        if (_session is not null) await _session.DisposeAsync();
-    }
+    public static Task StopAsync() => Shared.StopAsync();
 
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
@@ -48,7 +45,7 @@ public sealed class ScanBudgetTests(TestContext context)
         {
             ["start_time"] = AnswerKey.Iso(_since - 5 * Minute), ["end_time"] = AnswerKey.Iso(_since + 45 * Minute),
             ["since"] = AnswerKey.Iso(_since),
-            ["matchers"] = new JsonArray(new JsonObject { ["key"] = "service.name", ["op"] = "eq", ["value"] = Service, ["scope"] = "resource" })
+            ["matchers"] = new JsonArray(AnswerKey.Matcher("service.name", "eq", Service))
         }, context.CancellationToken);
         Assert.AreNotEqual("passed", output.Verdict,
             $"A recurrence exists after the change; scan_complete={output.Coverage.ScanComplete}, requests={output.After.Requests}.");

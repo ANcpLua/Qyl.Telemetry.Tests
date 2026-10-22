@@ -12,7 +12,7 @@ Binding rules: the root skill `/Users/alexandernachtmann/RiderProjects/Qyl.Telem
 - Raw OTLP requests go through `OtlpHttp` (`PostAsync`, `Content`, `Compress`) and `OtlpGrpc.ExportAsync`, export envelopes through `OtlpEvidence.Traces/Logs/Metrics`, reference metrics through `MetricFixture.Of`. A test class never calls into another test class.
 - Signals and metric shapes are the constants `Signals.Traces/Metrics/Logs` and `MetricShapes.*`; log value kinds are the class constants (`TextBody`, `BytesBody`). A `case` on a literal is a defect.
 - State changes use scopes: `EnvironmentScope` with `[ResourceLock(WellKnownResources.EnvironmentVariables)]`, `TelemetryPipeline.Ending(root)`, `await using` for receivers and relays. A test that proves disposal declares the variable without `using` and disposes it explicitly, once.
-- Waiting is `CollectorClient.WaitForTraceAsync` / `WaitForSpanEventsAsync` with a deadline; no polling loop in a test. Deadlines read the fixture's `TimeProvider`.
+- Waiting is `CollectorClient.WaitForTraceAsync` / `WaitForSpansAsync` / `WaitForSpanEventsAsync` with a deadline; no polling loop in a test. Deadlines read the fixture's `TimeProvider`.
 - Child runners go through `ChildProcess`. `Probes/InvocationContractTests` runs `Fixtures/TelemetryInvocation.Probe`; its `ProbeContract.cs` lists the probe case names and must follow every rename.
 - Classes that change process-wide state (environment variables, the Collector) are `[DoNotParallelize]`; tests that wait carry `[Timeout]`.
 - Run: `dotnet test --project Qyl.Telemetry.IntegrationTests/Qyl.Telemetry.IntegrationTests.csproj -c Release`; report the counts.

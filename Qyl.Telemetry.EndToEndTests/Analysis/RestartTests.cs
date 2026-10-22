@@ -44,9 +44,7 @@ public sealed class RestartTests(TestContext context)
             incidents.Span($"durable-failure-{i}", Service, $"operation-{i}", now - (9 - (ulong)i) * Minute, 5, error: true,
                 parent: root.SpanId, trace: root.TraceId, attributes: new Dictionary<string, object> { ["error.type"] = $"kind-{i}" },
                 message: $"failure {i}");
-        await incidents.SendAsync(Session.Client, context.CancellationToken);
-        _ = await Session.Client.WaitForTraceAsync(root.TraceId,
-            trace => trace.GetProperty("spans").GetArrayLength() == FailureKinds + 1, context.CancellationToken);
+        await incidents.SendAndWaitAsync(Session.Client, "durable-root", context.CancellationToken);
         var window = new JsonObject
         {
             ["start_time"] = AnswerKey.Iso(now - 30 * Minute), ["end_time"] = AnswerKey.Iso(now + Minute), ["service_name"] = Service

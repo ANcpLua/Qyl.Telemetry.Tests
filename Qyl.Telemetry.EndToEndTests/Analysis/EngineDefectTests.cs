@@ -12,24 +12,21 @@ namespace Qyl.Telemetry.EndToEndTests.Analysis;
 [DoNotParallelize]
 public sealed class EngineDefectTests(TestContext context)
 {
-    private static AnalysisSession? _session;
+    private static readonly SharedAnalysisSession Shared = new();
     private static ulong _now;
 
-    private static AnalysisSession Session => _session ?? throw new InvalidOperationException("The Collector has not started.");
+    private static AnalysisSession Session => Shared.Session;
 
     [ClassInitialize]
     [Timeout(300_000, CooperativeCancellation = true)]
     public static async Task StartAsync(TestContext context)
     {
-        _session = await AnalysisSession.StartAsync(context);
-        _now = Nanoseconds(_session.TimeProvider.GetUtcNow());
+        var session = await Shared.StartAsync(context);
+        _now = Nanoseconds(session.TimeProvider.GetUtcNow());
     }
 
     [ClassCleanup]
-    public static async Task StopAsync()
-    {
-        if (_session is not null) await _session.DisposeAsync();
-    }
+    public static Task StopAsync() => Shared.StopAsync();
 
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
@@ -42,11 +39,11 @@ public sealed class EngineDefectTests(TestContext context)
             attributes: new Dictionary<string, object> { ["error.type"] = "env-failure" }, resource: Environment("prod"));
         for (var i = 0; i < 150; i++)
             incidents.Span($"{service}-staging-{i}", service, "checkout", _now - 30 * Minute + (ulong)i * Millisecond, resource: Environment("staging"));
-        await SendAsync(incidents, $"{service}-staging-149");
+        await incidents.SendAndWaitAsync(Session.Client, $"{service}-staging-149", context.CancellationToken);
         var failure = Assert.ContainsSingle((await AskAsync<TriageOutput>(path, "triage",
-            Window(("service_name", service), ("environment", "prod"), ("status", "all")))).Failures);
+            AnswerKey.Window(_now, ("service_name", service), ("environment", "prod"), ("status", "all")))).Failures);
         Assert.IsNotNull(failure.FailureId);
-        var verification = await AskAsync<VerifyFixOutput>(path, "verify_fix", Window(("matchers", ScopeMatchers(service, "prod")),
+        var verification = await AskAsync<VerifyFixOutput>(path, "verify_fix", AnswerKey.Window(_now, ("matchers", ScopeMatchers(service, "prod")),
             ("since", AnswerKey.Iso(_now - 35 * Minute)), ("min_minutes", 1)));
         Assert.AreEqual(0L, verification.After.Requests, "Staging requests must not count for prod.");
         Assert.AreEqual("pending", verification.Verdict);
@@ -63,9 +60,9 @@ public sealed class EngineDefectTests(TestContext context)
             attributes: new Dictionary<string, object> { ["error.type"] = "reuse" });
         var second = incidents.Span($"{service}-b", service, "second", _now - 9 * Minute, error: true, session: service, spanId: first.SpanId,
             attributes: new Dictionary<string, object> { ["error.type"] = "reuse" });
-        await SendAsync(incidents, $"{service}-a");
-        await SendAsync(incidents, $"{service}-b");
-        var output = await AskAsync<GetFailureContextOutput>(path, "get_failure_context", Window(("session_id", service)));
+        await incidents.SendAndWaitAsync(Session.Client, $"{service}-a", context.CancellationToken);
+        await incidents.SendAndWaitAsync(Session.Client, $"{service}-b", context.CancellationToken);
+        var output = await AskAsync<GetFailureContextOutput>(path, "get_failure_context", AnswerKey.Window(_now, ("session_id", service)));
         Assert.AreEqual(first.TraceId, output.Observed.RootCauseSpan?.TraceId);
         Assert.AreEquivalent(new[] { first.TraceId, second.TraceId },
             output.Observed.ErrorSpans.Select(span => span.TraceId).ToArray());
@@ -87,11 +84,11 @@ public sealed class EngineDefectTests(TestContext context)
                 incidents.Span($"{service}-{region}-ok-{i}", service, "work", start + (ulong)(i + 100) * Millisecond,
                     resource: new Dictionary<string, object> { ["cloud.region"] = region });
             }
-        await SendAsync(incidents, $"{service}-us-ok-9");
+        await incidents.SendAndWaitAsync(Session.Client, $"{service}-us-ok-9", context.CancellationToken);
         var failure = Assert.ContainsSingle((await AskAsync<TriageOutput>(path, "triage",
-            Window(("service_name", service), ("status", "all")))).Failures);
-        var output = await AskAsync<CompareGroupsOutput>(path, "compare_groups", Window(
-            ("matchers", new JsonArray(new JsonObject { ["key"] = "service.name", ["op"] = "eq", ["value"] = service, ["scope"] = "resource" })),
+            AnswerKey.Window(_now, ("service_name", service), ("status", "all")))).Failures);
+        var output = await AskAsync<CompareGroupsOutput>(path, "compare_groups", AnswerKey.Window(_now,
+            ("matchers", new JsonArray(AnswerKey.Matcher("service.name", "eq", service))),
             ("signal", "spans"), ("group_b", "rest"), ("attribute_scope", "both"),
             ("group_a", new JsonObject
             {
@@ -152,7 +149,7 @@ public sealed class EngineDefectTests(TestContext context)
             }
         });
         await incidents.SendAsync(Session.Client, context.CancellationToken);
-        var output = await AskAsync<QueryMetricOutput>(path, "query_metric", Window(("metric_name", name), ("aggregation", "p50"),
+        var output = await AskAsync<QueryMetricOutput>(path, "query_metric", AnswerKey.Window(_now, ("metric_name", name), ("aggregation", "p50"),
             ("step_ms", 3_600_000)));
         Assert.IsNotNull(output.Series);
         var median = Assert.ContainsSingle(Assert.ContainsSingle(output.Series).Buckets.Select(bucket => bucket.Value).OfType<double>());
@@ -171,12 +168,12 @@ public sealed class EngineDefectTests(TestContext context)
         foreach (var seconds in new ulong[] { 20, 30 })
             incidents.Span($"{service}-child-{seconds}", service, "child", start + seconds * Second, 1,
                 parent: root.SpanId, trace: root.TraceId);
-        await SendAsync(incidents, $"{service}-child-30");
-        var input = Window(("trace_id", root.TraceId), ("max_spans", 2));
+        await incidents.SendAndWaitAsync(Session.Client, $"{service}-child-30", context.CancellationToken);
+        var input = AnswerKey.Window(_now, ("trace_id", root.TraceId), ("max_spans", 2));
         var page = await AskAsync<JsonElement>(path, "get_trace", input);
         Assert.IsTrue(page.GetProperty("has_more").GetBoolean(), "Two of three spans fill the first page.");
         var late = incidents.Span($"{service}-late", service, "late", start + 5_000 * Millisecond, 1, parent: root.SpanId, trace: root.TraceId);
-        await SendAsync(incidents, $"{service}-late");
+        await incidents.SendAndWaitAsync(Session.Client, $"{service}-late", context.CancellationToken);
 
         var stale = input.DeepClone().AsObject();
         stale["cursor"] = page.GetProperty("next_cursor").GetString();
@@ -202,28 +199,11 @@ public sealed class EngineDefectTests(TestContext context)
     private static IEnumerable<string> SpanIds(JsonElement page) =>
         page.GetProperty("trace").GetProperty("spans").EnumerateArray().Select(span => span.GetProperty("span_id").GetString()!);
 
-    private async Task SendAsync(OtlpIncidents incidents, string lastKey)
-    {
-        var last = incidents.Keys[lastKey];
-        var expected = incidents.Keys.Values.Count(key => key.TraceId == last.TraceId);
-        await incidents.SendAsync(Session.Client, context.CancellationToken);
-        _ = await Session.Client.WaitForTraceAsync(last.TraceId, trace => trace.GetProperty("spans").GetArrayLength() >= expected,
-            context.CancellationToken);
-    }
-
     private Task<T> AskAsync<T>(AnalysisPath path, string tool, JsonObject input) =>
         Session.AskAsync<T>(path, tool, input, context.CancellationToken);
-
-    private static JsonObject Window(params (string Key, JsonNode? Value)[] fields)
-    {
-        var input = new JsonObject { ["start_time"] = AnswerKey.Iso(_now - 60 * Minute), ["end_time"] = AnswerKey.Iso(_now + Minute) };
-        foreach (var (key, value) in fields) input[key] = value;
-        return input;
-    }
 
     private static Dictionary<string, object> Environment(string name) => new() { ["deployment.environment.name"] = name };
 
     private static JsonArray ScopeMatchers(string service, string environment) =>
-        [new JsonObject { ["key"] = "service.name", ["op"] = "eq", ["value"] = service, ["scope"] = "resource" },
-         new JsonObject { ["key"] = "deployment.environment.name", ["op"] = "eq", ["value"] = environment, ["scope"] = "resource" }];
+        [AnswerKey.Matcher("service.name", "eq", service), AnswerKey.Matcher("deployment.environment.name", "eq", environment)];
 }

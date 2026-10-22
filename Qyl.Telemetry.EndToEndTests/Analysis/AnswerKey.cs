@@ -34,7 +34,21 @@ internal sealed class AnswerKey
     internal OtlpIncidents Incidents { get; } = new();
     internal SpanKey this[string key] => Incidents.Keys[key];
 
-    internal JsonObject Window() => new() { ["start_time"] = Iso(Now - 60 * Minute), ["end_time"] = Iso(Now + Minute) };
+    /// <summary>An analysis input over the hour before <see cref="Now" /> and the minute after it, with <paramref name="fields" />.</summary>
+    internal JsonObject Window(params (string Key, JsonNode? Value)[] fields) => Window(Now, fields);
+
+    /// <summary>An analysis input over the hour before <paramref name="now" /> and the minute after it, with <paramref name="fields" />.</summary>
+    internal static JsonObject Window(ulong now, params (string Key, JsonNode? Value)[] fields)
+    {
+        var input = new JsonObject { ["start_time"] = Iso(now - 60 * Minute), ["end_time"] = Iso(now + Minute) };
+        foreach (var (key, value) in fields) input[key] = value;
+        return input;
+    }
+
+    /// <summary>A resource-scoped attribute matcher; the <c>in</c> operator takes a list of values.</summary>
+    internal static JsonObject Matcher(string key, string op, JsonNode value) => op == "in"
+        ? new JsonObject { ["key"] = key, ["op"] = op, ["values"] = value, ["scope"] = "resource" }
+        : new JsonObject { ["key"] = key, ["op"] = op, ["value"] = value, ["scope"] = "resource" };
 
     internal static string Iso(ulong nanoseconds) =>
         Time(nanoseconds).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture);
