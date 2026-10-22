@@ -18,11 +18,17 @@ using Microsoft.Net.Http.Headers;
 using OpenTelemetry.Proto.Collector.Logs.V1;
 using OpenTelemetry.Proto.Collector.Metrics.V1;
 using OpenTelemetry.Proto.Collector.Trace.V1;
+using OpenTelemetry.Proto.Logs.V1;
 using OpenTelemetry.Proto.Metrics.V1;
+using OpenTelemetry.Proto.Trace.V1;
 using Qyl.Telemetry.SemanticConventions;
 using Google.Rpc;
 using BadHttpRequestException = Microsoft.AspNetCore.Http.BadHttpRequestException;
 using RpcStatus = Google.Rpc.Status;
+using ProtoLog = OpenTelemetry.Proto.Logs.V1.LogRecord;
+using ProtoResource = OpenTelemetry.Proto.Resource.V1.Resource;
+using ProtoScope = OpenTelemetry.Proto.Common.V1.InstrumentationScope;
+using ProtoSpan = OpenTelemetry.Proto.Trace.V1.Span;
 
 namespace Qyl.Telemetry.Tests;
 
@@ -279,74 +285,51 @@ public sealed class OtlpReceiver : IAsyncDisposable
         long accepted = 0, rejected = 0;
         var errors = new List<string>();
 
-        IMessage response;
         switch (signal)
         {
             case "traces":
-            {
-                foreach (var resource in ExportTraceServiceRequest.Parser.ParseFrom(bytes).ResourceSpans)
-                {
-                    var resourceRecord = Once(() => decoder.Resource(resource.Resource, resource.SchemaUrl));
-                    foreach (var scope in resource.ScopeSpans)
-                    {
-                        var scopeRecord = Once(() => decoder.Scope(scope.Scope, scope.SchemaUrl));
-                        foreach (var span in scope.Spans)
-                            Add(span, s => decoder.Span(s, resourceRecord.Value, scopeRecord.Value), _spans);
-                    }
-                }
-                response = new ExportTraceServiceResponse
-                {
-                    PartialSuccess = rejected == 0 && decoder.Warnings.Count == 0
-                        ? null
-                        : new ExportTracePartialSuccess
-                            { RejectedSpans = rejected, ErrorMessage = ResponseMessage(errors.Concat(decoder.Warnings)) }
-                };
+                DecodeAll<ResourceSpans, ScopeSpans, ProtoSpan, SpanRecord>(
+                    ExportTraceServiceRequest.Parser.ParseFrom(bytes).ResourceSpans,
+                    static resource => (resource.Resource, resource.SchemaUrl, resource.ScopeSpans),
+                    static scope => (scope.Scope, scope.SchemaUrl, scope.Spans), decoder.Span, _spans, static _ => 1);
                 break;
-            }
             case "logs":
-            {
-                foreach (var resource in ExportLogsServiceRequest.Parser.ParseFrom(bytes).ResourceLogs)
-                {
-                    var resourceRecord = Once(() => decoder.Resource(resource.Resource, resource.SchemaUrl));
-                    foreach (var scope in resource.ScopeLogs)
-                    {
-                        var scopeRecord = Once(() => decoder.Scope(scope.Scope, scope.SchemaUrl));
-                        foreach (var log in scope.LogRecords)
-                            Add(log, l => decoder.Log(l, resourceRecord.Value, scopeRecord.Value), _logs);
-                    }
-                }
-                response = new ExportLogsServiceResponse
-                {
-                    PartialSuccess = rejected == 0 && decoder.Warnings.Count == 0
-                        ? null
-                        : new ExportLogsPartialSuccess
-                            { RejectedLogRecords = rejected, ErrorMessage = ResponseMessage(errors.Concat(decoder.Warnings)) }
-                };
+                DecodeAll<ResourceLogs, ScopeLogs, ProtoLog, LogRecord>(
+                    ExportLogsServiceRequest.Parser.ParseFrom(bytes).ResourceLogs,
+                    static resource => (resource.Resource, resource.SchemaUrl, resource.ScopeLogs),
+                    static scope => (scope.Scope, scope.SchemaUrl, scope.LogRecords), decoder.Log, _logs, static _ => 1);
                 break;
-            }
             default:
-            {
-                foreach (var resource in ExportMetricsServiceRequest.Parser.ParseFrom(bytes).ResourceMetrics)
-                {
-                    var resourceRecord = Once(() => decoder.Resource(resource.Resource, resource.SchemaUrl));
-                    foreach (var scope in resource.ScopeMetrics)
-                    {
-                        var scopeRecord = Once(() => decoder.Scope(scope.Scope, scope.SchemaUrl));
-                        foreach (var metric in scope.Metrics)
-                            Add(metric, m => decoder.Metric(m, resourceRecord.Value, scopeRecord.Value), _metrics,
-                                PointCount(metric));
-                    }
-                }
-                response = new ExportMetricsServiceResponse
-                {
-                    PartialSuccess = rejected == 0 && decoder.Warnings.Count == 0
-                        ? null
-                        : new ExportMetricsPartialSuccess
-                            { RejectedDataPoints = rejected, ErrorMessage = ResponseMessage(errors.Concat(decoder.Warnings)) }
-                };
+                DecodeAll<ResourceMetrics, ScopeMetrics, Metric, MetricRecord>(
+                    ExportMetricsServiceRequest.Parser.ParseFrom(bytes).ResourceMetrics,
+                    static resource => (resource.Resource, resource.SchemaUrl, resource.ScopeMetrics),
+                    static scope => (scope.Scope, scope.SchemaUrl, scope.Metrics), decoder.Metric, _metrics, PointCount);
                 break;
-            }
         }
+
+        var partial = rejected != 0 || decoder.Warnings.Count != 0;
+        var message = partial ? ResponseMessage(errors.Concat(decoder.Warnings)) : "";
+        IMessage response = signal switch
+        {
+            "traces" => new ExportTraceServiceResponse
+            {
+                PartialSuccess = partial
+                    ? new ExportTracePartialSuccess { RejectedSpans = rejected, ErrorMessage = message }
+                    : null
+            },
+            "logs" => new ExportLogsServiceResponse
+            {
+                PartialSuccess = partial
+                    ? new ExportLogsPartialSuccess { RejectedLogRecords = rejected, ErrorMessage = message }
+                    : null
+            },
+            _ => new ExportMetricsServiceResponse
+            {
+                PartialSuccess = partial
+                    ? new ExportMetricsPartialSuccess { RejectedDataPoints = rejected, ErrorMessage = message }
+                    : null
+            }
+        };
 
         foreach (var warning in decoder.Warnings)
             _application.Logger.LogWarning("OTLP decoding warning: {Warning}", warning);
@@ -357,12 +340,30 @@ public sealed class OtlpReceiver : IAsyncDisposable
         });
         return response.ToByteArray();
 
-        // A resource or scope is decoded, and warned about, once for all its records; a decoding error
-        // is cached by the Lazy and rejects each of those records as before.
-        static Lazy<T> Once<T>(Func<T> decode) => new(decode, LazyThreadSafetyMode.None);
+        // Each resource and scope is decoded, and warned about, once for all its records; a decoding error
+        // is cached by the Lazy and rejects each of those records.
+        void DecodeAll<TResource, TScope, TRecord, TOutput>(IEnumerable<TResource> resources,
+            Func<TResource, (ProtoResource? Resource, string SchemaUrl, IEnumerable<TScope> Scopes)> resourceOf,
+            Func<TScope, (ProtoScope? Scope, string SchemaUrl, IEnumerable<TRecord> Records)> scopeOf,
+            Func<TRecord, ResourceRecord, InstrumentationScopeRecord?, TOutput> decode, List<TOutput> destination,
+            Func<TRecord, long> units)
+        {
+            foreach (var (resource, resourceSchema, scopes) in resources.Select(resourceOf))
+            {
+                var resourceRecord = new Lazy<ResourceRecord>(() => decoder.Resource(resource, resourceSchema),
+                    LazyThreadSafetyMode.None);
+                foreach (var (scope, scopeSchema, records) in scopes.Select(scopeOf))
+                {
+                    var scopeRecord = new Lazy<InstrumentationScopeRecord?>(() => decoder.Scope(scope, scopeSchema),
+                        LazyThreadSafetyMode.None);
+                    foreach (var record in records)
+                        Add(record, item => decode(item, resourceRecord.Value, scopeRecord.Value), destination, units(record));
+                }
+            }
+        }
 
-        void Add<TInput, TOutput>(TInput sourceRecord, Func<TInput, TOutput> decode, List<TOutput> destination,
-            long units = 1)
+        void Add<TRecord, TOutput>(TRecord sourceRecord, Func<TRecord, TOutput> decode, List<TOutput> destination,
+            long units)
         {
             try
             {
@@ -414,7 +415,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
         return message.Length > 4096 ? message[..4096] : message;
     }
 
-    private static int PointCount(Metric metric)
+    private static long PointCount(Metric metric)
     {
         return metric.DataCase switch
         {
