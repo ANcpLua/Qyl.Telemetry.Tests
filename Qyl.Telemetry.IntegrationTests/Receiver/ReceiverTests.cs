@@ -48,8 +48,8 @@ public sealed class ReceiverTests
         var scope = new ScopeSpans();
         scope.Spans.Add(new Span
         {
-            TraceId = ByteString.CopyFrom(Convert.FromHexString("11111111111111111111111111111111")),
-            SpanId = ByteString.CopyFrom(Convert.FromHexString("2222222222222222")), Name = "valid"
+            TraceId = OtlpEvidence.Id("11111111111111111111111111111111"),
+            SpanId = OtlpEvidence.Id("2222222222222222"), Name = "valid"
         });
         scope.Spans.Add(new Span { Name = "invalid" });
         request.ResourceSpans.Add(new ResourceSpans { ScopeSpans = { scope } });

@@ -8,6 +8,7 @@ using OpenTelemetry.Proto.Logs.V1;
 using OpenTelemetry.Proto.Metrics.V1;
 using OpenTelemetry.Proto.Resource.V1;
 using OpenTelemetry.Proto.Trace.V1;
+using Qyl.Telemetry.Tests.Evidence;
 using ProtoLog = OpenTelemetry.Proto.Logs.V1.LogRecord;
 
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
@@ -153,8 +154,8 @@ public sealed class ProfilingFieldTests
             {
                 Spans = { new Span
                 {
-                    TraceId = ByteString.CopyFrom(Convert.FromHexString("11111111111111111111111111111111")),
-                    SpanId = ByteString.CopyFrom(Convert.FromHexString("2222222222222222")), Name = "preserved"
+                    TraceId = OtlpEvidence.Id("11111111111111111111111111111111"),
+                    SpanId = OtlpEvidence.Id("2222222222222222"), Name = "preserved"
                 } }
             } } } }
         },

@@ -8,6 +8,7 @@ using OpenTelemetry.Proto.Metrics.V1;
 using OpenTelemetry.Proto.Resource.V1;
 using OpenTelemetry.Proto.Trace.V1;
 using Qyl.Telemetry.Tests.Collector;
+using Qyl.Telemetry.Tests.Evidence;
 using OtlpSpan = OpenTelemetry.Proto.Trace.V1.Span;
 
 namespace Qyl.Telemetry.EndToEndTests.Analysis;
@@ -41,11 +42,11 @@ internal sealed class OtlpIncidents
         var identity = new SpanKey(trace ?? Id(key, 32), spanId ?? Id(key, 16));
         var span = new OtlpSpan
         {
-            TraceId = Bytes(identity.TraceId), SpanId = Bytes(identity.SpanId), Name = name, Kind = OtlpSpan.Types.SpanKind.Server,
+            TraceId = OtlpEvidence.Id(identity.TraceId), SpanId = OtlpEvidence.Id(identity.SpanId), Name = name, Kind = OtlpSpan.Types.SpanKind.Server,
             StartTimeUnixNano = at, EndTimeUnixNano = at + (ulong)(durationMs * Millisecond),
             Status = new Status { Code = error ? Status.Types.StatusCode.Error : Status.Types.StatusCode.Ok, Message = message ?? "" }
         };
-        if (parent is not null) span.ParentSpanId = Bytes(parent);
+        if (parent is not null) span.ParentSpanId = OtlpEvidence.Id(parent);
         span.Attributes.Add(Attributes(attributes));
         if (session is not null) span.Attributes.Add(Pair("session.id", session));
         _spans.Add(new ResourceSpans
@@ -116,6 +117,4 @@ internal sealed class OtlpIncidents
         string[] items => new AnyValue { ArrayValue = new ArrayValue { Values = { items.Select(Value) } } },
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported OTLP attribute value.")
     };
-
-    private static ByteString Bytes(string hex) => ByteString.CopyFrom(Convert.FromHexString(hex));
 }
