@@ -15,38 +15,60 @@ public sealed class DuplicateAttributeTests
     [DataRow(AttributeShape.Integer)]
     [DataRow(AttributeShape.Array)]
     [DataRow(AttributeShape.Bytes)]
-    public void DuplicateAttributes_IdenticalTypedValues_AreCoalescedWithoutMutatingWireEvidence(AttributeShape shape)
+    public void DuplicateAttributes_IdenticalTypedValues_AreCoalescedIntoOneAttribute(AttributeShape shape)
     {
-        var value = Value(shape);
-        var input = new ProtoLog
-        {
-            Attributes = { new KeyValue { Key = Key, Value = value }, new KeyValue { Key = Key, Value = value.Clone() } }
-        };
-        var original = input.ToByteArray();
-        var decoder = new OtlpDecode();
-        var observed = decoder.Log(input, new ResourceRecord(new Dictionary<string, object?>()), null);
+        var (observed, _, _, _) = DecodeIdenticalDuplicates(shape);
+        Assert.AreSequenceEqual([Key], observed.Attributes.Keys);
+    }
 
-        Assert.HasCount(1, observed.Attributes);
-        Assert.Contains(Key, observed.Attributes.Keys);
-        switch (shape)
-        {
-            case AttributeShape.String:
-                Assert.AreEqual("connection-1", observed.Attributes[Key]);
-                break;
-            case AttributeShape.Integer:
-                Assert.AreEqual(1L, observed.Attributes[Key]);
-                break;
-            case AttributeShape.Array:
-                Assert.AreSequenceEqual(["first", "second"], Assert.IsInstanceOfType<IReadOnlyList<object?>>(observed.Attributes[Key]));
-                break;
-            case AttributeShape.Bytes:
-                Assert.AreSequenceEqual<byte>([1, 2], Assert.IsInstanceOfType<byte[]>(observed.Attributes[Key]));
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(shape));
-        }
-        Assert.AreEqual($"Coalesced identical OTLP attribute: {Key}.", Assert.ContainsSingle(decoder.Warnings));
+    [TestMethod]
+    [DataRow(AttributeShape.String)]
+    [DataRow(AttributeShape.Integer)]
+    [DataRow(AttributeShape.Array)]
+    [DataRow(AttributeShape.Bytes)]
+    public void DuplicateAttributes_IdenticalTypedValues_ReportACoalescingWarning(AttributeShape shape)
+    {
+        var (_, warnings, _, _) = DecodeIdenticalDuplicates(shape);
+        Assert.AreEqual($"Coalesced identical OTLP attribute: {Key}.", Assert.ContainsSingle(warnings));
+    }
+
+    [TestMethod]
+    [DataRow(AttributeShape.String)]
+    [DataRow(AttributeShape.Integer)]
+    [DataRow(AttributeShape.Array)]
+    [DataRow(AttributeShape.Bytes)]
+    public void DuplicateAttributes_IdenticalTypedValues_LeaveTheWireMessageUnchanged(AttributeShape shape)
+    {
+        var (_, _, original, input) = DecodeIdenticalDuplicates(shape);
         Assert.AreSequenceEqual(original, input.ToByteArray());
+    }
+
+    [TestMethod]
+    public void DuplicateAttributes_IdenticalStrings_KeepTheString()
+    {
+        var (observed, _, _, _) = DecodeIdenticalDuplicates(AttributeShape.String);
+        Assert.AreEqual("connection-1", observed.Attributes[Key]);
+    }
+
+    [TestMethod]
+    public void DuplicateAttributes_IdenticalIntegers_KeepTheInt64()
+    {
+        var (observed, _, _, _) = DecodeIdenticalDuplicates(AttributeShape.Integer);
+        Assert.AreEqual(1L, observed.Attributes[Key]);
+    }
+
+    [TestMethod]
+    public void DuplicateAttributes_IdenticalArrays_KeepTheOrderedValues()
+    {
+        var (observed, _, _, _) = DecodeIdenticalDuplicates(AttributeShape.Array);
+        Assert.AreSequenceEqual(["first", "second"], Assert.IsInstanceOfType<IReadOnlyList<object?>>(observed.Attributes[Key]));
+    }
+
+    [TestMethod]
+    public void DuplicateAttributes_IdenticalBytes_KeepTheBytes()
+    {
+        var (observed, _, _, _) = DecodeIdenticalDuplicates(AttributeShape.Bytes);
+        Assert.AreSequenceEqual<byte>([1, 2], Assert.IsInstanceOfType<byte[]>(observed.Attributes[Key]));
     }
 
     [TestMethod]
@@ -63,6 +85,19 @@ public sealed class DuplicateAttributeTests
         var failure = Assert.ThrowsExactly<InvalidDataException>(() =>
             new OtlpDecode().Log(input, new ResourceRecord(new Dictionary<string, object?>()), null));
         Assert.AreEqual($"Duplicate OTLP attribute: {Key}.", failure.Message);
+    }
+
+    private static (LogRecord Observed, IReadOnlyList<string> Warnings, byte[] Original, ProtoLog Input) DecodeIdenticalDuplicates(AttributeShape shape)
+    {
+        var value = Value(shape);
+        var input = new ProtoLog
+        {
+            Attributes = { new KeyValue { Key = Key, Value = value }, new KeyValue { Key = Key, Value = value.Clone() } }
+        };
+        var original = input.ToByteArray();
+        var decoder = new OtlpDecode();
+        var observed = decoder.Log(input, new ResourceRecord(new Dictionary<string, object?>()), null);
+        return (observed, [.. decoder.Warnings], original, input);
     }
 
     private static AnyValue Value(AttributeShape shape) => shape switch

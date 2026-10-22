@@ -7,44 +7,55 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 public sealed class TraceEvidenceTests
 {
     [TestMethod]
-    public void TraceEvidence_SelectedTrace_KeepsTheCompleteOriginalCapture()
+    public void TraceEvidence_SelectedTrace_KeepsTheOriginalCaptureInstance()
     {
-        var selected = TestSpan.Create("orders", "selected");
-        var unrelated = new SpanRecord("ffeeddccbbaa99887766554433221100", "unrelated", "other operation");
-        var capture = new TelemetrySnapshot([selected, unrelated], [], [], []);
-        var trace = new TraceEvidence(selected.TraceId, capture);
-
+        var (capture, trace, _) = SelectedTrace();
         Assert.AreSame(capture, trace.Capture);
+    }
+
+    [TestMethod]
+    public void TraceEvidence_SelectedTrace_KeepsUnrelatedCapturedSpans()
+    {
+        var (_, trace, _) = SelectedTrace();
         Assert.HasCount(2, trace.Capture.Spans);
+    }
+
+    [TestMethod]
+    public void TraceEvidence_SelectedTrace_SpansAreOnlyItsOwn()
+    {
+        var (_, trace, selected) = SelectedTrace();
         Assert.AreSame(selected, Assert.ContainsSingle(trace.Spans));
     }
 
     [TestMethod]
-    public void TraceEvidenceCalls_RepeatedExportOrMissingCrossServiceClientParent_IsNoExtraCall()
+    public void TraceEvidenceCalls_CrossServiceClientServerChain_IsTheOnlyCall()
     {
-        var client = TestSpan.Create("orders", "client", SpanKind.Client);
-        var server = TestSpan.Create("payments", "server", SpanKind.Server, "client");
-        var trace = TestSpan.Trace(client, server, server,
-            TestSpan.Create("payments", "root", SpanKind.Server),
-            TestSpan.Create("payments", "orphan", SpanKind.Server, "missing"),
-            TestSpan.Create("orders", "same-service", SpanKind.Server, "client"),
-            TestSpan.Create("payments", "internal", SpanKind.Internal, "client"),
-            TestSpan.Create("payments", "wrong-parent", SpanKind.Server, "internal"));
-        var call = Assert.ContainsSingle(trace.Calls);
-        Assert.AreEqual("orders", call.From);
-        Assert.AreEqual("payments", call.To);
-        Assert.HasCount(8, trace.Spans);
+        var call = Assert.ContainsSingle(MixedCallTrace().Calls);
+        Assert.AreEqual(("orders", "payments"), (call.From, call.To));
     }
 
     [TestMethod]
-    public void TraceEvidence_ServicesAndDatabaseStores_AreOrderedAndKeepCompleteIdentities()
+    public void TraceEvidence_RepeatedExport_KeepsEverySpanRecord()
     {
-        var trace = TestSpan.Trace(TestSpan.Create("z", "1", store: "second"),
-            TestSpan.Create("a", "2", store: "first"), TestSpan.Create("a", "3", store: "first"),
-            TestSpan.Create("a", "4", store: "another"), TestSpan.Create("test", "5"));
-        Assert.AreSequenceEqual(["a", "test", "z"], trace.Services);
-        Assert.AreSequenceEqual(["another", "first"], trace.StoresOf("a").Select(store => store.Namespace).Order(StringComparer.Ordinal));
-        Assert.IsEmpty(trace.StoresOf("missing"));
+        Assert.HasCount(8, MixedCallTrace().Spans);
+    }
+
+    [TestMethod]
+    public void TraceEvidence_Services_AreDistinctAndOrdered()
+    {
+        Assert.AreSequenceEqual(["a", "test", "z"], StoreTrace().Services);
+    }
+
+    [TestMethod]
+    public void TraceEvidenceStores_OfOneService_AreDistinctByNamespace()
+    {
+        Assert.AreSequenceEqual(["another", "first"], StoreTrace().StoresOf("a").Select(store => store.Namespace).Order(StringComparer.Ordinal));
+    }
+
+    [TestMethod]
+    public void TraceEvidenceStores_OfAnUnknownService_AreEmpty()
+    {
+        Assert.IsEmpty(StoreTrace().StoresOf("missing"));
     }
 
     [TestMethod]
@@ -52,11 +63,32 @@ public sealed class TraceEvidenceTests
     {
         var trace = TestSpan.Trace(TestSpan.Create("orders", "1", store: "orders", server: "db-a"),
             TestSpan.Create("orders", "2", store: "orders", server: "db-b"));
-        Assert.HasCount(2, trace.StoresOf("orders"));
         Assert.AreSequenceEqual(["db-a", "db-b"], trace.StoresOf("orders").Select(store => store.ServerAddress).Order(StringComparer.Ordinal));
     }
 
+    private static (TelemetrySnapshot Capture, TraceEvidence Trace, SpanRecord Selected) SelectedTrace()
+    {
+        var selected = TestSpan.Create("orders", "selected");
+        var unrelated = new SpanRecord("ffeeddccbbaa99887766554433221100", "unrelated", "other operation");
+        var capture = new TelemetrySnapshot([selected, unrelated], [], [], []);
+        return (capture, new TraceEvidence(selected.TraceId, capture), selected);
+    }
 
+    private static TraceEvidence MixedCallTrace()
+    {
+        var client = TestSpan.Create("orders", "client", SpanKind.Client);
+        var server = TestSpan.Create("payments", "server", SpanKind.Server, "client");
+        return TestSpan.Trace(client, server, server,
+            TestSpan.Create("payments", "root", SpanKind.Server),
+            TestSpan.Create("payments", "orphan", SpanKind.Server, "missing"),
+            TestSpan.Create("orders", "same-service", SpanKind.Server, "client"),
+            TestSpan.Create("payments", "internal", SpanKind.Internal, "client"),
+            TestSpan.Create("payments", "wrong-parent", SpanKind.Server, "internal"));
+    }
+
+    private static TraceEvidence StoreTrace() => TestSpan.Trace(TestSpan.Create("z", "1", store: "second"),
+        TestSpan.Create("a", "2", store: "first"), TestSpan.Create("a", "3", store: "first"),
+        TestSpan.Create("a", "4", store: "another"), TestSpan.Create("test", "5"));
 }
 
 internal static class TestSpan

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Qyl.Telemetry.Tests.Collector;
 using Qyl.Api.Contracts.OTel.Metrics;
+using StoredLogRecord = Qyl.Api.Contracts.OTel.Logs.LogRecord;
 
 namespace Qyl.Telemetry.UnitTests.Collector;
 
@@ -12,23 +13,36 @@ namespace Qyl.Telemetry.UnitTests.Collector;
 public sealed class CollectorClientTests(TestContext testContext)
 {
     private const string Repeated = "repeated";
+    private const string ExportRoute = "v1/traces";
+    private const string Protobuf = "application/x-protobuf";
+    private static readonly DateTimeOffset WindowStart = new(2026, 10, 16, 12, 0, 0, TimeSpan.FromHours(2));
 
     [TestMethod]
-    public async Task CollectorClientLogs_ContinuationCursorAndTraceIdWithReservedCharacters_ReadsEveryPageEncoded()
+    public async Task CollectorClientLogs_ContinuationCursor_ReadsEveryPage()
     {
-        var requests = new List<string>();
-        using var client = Client(request =>
-        {
-            requests.Add(request.RequestUri!.Query);
-            return Json(requests.Count == 1
-                ? """{"items":[],"has_more":true,"next_cursor":"next +&"}"""
-                : """{"items":[],"has_more":false}""");
-        });
-        var logs = await new CollectorClient(client).LogsAsync("trace&one", testContext.CancellationToken);
+        var (_, queries) = await ReadTwoLogPagesAsync();
+        Assert.HasCount(2, queries);
+    }
+
+    [TestMethod]
+    public async Task CollectorClientLogs_TwoEmptyPages_ReturnNoRecords()
+    {
+        var (logs, _) = await ReadTwoLogPagesAsync();
         Assert.IsEmpty(logs);
-        Assert.HasCount(2, requests);
-        Assert.Contains("trace_id=trace%26one", requests[0]);
-        Assert.Contains("cursor=next%20%2B%26", requests[1]);
+    }
+
+    [TestMethod]
+    public async Task CollectorClientLogs_TraceIdWithReservedCharacters_IsEncodedInTheQuery()
+    {
+        var (_, queries) = await ReadTwoLogPagesAsync();
+        Assert.Contains("trace_id=trace%26one", queries[0]);
+    }
+
+    [TestMethod]
+    public async Task CollectorClientLogs_CursorWithReservedCharacters_IsEncodedInTheNextQuery()
+    {
+        var (_, queries) = await ReadTwoLogPagesAsync();
+        Assert.Contains("cursor=next%20%2B%26", queries[1]);
     }
 
     [TestMethod]
@@ -44,62 +58,140 @@ public sealed class CollectorClientTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task CollectorClientLogs_HttpErrorOrNullJson_ThrowsInsteadOfReturningEmpty()
+    public async Task CollectorClientLogs_HttpError_ThrowsHttpRequestException()
     {
         using var failed = Client(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
         _ = await Assert.ThrowsExactlyAsync<HttpRequestException>(() => new CollectorClient(failed).LogsAsync("trace", testContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public async Task CollectorClientLogs_NullJson_ThrowsInvalidDataException()
+    {
         using var empty = Client(_ => Json("null"));
         _ = await Assert.ThrowsExactlyAsync<InvalidDataException>(() => new CollectorClient(empty).LogsAsync("trace", testContext.CancellationToken));
     }
 
     [TestMethod]
-    public async Task CollectorClientMetricQuery_ExplicitUtcWindowAndAggregation_ArePreservedWithResponseMetadata()
+    public async Task CollectorClientMetricQuery_P95Aggregation_IsSentInTheQuery()
     {
-        var start = new DateTimeOffset(2026, 10, 16, 12, 0, 0, TimeSpan.FromHours(2));
-        var expected = new MetricQueryResult
-        {
-            Name = "http.server.request.duration",
-            Kind = MetricKind.Histogram,
-            Unit = "s",
-            Aggregation = MetricAggregation.P95,
-            StartTime = start,
-            EndTime = start.AddMinutes(1),
-            StepMs = 1000,
-            NumericRepresentation = "float64",
-            Approximate = true,
-            Series = [],
-            Truncated = true
-        };
-        using var client = Client(request =>
-        {
-            Assert.Contains("aggregation=p95", request.RequestUri!.Query);
-            Assert.Contains("start_time=2026-10-16T10%3A00%3A00", request.RequestUri.Query);
-            return Json(JsonSerializer.Serialize(expected));
-        });
-        var telemetry = new CollectorClient(client);
-        var actual = await telemetry.QueryMetricAsync(expected.Name, start, start.AddMinutes(1),
-            MetricAggregation.P95, testContext.CancellationToken);
-        Assert.AreEqual(expected.Name, actual.Name);
-        Assert.AreEqual(expected.Aggregation, actual.Aggregation);
-        Assert.IsTrue(actual.Truncated);
-        _ = await Assert.ThrowsExactlyAsync<ArgumentException>(() => telemetry.QueryMetricAsync(" ", start, start, cancellationToken: testContext.CancellationToken));
+        var (query, _) = await QueryP95MetricAsync();
+        Assert.Contains("aggregation=p95", query);
     }
 
     [TestMethod]
-    public async Task CollectorClientExport_NonemptyAcknowledgementOrHttpError_IsForwardedUnchanged()
+    public async Task CollectorClientMetricQuery_OffsetStartTime_IsSentAsUtc()
+    {
+        var (query, _) = await QueryP95MetricAsync();
+        Assert.Contains("start_time=2026-10-16T10%3A00%3A00", query);
+    }
+
+    [TestMethod]
+    public async Task CollectorClientMetricQuery_Response_KeepsTheMetricName()
+    {
+        var (_, result) = await QueryP95MetricAsync();
+        Assert.AreEqual(MetricResponse.Name, result.Name);
+    }
+
+    [TestMethod]
+    public async Task CollectorClientMetricQuery_Response_KeepsTheAggregation()
+    {
+        var (_, result) = await QueryP95MetricAsync();
+        Assert.AreEqual(MetricResponse.Aggregation, result.Aggregation);
+    }
+
+    [TestMethod]
+    public async Task CollectorClientMetricQuery_TruncatedResponse_StaysTruncated()
+    {
+        var (_, result) = await QueryP95MetricAsync();
+        Assert.IsTrue(result.Truncated);
+    }
+
+    [TestMethod]
+    public async Task CollectorClientMetricQuery_BlankName_ThrowsArgumentException()
+    {
+        using var client = Client(_ => Json(JsonSerializer.Serialize(MetricResponse)));
+        _ = await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
+            new CollectorClient(client).QueryMetricAsync(" ", WindowStart, WindowStart, cancellationToken: testContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public async Task CollectorClientExport_EmptyAcknowledgement_IsForwardedAsOk()
     {
         using var accepted = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([]) });
-        using var acceptedReply = await new CollectorClient(accepted).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);
-        Assert.AreEqual(HttpStatusCode.OK, acceptedReply.StatusCode);
-        byte[] expectedReply = [.. "\n\0"u8];
-        using var partial = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(expectedReply) });
-        using var acknowledged = await new CollectorClient(partial).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);
-        Assert.AreEqual(HttpStatusCode.OK, acknowledged.StatusCode);
-        Assert.AreSequenceEqual(expectedReply, await acknowledged.Content.ReadAsByteArrayAsync(testContext.CancellationToken));
-        using var failed = Client(_ => new HttpResponseMessage(HttpStatusCode.BadRequest));
-        using var rejected = await new CollectorClient(failed).ExportAsync("v1/traces", ReadOnlyMemory<byte>.Empty, "application/x-protobuf", null, testContext.CancellationToken);
-        Assert.AreEqual(HttpStatusCode.BadRequest, rejected.StatusCode);
+        using var reply = await ExportAsync(accepted);
+        Assert.AreEqual(HttpStatusCode.OK, reply.StatusCode);
     }
+
+    [TestMethod]
+    public async Task CollectorClientExport_NonemptyAcknowledgement_IsForwardedAsOk()
+    {
+        using var partial = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(NonemptyAcknowledgement) });
+        using var reply = await ExportAsync(partial);
+        Assert.AreEqual(HttpStatusCode.OK, reply.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task CollectorClientExport_NonemptyAcknowledgement_IsForwardedByteForByte()
+    {
+        using var partial = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(NonemptyAcknowledgement) });
+        using var reply = await ExportAsync(partial);
+        Assert.AreSequenceEqual(NonemptyAcknowledgement, await reply.Content.ReadAsByteArrayAsync(testContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public async Task CollectorClientExport_HttpError_IsForwardedWithItsStatus()
+    {
+        using var failed = Client(_ => new HttpResponseMessage(HttpStatusCode.BadRequest));
+        using var reply = await ExportAsync(failed);
+        Assert.AreEqual(HttpStatusCode.BadRequest, reply.StatusCode);
+    }
+
+    private static byte[] NonemptyAcknowledgement => [.. "\n\0"u8];
+
+    private static MetricQueryResult MetricResponse => new()
+    {
+        Name = "http.server.request.duration",
+        Kind = MetricKind.Histogram,
+        Unit = "s",
+        Aggregation = MetricAggregation.P95,
+        StartTime = WindowStart,
+        EndTime = WindowStart.AddMinutes(1),
+        StepMs = 1000,
+        NumericRepresentation = "float64",
+        Approximate = true,
+        Series = [],
+        Truncated = true
+    };
+
+    private async Task<(IReadOnlyList<StoredLogRecord> Logs, List<string> Queries)> ReadTwoLogPagesAsync()
+    {
+        var queries = new List<string>();
+        using var client = Client(request =>
+        {
+            queries.Add(request.RequestUri!.Query);
+            return Json(queries.Count == 1
+                ? """{"items":[],"has_more":true,"next_cursor":"next +&"}"""
+                : """{"items":[],"has_more":false}""");
+        });
+        var logs = await new CollectorClient(client).LogsAsync("trace&one", testContext.CancellationToken);
+        return (logs, queries);
+    }
+
+    private async Task<(string Query, MetricQueryResult Result)> QueryP95MetricAsync()
+    {
+        var query = "";
+        using var client = Client(request =>
+        {
+            query = request.RequestUri!.Query;
+            return Json(JsonSerializer.Serialize(MetricResponse));
+        });
+        var result = await new CollectorClient(client).QueryMetricAsync(MetricResponse.Name, WindowStart, WindowStart.AddMinutes(1),
+            MetricAggregation.P95, testContext.CancellationToken);
+        return (query, result);
+    }
+
+    private Task<HttpResponseMessage> ExportAsync(HttpClient client) =>
+        new CollectorClient(client).ExportAsync(ExportRoute, ReadOnlyMemory<byte>.Empty, Protobuf, null, testContext.CancellationToken);
 
     private static HttpResponseMessage Json(string text) => new(HttpStatusCode.OK)
     {

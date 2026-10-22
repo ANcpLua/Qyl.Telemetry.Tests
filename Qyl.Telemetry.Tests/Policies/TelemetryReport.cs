@@ -18,11 +18,8 @@ internal static class TelemetryReport
             : lines.Take(OutlineLines).Append($"... {lines.Length - OutlineLines} more lines in the evidence file."));
     }
 
-    internal static string Write(TelemetryInvocation invocation, IReadOnlyList<string> violations)
+    internal static string Render(TelemetryInvocation invocation, IReadOnlyList<string> violations)
     {
-        var directory = Path.Combine(Path.GetTempPath(), "qyl-telemetry-evidence", Guid.NewGuid().ToString("N"));
-        _ = Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, "telemetry-evidence.txt");
         var text = new StringBuilder();
         foreach (var violation in violations) text.AppendLine(violation);
         foreach (var trace in invocation.Traces)
@@ -60,8 +57,7 @@ internal static class TelemetryReport
                 text.AppendLine($"  metric {metric.Name} [{metric.Unit}] {Service(metric.Resource)} {metric.Scope?.Name ?? "-"}");
         }
 
-        File.WriteAllText(path, text.ToString());
-        return path;
+        return text.ToString();
     }
 
     internal static string Service(ResourceRecord resource) =>

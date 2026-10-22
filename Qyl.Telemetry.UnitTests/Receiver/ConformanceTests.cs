@@ -8,14 +8,22 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 public sealed class ConformanceTests
 {
     [TestMethod]
-    public void Conformance_EmptySelection_FailsInsteadOfPassingAnEmptyLoop()
+    public void Conformance_EmptySelection_IsNotConformant()
     {
-        var trace = new TraceEvidence("trace", new TelemetrySnapshot([], [], [], []));
-        var report = trace.Conformance(Definition("string"), _ => true);
-        Assert.IsFalse(report.IsConformant);
-        Assert.AreEqual(0, report.SpansChecked);
+        Assert.IsFalse(EmptySelectionReport().IsConformant);
+    }
+
+    [TestMethod]
+    public void Conformance_EmptySelection_ChecksNoSpan()
+    {
+        Assert.AreEqual(0, EmptySelectionReport().SpansChecked);
+    }
+
+    [TestMethod]
+    public void Conformance_EmptySelection_ReportsThatNoSpanMatched()
+    {
         Assert.AreEqual("No span matched the explicit conformance selection.",
-            Assert.ContainsSingle(report.Issues).Message);
+            Assert.ContainsSingle(EmptySelectionReport().Issues).Message);
     }
 
     [TestMethod]
@@ -79,15 +87,220 @@ public sealed class ConformanceTests
         var report =
             new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(Definition(type),
                 _ => true);
-        Assert.AreEqual("test.server", report.DefinitionId);
-        Assert.AreEqual(1, report.SpansChecked);
         Assert.AreEqual(expected, report.IsConformant);
         Assert.HasCount(expected ? 0 : 1, report.Issues);
-        Assert.IsEmpty(report.UnevaluatedConditions);
     }
 
     [TestMethod]
-    public void Conformance_MissingRequiredDeprecatedOrUnknownConditions_AreReported()
+    public void Conformance_DefinitionScopedReport_NamesTheDefinition()
+    {
+        Assert.AreEqual("test.server", StringFieldReport().DefinitionId);
+    }
+
+    [TestMethod]
+    public void Conformance_DefinitionScopedReport_ChecksTheSelectedSpan()
+    {
+        Assert.AreEqual(1, StringFieldReport().SpansChecked);
+    }
+
+    [TestMethod]
+    public void Conformance_UnconditionalDefinition_LeavesNoUnevaluatedCondition()
+    {
+        Assert.IsEmpty(StringFieldReport().UnevaluatedConditions);
+    }
+
+    [TestMethod]
+    public void Conformance_MissingRequiredOrPresentDeprecated_IsNotConformant()
+    {
+        Assert.IsFalse(MixedRequirementReport().IsConformant);
+    }
+
+    [TestMethod]
+    public void Conformance_MissingRequiredAndPresentDeprecated_AreReportedInDefinitionOrder()
+    {
+        Assert.AreSequenceEqual(["required", "deprecated"], MixedRequirementReport().Issues.Select(i => i.Attribute));
+    }
+
+    [TestMethod]
+    public void Conformance_MissingRequiredAttribute_IsReportedAsAbsent()
+    {
+        Assert.AreEqual("Required attribute is absent.",
+            Assert.ContainsSingle(MixedRequirementReport().Issues.Where(i => i.Attribute == "required")).Message);
+    }
+
+    [TestMethod]
+    public void Conformance_PresentDeprecatedAttribute_IsReportedAsDeprecated()
+    {
+        Assert.AreEqual("The selected definition marks this attribute deprecated.",
+            Assert.ContainsSingle(MixedRequirementReport().Issues.Where(i => i.Attribute == "deprecated")).Message);
+    }
+
+    [TestMethod]
+    public void Conformance_AbsentConditionalAttribute_IsAnUnevaluatedCondition()
+    {
+        Assert.AreEqual("2222222222222222:conditional: When the operation retries.",
+            Assert.ContainsSingle(MixedRequirementReport().UnevaluatedConditions));
+    }
+
+    [TestMethod]
+    public void Conformance_WrongSpanKind_IsNotConformant()
+    {
+        Assert.IsFalse(ClientKindReport().IsConformant);
+    }
+
+    [TestMethod]
+    public void Conformance_WrongSpanKind_IsReportedOnSpanKind()
+    {
+        Assert.AreEqual("span.kind", Assert.ContainsSingle(ClientKindReport().Issues).Attribute);
+    }
+
+    [TestMethod]
+    public void Conformance_WrongSpanKind_NamesExpectedAndObservedKind()
+    {
+        Assert.AreEqual("Expected server, observed Client.", Assert.ContainsSingle(ClientKindReport().Issues).Message);
+    }
+
+    [TestMethod]
+    [DataRow(RequirementLevel.Unspecified)]
+    [DataRow(RequirementLevel.Recommended)]
+    [DataRow(RequirementLevel.OptIn)]
+    public void Conformance_AbsentNonRequiredAttribute_IsConformant(RequirementLevel level)
+    {
+        Assert.IsTrue(OptionalFieldReport(level).IsConformant);
+    }
+
+    [TestMethod]
+    [DataRow(RequirementLevel.Unspecified)]
+    [DataRow(RequirementLevel.Recommended)]
+    [DataRow(RequirementLevel.OptIn)]
+    public void Conformance_AbsentNonRequiredAttribute_ReportsNoIssue(RequirementLevel level)
+    {
+        Assert.IsEmpty(OptionalFieldReport(level).Issues);
+    }
+
+    [TestMethod]
+    [DataRow(RequirementLevel.Unspecified)]
+    [DataRow(RequirementLevel.Recommended)]
+    [DataRow(RequirementLevel.OptIn)]
+    public void Conformance_AbsentNonRequiredAttribute_LeavesNoUnevaluatedCondition(RequirementLevel level)
+    {
+        Assert.IsEmpty(OptionalFieldReport(level).UnevaluatedConditions);
+    }
+
+    [TestMethod]
+    [DataRow(RequirementLevel.Unspecified)]
+    [DataRow(RequirementLevel.Recommended)]
+    [DataRow(RequirementLevel.OptIn)]
+    public void Conformance_AbsentNonRequiredAttribute_StillChecksTheSpan(RequirementLevel level)
+    {
+        Assert.AreEqual(1, OptionalFieldReport(level).SpansChecked);
+    }
+
+    [TestMethod]
+    [DataRow(RequirementLevel.Unspecified)]
+    [DataRow(RequirementLevel.Recommended)]
+    [DataRow(RequirementLevel.OptIn)]
+    public void Conformance_AbsentNonRequiredAttribute_NamesTheDefinition(RequirementLevel level)
+    {
+        Assert.AreEqual("optional.server", OptionalFieldReport(level).DefinitionId);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Conformance_UndefinedPublicRequirementLevel_IsRejectedAsTheDefinitionArgument(bool present)
+    {
+        var error = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => CheckUndefinedLevel(present));
+        Assert.AreEqual("definition", error.ParamName);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Conformance_UndefinedPublicRequirementLevel_IsRejectedWithItsValue(bool present)
+    {
+        var error = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => CheckUndefinedLevel(present));
+        Assert.AreEqual((RequirementLevel)99, error.ActualValue);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Conformance_UndefinedPublicRequirementLevel_IsRejectedNamingTheAttribute(bool present)
+    {
+        var error = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => CheckUndefinedLevel(present));
+        Assert.Contains("Attribute 'field' has an unsupported requirement level.", error.Message);
+    }
+
+    [TestMethod]
+    public void Conformance_PresentConditionalAttribute_LeavesNoUnresolvedRequirement()
+    {
+        Assert.IsEmpty(PresentConditionalReport().UnevaluatedConditions);
+    }
+
+    [TestMethod]
+    public void Conformance_PresentConditionalAttribute_IsConformant()
+    {
+        Assert.IsTrue(PresentConditionalReport().IsConformant);
+    }
+
+    [TestMethod]
+    public void Conformance_PresentConditionalAttribute_ReportsNoIssue()
+    {
+        Assert.IsEmpty(PresentConditionalReport().Issues);
+    }
+
+    [TestMethod]
+    public void Conformance_PresentConditionalAttribute_ChecksTheSpan()
+    {
+        Assert.AreEqual(1, PresentConditionalReport().SpansChecked);
+    }
+
+    [TestMethod]
+    public void Conformance_GeneratedHttpServerDefinition_RetainsUnresolvedConditions()
+    {
+        Assert.AreSequenceEqual(
+            [
+                "error.type", "http.request.method_original", "http.response.status_code", "http.route",
+                "network.protocol.name", "server.port", "url.query"
+            ],
+            HttpServerReport().UnevaluatedConditions.Select(condition => condition.Split(':')[1]));
+    }
+
+    [TestMethod]
+    public void Conformance_GeneratedHttpServerWithUnresolvedConditions_IsNotConformant()
+    {
+        Assert.IsFalse(HttpServerReport().IsConformant);
+    }
+
+    [TestMethod]
+    public void Conformance_GeneratedHttpServerWithRequiredAttributes_ReportsNoIssue()
+    {
+        Assert.IsEmpty(HttpServerReport().Issues);
+    }
+
+    [TestMethod]
+    public void Conformance_GeneratedHttpServerDefinition_IsNamedHttpServer()
+    {
+        Assert.AreEqual("http.server", HttpServerReport().DefinitionId);
+    }
+
+    [TestMethod]
+    public void Conformance_GeneratedHttpServerDefinition_ChecksTheSpan()
+    {
+        Assert.AreEqual(1, HttpServerReport().SpansChecked);
+    }
+
+    private static ConformanceReport Check(SpanRecord span, SpanDefinition<Server> definition) =>
+        new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
+
+    private static ConformanceReport EmptySelectionReport() =>
+        new TraceEvidence("trace", new TelemetrySnapshot([], [], [], [])).Conformance(Definition("string"), _ => true);
+
+    private static ConformanceReport StringFieldReport() =>
+        Check(Model(new Dictionary<string, object?> { ["field"] = Literal("string") }), Definition("string"));
+
+    private static ConformanceReport MixedRequirementReport()
     {
         var attributes = new AttributeRef[]
         {
@@ -98,109 +311,40 @@ public sealed class ConformanceTests
         };
         var definition = new SpanDefinition<Server>("test.server", "test.server", "Explicit fixture contract",
             Stability.Stable, Deprecation.None, attributes, []);
-        var span = Model(new Dictionary<string, object?> { ["deprecated"] = 7L });
-        var report =
-            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
-        Assert.IsFalse(report.IsConformant);
-        Assert.AreSequenceEqual(["required", "deprecated"], report.Issues.Select(i => i.Attribute));
-        Assert.AreEqual("Required attribute is absent.", report.Issues[0].Message);
-        Assert.AreEqual("The selected definition marks this attribute deprecated.", report.Issues[1].Message);
-        Assert.AreEqual("2222222222222222:conditional: When the operation retries.",
-            Assert.ContainsSingle(report.UnevaluatedConditions));
+        return Check(Model(new Dictionary<string, object?> { ["deprecated"] = 7L }), definition);
     }
 
-    [TestMethod]
-    public void Conformance_WrongSpanKind_IsReportedAgainstTheSelectedDefinition()
-    {
-        var span = new SpanRecord("11111111111111111111111111111111", "2222222222222222", "operation")
-            { Kind = SpanKind.Client, Attributes = new Dictionary<string, object?> { ["field"] = "value" } };
-        var report =
-            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(Definition("string"),
-                _ => true);
-        Assert.IsFalse(report.IsConformant);
-        var issue = Assert.ContainsSingle(report.Issues);
-        Assert.AreEqual("span.kind", issue.Attribute);
-        Assert.AreEqual("Expected server, observed Client.", issue.Message);
-    }
+    private static ConformanceReport ClientKindReport() =>
+        Check(new SpanRecord("11111111111111111111111111111111", "2222222222222222", "operation")
+            { Kind = SpanKind.Client, Attributes = new Dictionary<string, object?> { ["field"] = "value" } }, Definition("string"));
 
-    [TestMethod]
-    [DataRow(RequirementLevel.Unspecified)]
-    [DataRow(RequirementLevel.Recommended)]
-    [DataRow(RequirementLevel.OptIn)]
-    public void Conformance_AbsentNonRequiredAttributes_Pass(RequirementLevel level)
-    {
-        var definition = new SpanDefinition<Server>("optional.server", "optional.server", "Optional field contract",
-            Stability.Stable,
-            Deprecation.None, [new AttributeRef("optional", "string", level, false, null, AttributePhase.Start, true)],
-            []);
-        var span = Model(new Dictionary<string, object?>());
-        var report =
-            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
-        Assert.AreEqual(1, report.SpansChecked);
-        Assert.AreEqual("optional.server", report.DefinitionId);
-        Assert.IsEmpty(report.Issues);
-        Assert.IsEmpty(report.UnevaluatedConditions);
-        Assert.IsTrue(report.IsConformant);
-    }
+    private static ConformanceReport OptionalFieldReport(RequirementLevel level) =>
+        Check(Model(new Dictionary<string, object?>()), new SpanDefinition<Server>("optional.server", "optional.server",
+            "Optional field contract", Stability.Stable, Deprecation.None,
+            [new AttributeRef("optional", "string", level, false, null, AttributePhase.Start, true)], []));
 
-    [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void Conformance_UndefinedPublicRequirementLevel_IsRejected(bool present)
+    private static ConformanceReport CheckUndefinedLevel(bool present)
     {
         var attributes = new Dictionary<string, object?>();
         if (present) attributes["field"] = "value";
-        var definition = new SpanDefinition<Server>("invalid.server", "invalid.server", "Invalid requirement contract",
-            Stability.Stable,
-            Deprecation.None,
-            [new AttributeRef("field", "string", (RequirementLevel)99, false, null, AttributePhase.Start, true)], []);
-        var span = Model(attributes);
-        var error = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
-            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true));
-        Assert.AreEqual("definition", error.ParamName);
-        Assert.AreEqual((RequirementLevel)99, error.ActualValue);
-        Assert.Contains("Attribute 'field' has an unsupported requirement level.", error.Message);
+        return Check(Model(attributes), new SpanDefinition<Server>("invalid.server", "invalid.server",
+            "Invalid requirement contract", Stability.Stable, Deprecation.None,
+            [new AttributeRef("field", "string", (RequirementLevel)99, false, null, AttributePhase.Start, true)], []));
     }
 
-    [TestMethod]
-    public void Conformance_PresentConditionalAttribute_LeavesNoUnresolvedRequirement()
-    {
-        var definition = new SpanDefinition<Server>("conditional.server", "conditional.server",
-            "Conditional field contract", Stability.Stable,
-            Deprecation.None,
+    private static ConformanceReport PresentConditionalReport() =>
+        Check(Model(new Dictionary<string, object?> { ["field"] = "value" }), new SpanDefinition<Server>("conditional.server",
+            "conditional.server", "Conditional field contract", Stability.Stable, Deprecation.None,
             [
                 new AttributeRef("field", "string", RequirementLevel.ConditionallyRequired, false, "When enabled",
                     AttributePhase.Start, true)
-            ], []);
-        var span = Model(new Dictionary<string, object?> { ["field"] = "value" });
-        var report =
-            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
-        Assert.AreEqual(1, report.SpansChecked);
-        Assert.IsEmpty(report.Issues);
-        Assert.IsEmpty(report.UnevaluatedConditions);
-        Assert.IsTrue(report.IsConformant);
-    }
+            ], []));
 
-    [TestMethod]
-    public void Conformance_GeneratedHttpServerDefinition_RetainsUnresolvedConditions()
-    {
-        var span = Model(new Dictionary<string, object?>
+    private static ConformanceReport HttpServerReport() =>
+        Check(Model(new Dictionary<string, object?>
         {
             ["http.request.method"] = "GET", ["url.path"] = "/checkout", ["url.scheme"] = "https"
-        });
-        var report = new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(
-            HttpSpanDefinitions.HttpServer, _ => true);
-        Assert.AreEqual("http.server", report.DefinitionId);
-        Assert.AreEqual(1, report.SpansChecked);
-        Assert.IsEmpty(report.Issues);
-        Assert.IsFalse(report.IsConformant);
-        Assert.AreSequenceEqual(
-            [
-                "error.type", "http.request.method_original", "http.response.status_code", "http.route",
-                "network.protocol.name", "server.port", "url.query"
-            ],
-            report.UnevaluatedConditions.Select(condition => condition.Split(':')[1]));
-    }
+        }), HttpSpanDefinitions.HttpServer);
 
     private static SpanDefinition<Server> Definition(string type)
     {

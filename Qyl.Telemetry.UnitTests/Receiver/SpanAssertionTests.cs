@@ -12,6 +12,13 @@ public sealed class SpanAssertionTests
     private const string Operation = "request";
 
     [TestMethod]
+    public void SpanAssertions_NativeSpanWithMatchingSourceOperationAndKind_IsReturned()
+    {
+        var span = NativeSpan();
+        Assert.AreSame(span, Assert.HasSingleNativeSpan([span], Source, Operation, SpanKind.Server));
+    }
+
+    [TestMethod]
     [DataRow(OwnershipMismatch.Source)]
     [DataRow(OwnershipMismatch.Operation)]
     [DataRow(OwnershipMismatch.Kind)]
@@ -19,12 +26,17 @@ public sealed class SpanAssertionTests
     public void SpanAssertions_SubstitutedOrDuplicateInstrumentation_FailsNativeOwnership(OwnershipMismatch mismatch)
     {
         var span = NativeSpan();
-        Assert.AreSame(span, Assert.HasSingleNativeSpan([span], Source, Operation, SpanKind.Server));
         IEnumerable<SpanRecord> observed = mismatch == OwnershipMismatch.Duplicate ? [span, span] : [span];
         Assert.ThrowsExactly<AssertFailedException>(() => Assert.HasSingleNativeSpan(observed,
             mismatch == OwnershipMismatch.Source ? "replacement.source" : Source,
             mismatch == OwnershipMismatch.Operation ? "replacement" : Operation,
             mismatch == OwnershipMismatch.Kind ? SpanKind.Internal : SpanKind.Server));
+    }
+
+    [TestMethod]
+    public void SpanAssertions_SpanUnderItsParentContext_PassesParentCheck()
+    {
+        Assert.HasParentContext(NativeSpan(), new SpanRecord(Trace, Parent, "parent"));
     }
 
     [TestMethod]
@@ -34,8 +46,6 @@ public sealed class SpanAssertionTests
     public void SpanAssertions_DisconnectedTraceWrongParentOrReusedIdentity_FailsParentCheck(ContextMismatch mismatch)
     {
         var parent = new SpanRecord(Trace, Parent, "parent");
-        var span = NativeSpan();
-        Assert.HasParentContext(span, parent);
         var changed = new SpanRecord(mismatch == ContextMismatch.Trace ? "ffeeddccbbaa99887766554433221100" : Trace,
             mismatch == ContextMismatch.ReusedIdentity ? Parent : Child, Operation)
         {

@@ -52,12 +52,12 @@ internal sealed class TelemetryInvocation : IDisposable
         [.. Policies.SelectMany(policy => policy.Check(this).Select(violation => $"[{policy.Name}] {violation}"))];
 
     /// <summary>Turns each passing result into a failure when a declared policy is violated; other outcomes stay.</summary>
-    internal void Verify(IReadOnlyList<TestResult> results)
+    internal void Verify(IReadOnlyList<TestResult> results, IEvidenceStore evidenceStore)
     {
         if (Policies.Count == 0 || results.All(result => result.Outcome != UnitTestOutcome.Passed)) return;
         var violations = Violations();
         if (violations.Count == 0) return;
-        var evidence = TelemetryReport.Write(this, violations);
+        var evidence = evidenceStore.Save(TelemetryReport.Render(this, violations));
         var message = new StringBuilder($"Telemetry policy violated ({violations.Count}):");
         foreach (var violation in violations.Take(ReportedViolations)) message.AppendLine().Append("- ").Append(violation);
         if (violations.Count > ReportedViolations)

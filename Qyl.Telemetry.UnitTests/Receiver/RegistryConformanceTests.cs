@@ -6,84 +6,138 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 public sealed class RegistryConformanceTests
 {
     [TestMethod]
-    public void RegistryAudit_EmptyOrNullCapture_IsNotEvidence()
+    public void RegistryAudit_NullCapture_ThrowsArgumentNullException()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => RegistryConformance.Check(null!));
-        var report = RegistryConformance.Check(new TelemetrySnapshot([], [], [], []));
-        Assert.IsFalse(report.IsConformant);
-        Assert.AreEqual(0, report.RecordsChecked);
-        Assert.AreEqual(0, report.AttributesChecked);
-        Assert.AreEqual(0, report.MetricsChecked);
-        Assert.IsEmpty(report.Issues);
+        _ = Assert.ThrowsExactly<ArgumentNullException>(() => RegistryConformance.Check(null!));
     }
 
     [TestMethod]
-    public void RegistryAudit_CustomNamesAndOpenEnumValues_AreValidAndVisible()
+    public void RegistryAudit_EmptyCapture_IsNotConformant()
     {
-        var span = new SpanRecord("trace", "span", "custom")
-        {
-            Attributes = Attributes(("error.type", "application-specific"), ("custom.payload", new byte[] { 1, 2 }))
-        };
-        var metric = Metric("custom.metric", "widget", new UnspecifiedMetricData());
-        var report = RegistryConformance.Check(new TelemetrySnapshot([span], [], [metric], []));
-        Assert.IsTrue(report.IsConformant);
-        Assert.AreEqual(2, report.RecordsChecked);
-        Assert.AreEqual(1, report.AttributesChecked);
-        Assert.AreEqual(0, report.MetricsChecked);
-        Assert.AreSequenceEqual(["custom.payload"], report.CustomAttributes);
-        Assert.AreSequenceEqual(["custom.metric"], report.CustomMetrics);
+        Assert.IsFalse(EmptyReport().IsConformant);
     }
 
     [TestMethod]
-    public void RegistryAudit_SpanLogResourceScopeEventAndLinkAttributes_AreReachedButTheLogBodyMapIsNot()
+    public void RegistryAudit_EmptyCapture_ChecksNoRecord()
     {
-        var invalid = Attributes(("http.response.status_code", "500"));
-        var scope = new InstrumentationScopeRecord { Attributes = invalid };
-        var resource = new ResourceRecord(invalid);
-        var span = new SpanRecord("trace", "span", "custom")
-        {
-            Resource = resource, Scope = scope, Attributes = invalid,
-            Events = [new SpanEventRecord("custom.event", 1, invalid)],
-            Links = [new SpanLinkRecord("other-trace", "other-span", invalid)]
-        };
-        var log = new LogRecord(resource, scope, 0, 0, 17, "Error", invalid, invalid, 0, 0, "trace", "span",
-            "custom.event");
-        var capture = new TelemetrySnapshot([span], [log], [], []);
-        var report = RegistryConformance.Check(capture);
-        Assert.IsFalse(report.IsConformant);
-        Assert.AreEqual(8, report.AttributesChecked);
+        Assert.AreEqual(0, EmptyReport().RecordsChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_EmptyCapture_ChecksNoAttribute()
+    {
+        Assert.AreEqual(0, EmptyReport().AttributesChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_EmptyCapture_ChecksNoMetric()
+    {
+        Assert.AreEqual(0, EmptyReport().MetricsChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_EmptyCapture_ReportsNoIssue()
+    {
+        Assert.IsEmpty(EmptyReport().Issues);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_CustomNamesAndOpenEnumValues_AreConformant()
+    {
+        Assert.IsTrue(CustomReport().IsConformant);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_CustomSpanAndMetric_AreBothCheckedAsRecords()
+    {
+        Assert.AreEqual(2, CustomReport().RecordsChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_OpenEnumValue_IsTheOnlyCheckedAttribute()
+    {
+        Assert.AreEqual(1, CustomReport().AttributesChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_CustomMetric_IsNotCheckedAgainstTheRegistry()
+    {
+        Assert.AreEqual(0, CustomReport().MetricsChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_CustomAttribute_IsListedAsCustom()
+    {
+        Assert.AreSequenceEqual(["custom.payload"], CustomReport().CustomAttributes);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_CustomMetric_IsListedAsCustom()
+    {
+        Assert.AreSequenceEqual(["custom.metric"], CustomReport().CustomMetrics);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_InvalidAttributesOnEveryRecordPart_AreNotConformant()
+    {
+        Assert.IsFalse(Audit(EveryRecordPartCapture()).IsConformant);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_LogBodyMap_IsNotCountedAsAnAttributeCollection()
+    {
+        Assert.AreEqual(8, Audit(EveryRecordPartCapture()).AttributesChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_SpanLogResourceScopeEventAndLinkAttributes_AreLocated()
+    {
         Assert.AreSequenceEqual(
         [
             "spans[0].resource", "spans[0].scope", "spans[0]", "spans[0].events[0]", "spans[0].links[0]",
             "logs[0].resource", "logs[0].scope", "logs[0]"
-        ], report.Issues.Select(i => i.Location));
-        Assert.IsTrue(report.Issues.All(i => i is
+        ], Audit(EveryRecordPartCapture()).Issues.Select(i => i.Location));
+    }
+
+    [TestMethod]
+    public void RegistryAudit_StringStatusCodeOnEveryRecordPart_IsAnIntegerTypeViolation()
+    {
+        Assert.IsTrue(Audit(EveryRecordPartCapture()).Issues.All(i => i is
             { Name: "http.response.status_code", Message: "Expected Integer.", Level: RegistryIssueLevel.Violation }));
-        Assert.AreSame(invalid, capture.Logs[0].Body);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_LogBodyMap_IsLeftUnchanged()
+    {
+        var capture = EveryRecordPartCapture();
+        var body = capture.Logs[0].Body;
+        _ = Audit(capture);
+        Assert.AreSame(body, capture.Logs[0].Body);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_LogWithoutTimestamp_KeepsZeroTime()
+    {
+        var capture = EveryRecordPartCapture();
+        _ = Audit(capture);
         Assert.AreEqual(0UL, capture.Logs[0].TimeUnixNano);
     }
 
     [TestMethod]
-    public void RegistryAudit_EveryPointShapeAndFilteredExemplarAttributes_AreReached()
+    public void RegistryAudit_InvalidPointAttributes_AreNotConformant()
     {
-        var invalid = Attributes(("http.response.status_code", "500"));
-        var exemplar = new ExemplarRecord(invalid, 1, 3L, "trace", "span");
-        var number = new NumberPoint(invalid, 0, 1, 3L, 0, [exemplar]);
-        MetricData[] shapes =
-        [
-            new GaugeData([number]), new SumData([number], 2, true),
-            new HistogramData([new HistogramPoint(invalid, 0, 1, 1, 3, [1], [], [exemplar], 0, 3, 3)], 2),
-            new ExponentialHistogramData([
-                new ExponentialHistogramPoint(invalid, 0, 1, 1, 3, 0, 0,
-                    null, null, 0, [exemplar], 3, 3, 0)
-            ], 2),
-            new SummaryData([new SummaryPoint(invalid, 0, 1, 1, 3, [], 0)])
-        ];
-        var capture =
-            new TelemetrySnapshot([], [], [.. shapes.Select(shape => Metric("custom.metric", "", shape))], []);
-        var report = RegistryConformance.Check(capture);
-        Assert.IsFalse(report.IsConformant);
-        Assert.AreEqual(9, report.AttributesChecked);
+        Assert.IsFalse(Audit(EveryPointShapeCapture()).IsConformant);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_EveryPointShapeAndFilteredExemplar_AreCheckedAsAttributes()
+    {
+        Assert.AreEqual(9, Audit(EveryPointShapeCapture()).AttributesChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_EveryPointShapeAndFilteredExemplarAttributes_AreLocated()
+    {
         Assert.AreSequenceEqual(
             [
                 "metrics[0].points[0]", "metrics[0].points[0].exemplars[0]", "metrics[1].points[0]",
@@ -91,56 +145,92 @@ public sealed class RegistryConformanceTests
                 "metrics[2].points[0]", "metrics[2].points[0].exemplars[0]", "metrics[3].points[0]",
                 "metrics[3].points[0].exemplars[0]", "metrics[4].points[0]"
             ],
-            report.Issues.Select(i => i.Location));
+            Audit(EveryPointShapeCapture()).Issues.Select(i => i.Location));
     }
 
     [TestMethod]
-    public void RegistryAudit_RegisteredUnitsAndDeprecations_AreReportedWithoutInferringAnSdkInstrument()
+    public void RegistryAudit_RegisteredMetrics_AreEachChecked()
     {
-        var span = new SpanRecord("trace", "span", "custom") { Attributes = Attributes(("db.system", "postgresql")) };
-        MetricRecord[] metrics =
-        [
-            Metric("http.server.request.duration", "s", new SummaryData([])),
-            Metric("http.server.request.duration", "ms", new GaugeData([])),
-            Metric("container.memory.paging.faults", "{fault}", new SumData([], 2, true))
-        ];
-        var report = RegistryConformance.Check(new TelemetrySnapshot([span], [], metrics, []));
-        Assert.AreEqual(3, report.MetricsChecked);
-        Assert.AreEqual(1, report.AttributesChecked);
+        Assert.AreEqual(3, UnitsReport().MetricsChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_DeprecatedSpanAttribute_IsChecked()
+    {
+        Assert.AreEqual(1, UnitsReport().AttributesChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_DeprecationsAndUnitMismatch_AreReportedWithoutInferringAnSdkInstrument()
+    {
         Assert.AreSequenceEqual(["db.system", "http.server.request.duration", "container.memory.paging.faults"],
-            report.Issues.Select(i => i.Name));
-        Assert.AreEqual("Expected unit 's', observed 'ms'.", report.Issues[1].Message);
-        Assert.AreEqual("metrics[1]", report.Issues[1].Location);
-        Assert.IsFalse(report.IsConformant);
+            UnitsReport().Issues.Select(i => i.Name));
     }
 
     [TestMethod]
-    public void RegistryAudit_Deprecation_IsVisibleAdviceNotAProtocolFailure()
+    public void RegistryAudit_UnitMismatch_NamesExpectedAndObservedUnit()
     {
-        var span = new SpanRecord("trace", "span", "custom") { Attributes = Attributes(("db.system", "postgresql")) };
-        var report = RegistryConformance.Check(new TelemetrySnapshot([span], [], [], []));
-        Assert.IsTrue(report.IsConformant);
-        var issue = Assert.ContainsSingle(report.Issues);
-        Assert.AreEqual(RegistryIssueLevel.Improvement, issue.Level);
-        Assert.AreEqual("db.system", issue.Name);
-        Assert.AreEqual("spans[0]", issue.Location);
-        Assert.AreEqual("The pinned registry marks this attribute deprecated.", issue.Message);
+        Assert.AreEqual("Expected unit 's', observed 'ms'.", UnitsReport().Issues[1].Message);
     }
 
     [TestMethod]
-    public void RegistryAudit_TemplateAttributes_UseDeclaredArrayKindAndAcceptCustomNeighbors()
+    public void RegistryAudit_UnitMismatch_IsLocatedOnItsMetric()
     {
-        var span = new SpanRecord("trace", "span", "custom")
-        {
-            Attributes = Attributes(("http.request.header.content_type", new object?[] { "text/plain" }),
-                ("http.request.headers.content_type", "custom"),
-                ("pprof.scope.sample_type_order", new object?[] { 1L }),
-                ("feature_flag.result.value", new Dictionary<string, object?>()))
-        };
-        var report = RegistryConformance.Check(new TelemetrySnapshot([span], [], [], []));
-        Assert.IsTrue(report.IsConformant);
-        Assert.AreEqual(3, report.AttributesChecked);
-        Assert.AreSequenceEqual(["http.request.headers.content_type"], report.CustomAttributes);
+        Assert.AreEqual("metrics[1]", UnitsReport().Issues[1].Location);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_UnitMismatch_IsNotConformant()
+    {
+        Assert.IsFalse(UnitsReport().IsConformant);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_Deprecation_IsNotAProtocolFailure()
+    {
+        Assert.IsTrue(DeprecationReport().IsConformant);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_Deprecation_IsAnImprovement()
+    {
+        Assert.AreEqual(RegistryIssueLevel.Improvement, Assert.ContainsSingle(DeprecationReport().Issues).Level);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_Deprecation_NamesTheAttribute()
+    {
+        Assert.AreEqual("db.system", Assert.ContainsSingle(DeprecationReport().Issues).Name);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_Deprecation_IsLocatedOnItsSpan()
+    {
+        Assert.AreEqual("spans[0]", Assert.ContainsSingle(DeprecationReport().Issues).Location);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_Deprecation_SaysTheRegistryDeprecatesIt()
+    {
+        Assert.AreEqual("The pinned registry marks this attribute deprecated.", Assert.ContainsSingle(DeprecationReport().Issues).Message);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_TemplateAttributesWithDeclaredArrayKind_AreConformant()
+    {
+        Assert.IsTrue(TemplateReport().IsConformant);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_TemplateAttributes_AreCheckedButCustomNeighborIsNot()
+    {
+        Assert.AreEqual(3, TemplateReport().AttributesChecked);
+    }
+
+    [TestMethod]
+    public void RegistryAudit_TemplateLookalikeNeighbor_IsListedAsCustom()
+    {
+        Assert.AreSequenceEqual(["http.request.headers.content_type"], TemplateReport().CustomAttributes);
     }
 
     [TestMethod]
@@ -175,6 +265,84 @@ public sealed class RegistryConformanceTests
             yield return [kind, valid, false];
             yield return [kind, Array.Empty<object?>(), true];
         }
+    }
+
+    private static RegistryReport Audit(TelemetrySnapshot capture) => RegistryConformance.Check(capture);
+
+    private static RegistryReport EmptyReport() => Audit(new TelemetrySnapshot([], [], [], []));
+
+    private static RegistryReport CustomReport()
+    {
+        var span = new SpanRecord("trace", "span", "custom")
+        {
+            Attributes = Attributes(("error.type", "application-specific"), ("custom.payload", new byte[] { 1, 2 }))
+        };
+        var metric = Metric("custom.metric", "widget", new UnspecifiedMetricData());
+        return Audit(new TelemetrySnapshot([span], [], [metric], []));
+    }
+
+    private static TelemetrySnapshot EveryRecordPartCapture()
+    {
+        var invalid = Attributes(("http.response.status_code", "500"));
+        var scope = new InstrumentationScopeRecord { Attributes = invalid };
+        var resource = new ResourceRecord(invalid);
+        var span = new SpanRecord("trace", "span", "custom")
+        {
+            Resource = resource, Scope = scope, Attributes = invalid,
+            Events = [new SpanEventRecord("custom.event", 1, invalid)],
+            Links = [new SpanLinkRecord("other-trace", "other-span", invalid)]
+        };
+        var log = new LogRecord(resource, scope, 0, 0, 17, "Error", invalid, invalid, 0, 0, "trace", "span",
+            "custom.event");
+        return new TelemetrySnapshot([span], [log], [], []);
+    }
+
+    private static TelemetrySnapshot EveryPointShapeCapture()
+    {
+        var invalid = Attributes(("http.response.status_code", "500"));
+        var exemplar = new ExemplarRecord(invalid, 1, 3L, "trace", "span");
+        var number = new NumberPoint(invalid, 0, 1, 3L, 0, [exemplar]);
+        MetricData[] shapes =
+        [
+            new GaugeData([number]), new SumData([number], 2, true),
+            new HistogramData([new HistogramPoint(invalid, 0, 1, 1, 3, [1], [], [exemplar], 0, 3, 3)], 2),
+            new ExponentialHistogramData([
+                new ExponentialHistogramPoint(invalid, 0, 1, 1, 3, 0, 0,
+                    null, null, 0, [exemplar], 3, 3, 0)
+            ], 2),
+            new SummaryData([new SummaryPoint(invalid, 0, 1, 1, 3, [], 0)])
+        ];
+        return new TelemetrySnapshot([], [], [.. shapes.Select(shape => Metric("custom.metric", "", shape))], []);
+    }
+
+    private static RegistryReport UnitsReport()
+    {
+        var span = new SpanRecord("trace", "span", "custom") { Attributes = Attributes(("db.system", "postgresql")) };
+        MetricRecord[] metrics =
+        [
+            Metric("http.server.request.duration", "s", new SummaryData([])),
+            Metric("http.server.request.duration", "ms", new GaugeData([])),
+            Metric("container.memory.paging.faults", "{fault}", new SumData([], 2, true))
+        ];
+        return Audit(new TelemetrySnapshot([span], [], metrics, []));
+    }
+
+    private static RegistryReport DeprecationReport()
+    {
+        var span = new SpanRecord("trace", "span", "custom") { Attributes = Attributes(("db.system", "postgresql")) };
+        return Audit(new TelemetrySnapshot([span], [], [], []));
+    }
+
+    private static RegistryReport TemplateReport()
+    {
+        var span = new SpanRecord("trace", "span", "custom")
+        {
+            Attributes = Attributes(("http.request.header.content_type", new object?[] { "text/plain" }),
+                ("http.request.headers.content_type", "custom"),
+                ("pprof.scope.sample_type_order", new object?[] { 1L }),
+                ("feature_flag.result.value", new Dictionary<string, object?>()))
+        };
+        return Audit(new TelemetrySnapshot([span], [], [], []));
     }
 
     private static MetricRecord Metric(string name, string unit, MetricData data)

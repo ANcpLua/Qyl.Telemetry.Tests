@@ -33,7 +33,7 @@ internal sealed class TracePerTestMethodAttribute(
         using var root = TelemetryActivity.Start();
         using var invocation = TelemetryInvocation.Begin(TelemetryPolicyAttribute.DeclaredOn(testMethod.MethodInfo));
         var results = await inner.ExecuteAsync(testMethod).ConfigureAwait(false);
-        invocation.Verify(results);
+        invocation.Verify(results, TempFileEvidenceStore.Instance);
         return results;
     }
 }
