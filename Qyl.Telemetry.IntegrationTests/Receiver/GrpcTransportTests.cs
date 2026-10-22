@@ -218,7 +218,7 @@ public sealed class GrpcTransportTests
     [TestMethod]
     public async Task OtlpReceiver_Disposed_ClosesBothListenersToFreshConnectionsAndWakesAPendingWait()
     {
-        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         using (var live = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
                    new CallOptions(cancellationToken: TestContext.CancellationToken), []))

@@ -67,7 +67,8 @@ public sealed class RawActivityCaptureTests
         using var parent = new Activity("parent").SetIdFormat(ActivityIdFormat.W3C).Start();
         using var child = new Activity("child").Start();
         var wrongTrace = ActivitySnapshot.Capture(child) with { Trace = ActivityTraceId.CreateRandom() };
-        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireParentContext(wrongTrace, parent.Context));
+        var parentContext = parent.Context;
+        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireParentContext(wrongTrace, parentContext));
         Assert.Contains("trace changed", error.Message);
     }
 
@@ -77,7 +78,8 @@ public sealed class RawActivityCaptureTests
         using var parent = new Activity("parent").SetIdFormat(ActivityIdFormat.W3C).Start();
         using var child = new Activity("child").Start();
         var wrongTrace = ActivitySnapshot.Capture(child) with { Trace = ActivityTraceId.CreateRandom() };
-        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireParentContext(wrongTrace, parent.Context));
+        var parentContext = parent.Context;
+        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireParentContext(wrongTrace, parentContext));
         Assert.Contains(parent.TraceId.ToHexString(), error.Message);
     }
 
@@ -216,6 +218,7 @@ public sealed class RawActivityCaptureTests
         {
             tags[Key] = violation switch
             {
+                RawViolation.Missing => throw new UnreachableException("handled above"),
                 RawViolation.Null => null,
                 RawViolation.Scalar => "first",
                 RawViolation.ObjectArray => new object[] { "first", "first", "" },

@@ -1,8 +1,6 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text.Json;
 using Qyl.Telemetry.Tests.Collector;
 using Google.Protobuf;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -253,7 +251,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         using var collector = new HttpClient(handler);
         collector.BaseAddress = new Uri("https://collector.test/");
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
-        await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
+        var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
         using var release = handler.Releasing();
         using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
         using var body = new ByteArrayContent([]);
