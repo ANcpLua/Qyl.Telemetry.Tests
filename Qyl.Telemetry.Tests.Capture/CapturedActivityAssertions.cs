@@ -55,6 +55,10 @@ public static class CapturedActivityAssertions
                 $"'{span.Operation}' has a zero or duplicate trace/span identity: {span.Trace}/{span.Span}.");
     }
 
+    /// <summary>
+    ///     The one definition of a captured HTTP header or RPC metadata attribute, including the registry's
+    ///     rpc.grpc.*.metadata names, which were renamed to rpc.*.metadata and are still emitted.
+    /// </summary>
     public static bool IsCapturedField(string key) =>
         key.StartsWith("http.request.header.", StringComparison.Ordinal) ||
         key.StartsWith("http.response.header.", StringComparison.Ordinal) ||
