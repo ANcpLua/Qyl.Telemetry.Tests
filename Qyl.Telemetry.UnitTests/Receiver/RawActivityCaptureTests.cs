@@ -12,6 +12,7 @@ public sealed class RawActivityCaptureTests
     private const string Key = "http.request.header.x-example";
     private const string DeprecatedGrpcMetadata = "rpc.grpc.request.metadata.authorization";
     private const string RepeatedKey = "probe.repeated";
+    private const string NumericArrayKey = "probe.status_codes";
 
     [TestMethod]
     public void RawActivityCaptureSnapshot_UrlWithQuery_KeepsOnlyThePath()
@@ -30,6 +31,16 @@ public sealed class RawActivityCaptureTests
     {
         using var activity = new Activity("repeated-tag").AddTag(RepeatedKey, "first").AddTag(RepeatedKey, "second").Start();
         Assert.AreEqual(activity.GetTagItem(RepeatedKey), ActivitySnapshot.Capture(activity).Tags[RepeatedKey]);
+    }
+
+    [TestMethod]
+    public void RawActivityCaptureSnapshot_Int64ArrayMutatedAfterCapture_KeepsTheOriginalValues()
+    {
+        long[] statusCodes = [200, 404];
+        using var activity = new Activity("numeric-array").SetTag(NumericArrayKey, statusCodes).Start();
+        var snapshot = ActivitySnapshot.Capture(activity);
+        statusCodes[0] = 500;
+        Assert.AreSequenceEqual([200L, 404L], Assert.IsInstanceOfType<long[]>(snapshot.Tags[NumericArrayKey]));
     }
 
     [TestMethod]
