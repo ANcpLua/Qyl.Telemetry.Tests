@@ -44,9 +44,9 @@ public sealed class LogWireTests
             Body = Body(bodyKind),
             Attributes =
             {
-                Pair("event.name", new AnyValue { StringValue = "attribute-event" }),
-                Pair("exception.message", new AnyValue { StringValue = "keep this failure" }),
-                Pair("exception.stacktrace", new AnyValue { StringValue = "exact stack" })
+                Pair("event.name", "attribute-event"),
+                Pair("exception.message", "keep this failure"),
+                Pair("exception.stacktrace", "exact stack")
             }
         };
         var request = new ExportLogsServiceRequest
@@ -57,7 +57,7 @@ public sealed class LogWireTests
                 {
                     SchemaUrl = "log-resource-schema",
                     Resource = new Resource
-                        { Attributes = { Pair("service.name", new AnyValue { StringValue = "log-service" }) } },
+                        { Attributes = { Pair("service.name", "log-service") } },
                     ScopeLogs =
                     {
                         new ScopeLogs
@@ -107,7 +107,7 @@ public sealed class LogWireTests
                     { Values = { new AnyValue { StringValue = "item" }, new AnyValue { IntValue = 7 } } }
             },
             MapBody => new AnyValue
-                { KvlistValue = new KeyValueList { Values = { Pair("key", new AnyValue { BoolValue = false }) } } },
+                { KvlistValue = new KeyValueList { Values = { Pair("key", false) } } },
             EmptyBody => new AnyValue(), _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
     }

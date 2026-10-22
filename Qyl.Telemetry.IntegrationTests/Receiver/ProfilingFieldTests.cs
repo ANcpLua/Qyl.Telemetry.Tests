@@ -24,21 +24,21 @@ public sealed class ProfilingFieldTests
         {
             Attributes =
             {
-                new KeyValue { Key = "profile.value", Value = new AnyValue { StringValueStrindex = 7 } },
-                new KeyValue
+                OtlpEvidence.Pair("profile.value", new AnyValue { StringValueStrindex = 7 }),
+                OtlpEvidence.Pair("nested", new AnyValue
                 {
-                    Key = "nested", Value = new AnyValue
+                    KvlistValue = new KeyValueList
                     {
-                        KvlistValue = new KeyValueList
+                        Values =
                         {
-                            Values = { new KeyValue { Key = "array", Value = new AnyValue
+                            OtlpEvidence.Pair("array", new AnyValue
                             {
                                 ArrayValue = new ArrayValue { Values = { new AnyValue { StringValueStrindex = 8 } } }
-                            } } }
+                            })
                         }
                     }
-                },
-                new KeyValue { Key = "unaffected", Value = new AnyValue { IntValue = 42 } }
+                }),
+                OtlpEvidence.Pair("unaffected", 42)
             }
         };
         var bytes = Request(signal, resource).ToByteArray();

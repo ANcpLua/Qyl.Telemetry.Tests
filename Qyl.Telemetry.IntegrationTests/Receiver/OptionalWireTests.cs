@@ -137,7 +137,7 @@ public sealed class OptionalWireTests
     public async Task OtlpReceiverMetrics_UnspecifiedData_StaysVisibleButIsNeverAMeasurement()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var request = Metrics(new Resource { Attributes = { Pair("qyl.test.id", new AnyValue { StringValue = "partition" }) } },
+        var request = Metrics(new Resource { Attributes = { Pair("qyl.test.id", "partition") } },
             new Metric { Name = "unspecified" });
         using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);

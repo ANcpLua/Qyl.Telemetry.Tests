@@ -48,7 +48,7 @@ internal sealed class OtlpIncidents
         };
         if (parent is not null) span.ParentSpanId = OtlpEvidence.Id(parent);
         span.Attributes.Add(Attributes(attributes));
-        if (session is not null) span.Attributes.Add(Pair("session.id", session));
+        if (session is not null) span.Attributes.Add(OtlpEvidence.Pair("session.id", session));
         _spans.Add(new ResourceSpans
         {
             Resource = Resource(service, resource),
@@ -65,9 +65,7 @@ internal sealed class OtlpIncidents
     });
 
     private static IEnumerable<KeyValue> Attributes(IReadOnlyDictionary<string, object>? attributes) =>
-        (attributes ?? new Dictionary<string, object>()).Select(pair => Pair(pair.Key, pair.Value));
-
-    internal static KeyValue Pair(string key, object value) => new() { Key = key, Value = Value(value) };
+        (attributes ?? new Dictionary<string, object>()).Select(pair => OtlpEvidence.Pair(pair.Key, pair.Value));
 
     /// <summary>Sends every pending signal and requires each export to be accepted completely.</summary>
     internal async Task SendAsync(CollectorClient client, CancellationToken cancellationToken)
@@ -102,19 +100,8 @@ internal sealed class OtlpIncidents
 
     private static Resource Resource(string service, IReadOnlyDictionary<string, object>? attributes)
     {
-        var resource = new Resource { Attributes = { Pair("service.name", service) } };
+        var resource = new Resource { Attributes = { OtlpEvidence.Pair("service.name", service) } };
         resource.Attributes.Add(Attributes(attributes));
         return resource;
     }
-
-    private static AnyValue Value(object value) => value switch
-    {
-        string text => new AnyValue { StringValue = text },
-        bool flag => new AnyValue { BoolValue = flag },
-        int number => new AnyValue { IntValue = number },
-        long number => new AnyValue { IntValue = number },
-        double number => new AnyValue { DoubleValue = number },
-        string[] items => new AnyValue { ArrayValue = new ArrayValue { Values = { items.Select(Value) } } },
-        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported OTLP attribute value.")
-    };
 }

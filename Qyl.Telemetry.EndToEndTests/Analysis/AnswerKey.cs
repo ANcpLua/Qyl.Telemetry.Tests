@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using OpenTelemetry.Proto.Metrics.V1;
+using Qyl.Telemetry.Tests.Evidence;
 using static Qyl.Telemetry.EndToEndTests.Analysis.OtlpIncidents;
 
 namespace Qyl.Telemetry.EndToEndTests.Analysis;
@@ -90,7 +91,7 @@ internal sealed class AnswerKey
                     {
                         new HistogramDataPoint
                         {
-                            Attributes = { Pair("http.route", route) }, StartTimeUnixNano = T - Minute, TimeUnixNano = T, Count = 100,
+                            Attributes = { OtlpEvidence.Pair("http.route", route) }, StartTimeUnixNano = T - Minute, TimeUnixNano = T, Count = 100,
                             Sum = seconds * 100, Min = seconds, Max = seconds, ExplicitBounds = { seconds / 2, seconds, seconds * 1.5 },
                             BucketCounts = { 0, 100, 0, 0 }
                         }

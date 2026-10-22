@@ -239,18 +239,18 @@ public sealed class GrpcTransportTests
 
     private static IMessage Request(string signal, bool invalid, bool warning)
     {
-        var resource = new Resource { Attributes = { new KeyValue { Key = "custom.value", Value = warning
-            ? new AnyValue { StringValueStrindex = 7 } : new AnyValue { IntValue = 9_007_199_254_740_993L } } } };
+        var resource = new Resource { Attributes = { OtlpEvidence.Pair("custom.value", warning
+            ? new AnyValue { StringValueStrindex = 7 } : new AnyValue { IntValue = 9_007_199_254_740_993L }) } };
         switch (signal)
         {
             case Signals.Traces:
-                List<Span> spans = [new() { TraceId = ByteString.CopyFrom(Enumerable.Repeat((byte)1, 16).ToArray()),
-                    SpanId = ByteString.CopyFrom(Enumerable.Repeat((byte)2, 8).ToArray()), Name = "preserved" }];
+                List<Span> spans = [new() { TraceId = OtlpEvidence.Id("01010101010101010101010101010101"),
+                    SpanId = OtlpEvidence.Id("0202020202020202"), Name = "preserved" }];
                 if (invalid) spans.Add(new Span { Name = "bad-identity" });
                 return OtlpEvidence.Traces(resource, new InstrumentationScope { Name = "grpc.trace" }, spans);
             case Signals.Logs:
                 List<ProtoLog> logs = [new() { Body = new AnyValue { BoolValue = false } }];
-                if (invalid) logs.Add(new ProtoLog { TraceId = ByteString.CopyFrom([1]) });
+                if (invalid) logs.Add(new ProtoLog { TraceId = OtlpEvidence.Id("01") });
                 return OtlpEvidence.Logs(resource, logs);
             default:
                 List<Metric> metrics = [new() { Name = "grpc.counter", Sum = new Sum
@@ -258,8 +258,7 @@ public sealed class GrpcTransportTests
                         DataPoints = { new NumberDataPoint { TimeUnixNano = 10, AsInt = 7 } } } }];
                 if (invalid) metrics.Add(new Metric { Name = "bad-attributes", Gauge = new Gauge
                     { DataPoints = { new NumberDataPoint { TimeUnixNano = 10, AsInt = 9, Attributes =
-                        { new KeyValue { Key = "same", Value = new AnyValue { IntValue = 1 } },
-                            new KeyValue { Key = "same", Value = new AnyValue { IntValue = 2 } } } } } } });
+                        { OtlpEvidence.Pair("same", 1), OtlpEvidence.Pair("same", 2) } } } } });
                 return OtlpEvidence.Metrics(resource, metrics);
         }
     }

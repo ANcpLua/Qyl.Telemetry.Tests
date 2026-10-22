@@ -52,19 +52,19 @@ public sealed class NumberAndSessionTests
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var spans = RichSpan();
         spans.ResourceSpans[0].Resource.Attributes
-            .Add(Pair("session.id", new AnyValue { StringValue = "resource-session" }));
+            .Add(Pair("session.id", "resource-session"));
         spans.ResourceSpans[0].ScopeSpans[0].Spans[0].Attributes
-            .Add(Pair("session.id", new AnyValue { StringValue = "span-session" }));
+            .Add(Pair("session.id", "span-session"));
         using var first =
             await OtlpHttp.PostAsync(receiver.Endpoint, spans.ToByteArray(), TestContext.CancellationToken);
         first.EnsureSuccessStatusCode();
-        var logs = Logs(new Resource { Attributes = { Pair("session.id", new AnyValue { StringValue = "log-resource-session" }) } },
+        var logs = Logs(new Resource { Attributes = { Pair("session.id", "log-resource-session") } },
             new InstrumentationScope { Name = "session-scope" },
             new OpenTelemetry.Proto.Logs.V1.LogRecord
             {
                 TraceId = Id("11111111111111111111111111111111"), EventName = "SessionObserved",
                 SeverityNumber = SeverityNumber.Info,
-                Attributes = { Pair("session.id", new AnyValue { StringValue = "log-session" }) }
+                Attributes = { Pair("session.id", "log-session") }
             });
         using var second = await OtlpHttp.PostAsync(receiver.Endpoint, logs.ToByteArray(),
             TestContext.CancellationToken, "logs");
@@ -89,7 +89,7 @@ public sealed class NumberAndSessionTests
             { EventName = "Valid", SeverityNumber = SeverityNumber.Warn };
         var invalid = new OpenTelemetry.Proto.Logs.V1.LogRecord
         {
-            EventName = "Invalid", Attributes = { Pair("duplicate", new AnyValue { StringValue = "first" }), Pair("duplicate", new AnyValue { StringValue = "second" }) }
+            EventName = "Invalid", Attributes = { Pair("duplicate", "first"), Pair("duplicate", "second") }
         };
         var request = Logs(null, new InstrumentationScope { Name = "partial-scope" }, valid, invalid);
         using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),

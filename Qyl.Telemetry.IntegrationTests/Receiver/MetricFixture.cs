@@ -1,4 +1,3 @@
-using OpenTelemetry.Proto.Common.V1;
 using OpenTelemetry.Proto.Metrics.V1;
 using static Qyl.Telemetry.Tests.Evidence.OtlpEvidence;
 
@@ -13,18 +12,18 @@ internal static class MetricFixture
         var metric = new Metric
         {
             Name = "metric." + shape, Description = "Exact distribution", Unit = "ms",
-            Metadata = { Pair("metadata", new AnyValue { StringValue = "original" }) }
+            Metadata = { Pair("metadata", "original") }
         };
         var exemplar = new Exemplar
         {
             AsDouble = 2.5, TimeUnixNano = 103, TraceId = Id("11111111111111111111111111111111"),
             SpanId = Id("2222222222222222"),
-            FilteredAttributes = { Pair("exemplar", new AnyValue { BoolValue = true }) }
+            FilteredAttributes = { Pair("exemplar", true) }
         };
         var point = new NumberDataPoint
         {
             AsInt = -9, StartTimeUnixNano = 101, TimeUnixNano = 109, Flags = 0x80000001,
-            Attributes = { Pair("point", new AnyValue { StringValue = "exact" }) }, Exemplars = { exemplar }
+            Attributes = { Pair("point", "exact") }, Exemplars = { exemplar }
         };
         switch (shape)
         {

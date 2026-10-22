@@ -1,6 +1,5 @@
 using Google.Protobuf;
 using JetBrains.Annotations;
-using OpenTelemetry.Proto.Common.V1;
 using Qyl.Telemetry.SemanticConventions;
 using static Qyl.Telemetry.Tests.Evidence.OtlpEvidence;
 using ProtoSpan = OpenTelemetry.Proto.Trace.V1.Span;
@@ -20,7 +19,7 @@ public sealed class TraceModelTests
         var orders = request.ResourceSpans[0];
         orders.Resource.Attributes[0].Value.StringValue = "orders";
         var client = orders.ScopeSpans[0].Spans[0];
-        client.Attributes.Add(Pair("session.id", new AnyValue { StringValue = "business-session" }));
+        client.Attributes.Add(Pair("session.id", "business-session"));
         client.Kind = ProtoSpan.Types.SpanKind.Client;
         var payments = orders.Clone();
         payments.Resource.Attributes[0].Value.StringValue = "payments";
@@ -33,10 +32,10 @@ public sealed class TraceModelTests
         database.ParentSpanId = Id("3333333333333333");
         database.SpanId = Id("4444444444444444");
         database.Name = "database.write";
-        database.Attributes.Add(Pair("db.system.name", new AnyValue { StringValue = "postgresql" }));
-        database.Attributes.Add(Pair("server.address", new AnyValue { StringValue = "db.internal" }));
-        database.Attributes.Add(Pair("server.port", new AnyValue { IntValue = 5432 }));
-        database.Attributes.Add(Pair("db.namespace", new AnyValue { StringValue = "payments" }));
+        database.Attributes.Add(Pair("db.system.name", "postgresql"));
+        database.Attributes.Add(Pair("server.address", "db.internal"));
+        database.Attributes.Add(Pair("server.port", 5432));
+        database.Attributes.Add(Pair("db.namespace", "payments"));
         payments.ScopeSpans[0].Spans.Add(database);
         request.ResourceSpans.Add(payments);
         var unrelated = orders.Clone();

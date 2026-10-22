@@ -113,6 +113,21 @@ internal static class OtlpEvidence
         return new KeyValue { Key = key, Value = value };
     }
 
+    /// <summary>An attribute whose CLR value is mapped to the matching OTLP value kind.</summary>
+    internal static KeyValue Pair(string key, object value) => Pair(key, Value(value));
+
+    /// <summary>The OTLP value of a string, boolean, 32- or 64-bit integer, double or string array.</summary>
+    private static AnyValue Value(object value) => value switch
+    {
+        string text => new AnyValue { StringValue = text },
+        bool flag => new AnyValue { BoolValue = flag },
+        int number => new AnyValue { IntValue = number },
+        long number => new AnyValue { IntValue = number },
+        double number => new AnyValue { DoubleValue = number },
+        string[] items => new AnyValue { ArrayValue = new ArrayValue { Values = { items.Select(Value) } } },
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported OTLP attribute value.")
+    };
+
     internal static ByteString Id(string hex)
     {
         return ByteString.CopyFrom(Convert.FromHexString(hex));

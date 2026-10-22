@@ -32,7 +32,7 @@ public sealed class MetricWireTests
                 {
                     SchemaUrl = "resource-schema",
                     Resource = new Resource
-                        { Attributes = { Pair("service.name", new AnyValue { StringValue = "metric-service" }) } },
+                        { Attributes = { Pair("service.name", "metric-service") } },
                     ScopeMetrics =
                     {
                         new ScopeMetrics

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using OpenTelemetry.Proto.Metrics.V1;
 using Qyl.Api.Contracts.Mcp.Tools;
+using Qyl.Telemetry.Tests.Evidence;
 using static Qyl.Telemetry.EndToEndTests.Analysis.OtlpIncidents;
 
 namespace Qyl.Telemetry.EndToEndTests.Analysis;
@@ -114,7 +115,7 @@ public sealed class EngineDefectTests(TestContext context)
         foreach (var (shard, seconds, value) in new[] { ("b", 10UL, 3d), ("a", 40UL, 7d), ("a", 70UL, 4d), ("b", 100UL, 9d) })
             gauge.DataPoints.Add(new NumberDataPoint
             {
-                Attributes = { Pair("shard", shard) }, TimeUnixNano = start + seconds * Second, AsDouble = value
+                Attributes = { OtlpEvidence.Pair("shard", shard) }, TimeUnixNano = start + seconds * Second, AsDouble = value
             });
         var incidents = new OtlpIncidents();
         incidents.Metric("metric-last", new Metric { Name = name, Unit = "{item}", Gauge = gauge });

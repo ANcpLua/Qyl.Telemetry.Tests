@@ -83,7 +83,7 @@ public sealed class WireMetadataTests
         input.Attributes.Add(Pair("map",
             new AnyValue
             {
-                KvlistValue = new KeyValueList { Values = { Pair("nested", new AnyValue { StringValue = "exact" }) } }
+                KvlistValue = new KeyValueList { Values = { Pair("nested", "exact") } }
             }));
         using var response =
             await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);

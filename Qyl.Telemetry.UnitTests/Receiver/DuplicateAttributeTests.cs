@@ -2,6 +2,7 @@ using Google.Protobuf;
 using OpenTelemetry.Proto.Common.V1;
 using ProtoLog = OpenTelemetry.Proto.Logs.V1.LogRecord;
 using Qyl.Telemetry.SemanticConventions;
+using Qyl.Telemetry.Tests.Evidence;
 
 namespace Qyl.Telemetry.UnitTests.Receiver;
 
@@ -80,7 +81,7 @@ public sealed class DuplicateAttributeTests
     {
         var input = new ProtoLog
         {
-            Attributes = { new KeyValue { Key = Key, Value = Value(shape) }, new KeyValue { Key = Key, Value = ConflictingValue(shape) } }
+            Attributes = { OtlpEvidence.Pair(Key, Value(shape)), OtlpEvidence.Pair(Key, ConflictingValue(shape)) }
         };
         var failure = Assert.ThrowsExactly<InvalidDataException>(() =>
             new OtlpDecode().Log(input, new ResourceRecord(new Dictionary<string, object?>()), null));
@@ -92,7 +93,7 @@ public sealed class DuplicateAttributeTests
         var value = Value(shape);
         var input = new ProtoLog
         {
-            Attributes = { new KeyValue { Key = Key, Value = value }, new KeyValue { Key = Key, Value = value.Clone() } }
+            Attributes = { OtlpEvidence.Pair(Key, value), OtlpEvidence.Pair(Key, value.Clone()) }
         };
         var original = input.ToByteArray();
         var decoder = new OtlpDecode();
