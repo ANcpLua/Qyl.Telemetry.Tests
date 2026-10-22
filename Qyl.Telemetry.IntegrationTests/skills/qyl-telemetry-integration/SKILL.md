@@ -5,7 +5,7 @@ description: Write tests in Qyl.Telemetry.IntegrationTests that export through r
 
 # Integration tests
 
-Binding rules: [test-code-rules.md](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/test-code-rules.md). Everything below is specific to this suite.
+Binding rules: the root skill `/Users/alexandernachtmann/RiderProjects/Qyl.Telemetry.Tests/SKILL.md` (section "Test-code rules"). Everything below is specific to this suite.
 
 - Capture with `TelemetryCapture.TraceAsync` or `OtlpReceiver`; reach the packaged Collector through `CollectorFixture` or `TelemetryPipeline`; relay through `OtlpRelay`.
 - Declare [telemetry policies](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/telemetry-policies.md) on a `[TracePerTest]` class; the policy is the assertion about the telemetry, the test asserts the behavior.

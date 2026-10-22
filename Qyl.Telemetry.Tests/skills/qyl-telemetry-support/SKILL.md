@@ -5,7 +5,7 @@ description: Use or extend the Qyl.Telemetry.Tests support library (OTLP receive
 
 # Telemetry support library
 
-Read [test-code-rules.md](references/test-code-rules.md) first; it binds every test and every support change. APIs and their sources: [api.md](references/api.md). Policies: [telemetry-policies.md](references/telemetry-policies.md).
+Read the root skill `/Users/alexandernachtmann/RiderProjects/Qyl.Telemetry.Tests/SKILL.md` (section "Test-code rules") first; it binds every test and every support change. APIs and their sources: [api.md](references/api.md). Policies: [telemetry-policies.md](references/telemetry-policies.md).
 
 ## What lives where
 

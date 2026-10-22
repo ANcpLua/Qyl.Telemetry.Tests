@@ -13,11 +13,6 @@
     <File Path="AGENTS.md" />
     <File Path="README.md" />
     <File Path="SKILL.md" />
-    <File Path="Qyl.Telemetry.Tests/skills/qyl-telemetry-support/SKILL.md" />
-    <File Path="Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/test-code-rules.md" />
-    <File Path="Qyl.Telemetry.UnitTests/skills/qyl-telemetry-unit/SKILL.md" />
-    <File Path="Qyl.Telemetry.IntegrationTests/skills/qyl-telemetry-integration/SKILL.md" />
-    <File Path="Qyl.Telemetry.EndToEndTests/skills/qyl-telemetry-end-to-end/SKILL.md" />
   </Folder>
   <Folder Name="/Applications/">
     <Project Path="Qyl.Telemetry.EndToEndTests/Applications/SemanticContractProbe/SemanticContractProbe.csproj" />

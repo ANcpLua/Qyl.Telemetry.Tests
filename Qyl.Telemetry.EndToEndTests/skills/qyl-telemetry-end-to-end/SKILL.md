@@ -5,7 +5,7 @@ description: Write tests in Qyl.Telemetry.EndToEndTests that drive an instrument
 
 # End-to-end tests
 
-Binding rules: [test-code-rules.md](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/test-code-rules.md). Everything below is specific to this suite.
+Binding rules: the root skill `/Users/alexandernachtmann/RiderProjects/Qyl.Telemetry.Tests/SKILL.md` (section "Test-code rules"). Everything below is specific to this suite.
 
 - `Applications/TelemetryProbe` is the instrumented workload; `CaptureDeliveryFixture` starts it with a `TelemetryPipeline` and the packaged managed Collector.
 - `Delivery/DeliveryTests` publishes managed and NativeAOT probes against the packages pinned in `Version.props`, builds a native Collector from the qyl commit in `Delivery/inputs.json` and calls the npm MCP server pinned there (`mcp.integrity`). Artifacts and logs are cached under `artifacts/delivery`; the first run needs network and a native compiler.

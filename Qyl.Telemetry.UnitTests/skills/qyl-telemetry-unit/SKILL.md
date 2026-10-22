@@ -5,7 +5,7 @@ description: Write deterministic tests in Qyl.Telemetry.UnitTests for decoding, 
 
 # Unit tests
 
-Binding rules: [test-code-rules.md](../../../Qyl.Telemetry.Tests/skills/qyl-telemetry-support/references/test-code-rules.md). Everything below is specific to this suite.
+Binding rules: the root skill `/Users/alexandernachtmann/RiderProjects/Qyl.Telemetry.Tests/SKILL.md` (section "Test-code rules"). Everything below is specific to this suite.
 
 - Build records in memory (`SpanRecord`, `TelemetrySnapshot`, `TraceEvidence`, `ActivitySnapshot`). Start no receiver, process or network connection; touch no file system (policy evidence goes through an in-memory `IEvidenceStore`); read no clock (`FakeTimeProvider`).
 - One behavior per test, named `Subject_State_Expected`. A fixture or helper builds data and runs the operation; the test holds the assertion. Many small tests are the goal.
