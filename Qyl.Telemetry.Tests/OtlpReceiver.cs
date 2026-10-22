@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
 using OpenTelemetry.Proto.Collector.Logs.V1;
 using OpenTelemetry.Proto.Collector.Metrics.V1;
 using OpenTelemetry.Proto.Collector.Trace.V1;
@@ -209,8 +210,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
             return;
         }
 
-        if (!string.Equals(context.Request.ContentType?.Split(';')[0], "application/x-protobuf",
-                StringComparison.OrdinalIgnoreCase))
+        if (!HasMediaType(context.Request.ContentType, "application/x-protobuf"))
         {
             await FailAsync(context, signal, 415, Code.Unimplemented, "This receiver accepts application/x-protobuf requests.");
             return;
@@ -390,7 +390,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
         // OTLP/HTTP requires a protobuf Status for HTTP errors and matching response encoding:
         // https://opentelemetry.io/docs/specs/otlp/#otlphttp-response
         // https://opentelemetry.io/docs/specs/otlp/#failures-1
-        if (string.Equals(context.Request.ContentType?.Split(';')[0], "application/json", StringComparison.OrdinalIgnoreCase))
+        if (HasMediaType(context.Request.ContentType, "application/json"))
         {
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonFormatter.Default.Format(status), context.RequestAborted).ConfigureAwait(false);
@@ -401,6 +401,10 @@ public sealed class OtlpReceiver : IAsyncDisposable
             await context.Response.Body.WriteAsync(status.ToByteArray(), context.RequestAborted).ConfigureAwait(false);
         }
     }
+
+    private static bool HasMediaType(string? contentType, string mediaType) =>
+        MediaTypeHeaderValue.TryParse(contentType, out var parsed) &&
+        parsed.MediaType.Equals(mediaType, StringComparison.OrdinalIgnoreCase);
 
     private static string ResponseMessage(IEnumerable<string> messages)
     {

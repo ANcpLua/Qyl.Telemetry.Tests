@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using JetBrains.Annotations;
 using Google.Protobuf;
 using RpcStatus = Google.Rpc.Status;
@@ -36,6 +37,22 @@ public sealed class TransportTests
             Assert.IsFalse(string.IsNullOrWhiteSpace(error.Message));
             Assert.AreEqual(error.Message, Assert.ContainsSingle(receiver.Snapshot().Receipts).Error);
         }
+    }
+
+    [TestMethod]
+    [DataRow("application/x-protobuf ; charset=utf-8")]
+    [DataRow("application/x-protobuf\t;charset=utf-8")]
+    public async Task HttpReceiver_MediaTypeWithWhitespaceBeforeItsParameter_IsAccepted(string contentType)
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        using var connection = new TcpClient();
+        await connection.ConnectAsync(receiver.Endpoint.Host, receiver.Endpoint.Port, TestContext.CancellationToken);
+        var stream = connection.GetStream();
+        var unnormalizedRequestHead = $"POST /v1/traces HTTP/1.1\r\nHost: {receiver.Endpoint.Authority}\r\n"
+            + $"Content-Type: {contentType}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        await stream.WriteAsync(System.Text.Encoding.ASCII.GetBytes(unnormalizedRequestHead), TestContext.CancellationToken);
+        using var reader = new StreamReader(stream, System.Text.Encoding.ASCII);
+        Assert.AreEqual("HTTP/1.1 200 OK", await reader.ReadLineAsync(TestContext.CancellationToken));
     }
 
     [TestMethod]
