@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
 using Qyl.Telemetry.EndToEndTests.Delivery;
 using Qyl.Telemetry.Tests.Collector;
 
@@ -53,11 +52,7 @@ internal sealed class AnalysisSession : IAsyncDisposable
     internal async Task<T> AskAsync<T>(AnalysisPath path, string tool, JsonObject input, CancellationToken cancellationToken)
     {
         if (path == AnalysisPath.Http) return await Client.AnalyzeAsync<T>(tool, input, cancellationToken);
-        var result = await _mcp.CallToolAsync(new CallToolRequestParams
-        {
-            Name = tool,
-            Arguments = input.ToDictionary(pair => pair.Key, pair => JsonSerializer.SerializeToElement(pair.Value))
-        }, cancellationToken);
+        var result = await _mcp.CallToolAsync(PublishedMcp.ToolCall(tool, input), cancellationToken);
         Assert.IsFalse(result.IsError ?? false, $"{tool}: {JsonSerializer.Serialize(result.Content)}");
         Assert.IsNotNull(result.StructuredContent, $"{tool} returned no structured content.");
         return result.StructuredContent.Value.Deserialize<T>(JsonSerializerOptions.Web)
@@ -79,11 +74,7 @@ internal sealed class AnalysisSession : IAsyncDisposable
             }
             Assert.Fail($"{tool} succeeded over HTTP but was expected to fail.");
         }
-        var result = await _mcp.CallToolAsync(new CallToolRequestParams
-        {
-            Name = tool,
-            Arguments = input.ToDictionary(pair => pair.Key, pair => JsonSerializer.SerializeToElement(pair.Value))
-        }, cancellationToken);
+        var result = await _mcp.CallToolAsync(PublishedMcp.ToolCall(tool, input), cancellationToken);
         Assert.IsTrue(result.IsError ?? false, $"{tool} succeeded over MCP but was expected to fail: {JsonSerializer.Serialize(result.StructuredContent)}");
         return (null, JsonSerializer.Serialize(result.StructuredContent) + JsonSerializer.Serialize(result.Content));
     }
@@ -102,16 +93,6 @@ internal sealed class AnalysisSession : IAsyncDisposable
         finally { await _collector.DisposeAsync(); }
     }
 
-    private static async Task<McpClient> ConnectAsync(string entryPoint, CollectorFixture collector, CancellationToken cancellationToken)
-    {
-        var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
-        environment["QYL_COLLECTOR_URL"] = collector.Address.ToString();
-        environment["QYL_MCP_TELEMETRY"] = "0";
-        var transport = new StdioClientTransport(new StdioClientTransportOptions
-        {
-            Name = "published-qyl-mcp", Command = "node", Arguments = [entryPoint, "--stdio"],
-            InheritEnvironmentVariables = false, EnvironmentVariables = environment, ShutdownTimeout = TimeSpan.FromSeconds(10)
-        });
-        return await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
-    }
+    private static Task<McpClient> ConnectAsync(string entryPoint, CollectorFixture collector, CancellationToken cancellationToken) =>
+        PublishedMcp.ConnectAsync(entryPoint, collector.Address, null, cancellationToken);
 }

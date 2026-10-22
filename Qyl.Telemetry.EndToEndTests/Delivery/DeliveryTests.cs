@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text.Json;
-using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
+using System.Text.Json.Nodes;
 using Qyl.Telemetry.SemanticConventions.Attributes.Http;
 using Qyl.Telemetry.Tests.Collector;
 using SpanKind = Qyl.Telemetry.SemanticConventions.SpanKind;
@@ -63,25 +62,12 @@ public sealed class DeliveryTests(TestContext context)
             stored => stored.GetProperty("spans").EnumerateArray().Any(span => span.GetProperty("span_id").GetString() == server.SpanId),
             context.CancellationToken);
 
-        var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
-        environment["QYL_COLLECTOR_URL"] = application.Telemetry.Collector.Address.ToString();
-        environment["QYL_MCP_TELEMETRY"] = "0";
-        var transport = new StdioClientTransport(new StdioClientTransportOptions
-        {
-            Name = "published-qyl-mcp", Command = "node", Arguments = [_delivery.McpEntryPoint, "--stdio"],
-            InheritEnvironmentVariables = false, EnvironmentVariables = environment,
-            ShutdownTimeout = TimeSpan.FromSeconds(10), StandardErrorLines = line => context.WriteLine("MCP: " + line)
-        });
-        await using var mcp = await McpClient.CreateAsync(transport, cancellationToken: context.CancellationToken);
+        await using var mcp = await PublishedMcp.ConnectAsync(_delivery.McpEntryPoint, application.Telemetry.Collector.Address,
+            line => context.WriteLine("MCP: " + line), context.CancellationToken);
         var tools = await mcp.ListToolsAsync(cancellationToken: context.CancellationToken);
         Assert.Contains(tool => tool.Name == TraceTool, tools);
-        var result = await mcp.CallToolAsync(new CallToolRequestParams
-        {
-            Name = TraceTool, Arguments = new Dictionary<string, JsonElement>
-            {
-                ["trace_id"] = JsonSerializer.SerializeToElement(traceId)
-            }
-        }, context.CancellationToken);
+        var result = await mcp.CallToolAsync(PublishedMcp.ToolCall(TraceTool, new JsonObject { ["trace_id"] = traceId }),
+            context.CancellationToken);
         Assert.IsFalse(result.IsError ?? false);
         Assert.IsNotNull(result.StructuredContent);
         var output = result.StructuredContent.Value;
