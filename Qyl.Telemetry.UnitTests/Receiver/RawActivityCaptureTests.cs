@@ -10,6 +10,7 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 public sealed class RawActivityCaptureTests
 {
     private const string Key = "http.request.header.x-example";
+    private const string DeprecatedGrpcMetadata = "rpc.grpc.request.metadata.authorization";
 
     [TestMethod]
     public void RawActivityCaptureSnapshot_UrlWithQuery_KeepsOnlyThePath()
@@ -191,6 +192,15 @@ public sealed class RawActivityCaptureTests
     {
         using var activity = new Activity("after-disposal").SetIdFormat(ActivityIdFormat.W3C).Start();
         var captured = NativeHttpSnapshot(activity) with { Tags = new Dictionary<string, object?> { [Key] = new[] { "leftover" } } };
+        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireCaptureStopped([captured], NativeHttpSource));
+        Assert.Contains("outlived", error.Message);
+    }
+
+    [TestMethod]
+    public void RawActivityCaptureDisposal_LeftoverDeprecatedGrpcMetadata_FailsAsOutlived()
+    {
+        using var activity = new Activity("after-disposal").SetIdFormat(ActivityIdFormat.W3C).Start();
+        var captured = NativeHttpSnapshot(activity) with { Tags = new Dictionary<string, object?> { [DeprecatedGrpcMetadata] = new[] { "leftover" } } };
         var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireCaptureStopped([captured], NativeHttpSource));
         Assert.Contains("outlived", error.Message);
     }

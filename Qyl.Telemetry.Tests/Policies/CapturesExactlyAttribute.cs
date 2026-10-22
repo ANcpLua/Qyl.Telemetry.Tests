@@ -27,5 +27,11 @@ public sealed class CapturesExactlyAttribute(params string[] fields) : Telemetry
             yield return $"{Describe(span)} captured unselected '{key}'.";
     }
 
-    private static bool IsCapturedField(string key) => RegistryPolicy.TryGetCapturedFieldPersistence(key, out _);
+    private static bool IsCapturedField(string key) =>
+        RegistryPolicy.TryGetCapturedFieldPersistence(key, out _) || IsRenamedCapturedField(key);
+
+    private static bool IsRenamedCapturedField(string key) =>
+        RegistryCatalog.TryGetAttribute(key, out var attribute) &&
+        attribute is { IsTemplate: true, Deprecation.Replacement: { } replacement } &&
+        RegistryPolicy.TryGetCapturedFieldPersistence(string.Concat(replacement, key.AsSpan(attribute.Name.Length)), out _);
 }

@@ -59,7 +59,9 @@ public static class CapturedActivityAssertions
         key.StartsWith("http.request.header.", StringComparison.Ordinal) ||
         key.StartsWith("http.response.header.", StringComparison.Ordinal) ||
         key.StartsWith("rpc.request.metadata.", StringComparison.Ordinal) ||
-        key.StartsWith("rpc.response.metadata.", StringComparison.Ordinal);
+        key.StartsWith("rpc.response.metadata.", StringComparison.Ordinal) ||
+        key.StartsWith("rpc.grpc.request.metadata.", StringComparison.Ordinal) ||
+        key.StartsWith("rpc.grpc.response.metadata.", StringComparison.Ordinal);
 
     public static void RequireCaptureStopped(IReadOnlyList<ActivitySnapshot> spans, string source)
     {

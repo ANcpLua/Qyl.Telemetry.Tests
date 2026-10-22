@@ -21,6 +21,7 @@ public sealed class TelemetryPolicyTests
     private const string Client = "0000000000000003";
     private const string Missing = "00000000000000ff";
     private const string Selected = "http.request.header.x-request-id";
+    private const string DeprecatedGrpcMetadata = "rpc.grpc.request.metadata.authorization";
 
     [TestMethod]
     [DynamicData(nameof(EveryPolicy))]
@@ -147,6 +148,20 @@ public sealed class TelemetryPolicyTests
         [
             "[CapturesExactly] 'GET /orders' (Server, orders, Microsoft.AspNetCore) captured unselected "
             + "'http.request.header.authorization'."
+        ], Violations(new CapturesExactlyAttribute(), server));
+    }
+
+    [TestMethod]
+    public void CapturesExactly_UnselectedDeprecatedGrpcMetadata_IsReported()
+    {
+        var server = Span(Server, Root, attributes: new Dictionary<string, object?>
+        {
+            [DeprecatedGrpcMetadata] = new object?[] { "secret" }
+        });
+        Assert.AreSequenceEqual(
+        [
+            "[CapturesExactly] 'GET /orders' (Server, orders, Microsoft.AspNetCore) captured unselected "
+            + "'rpc.grpc.request.metadata.authorization'."
         ], Violations(new CapturesExactlyAttribute(), server));
     }
 
