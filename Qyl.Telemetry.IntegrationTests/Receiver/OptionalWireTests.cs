@@ -23,7 +23,7 @@ public sealed class OptionalWireTests
         var request = Traces(null,
             new Span { Name = "minimal", TraceId = Id("11111111111111111111111111111111"), SpanId = Id("2222222222222222") });
         using var response =
-            await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
+            await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
         Assert.AreEqual("minimal", span.Name);
@@ -46,7 +46,7 @@ public sealed class OptionalWireTests
         var request = RichSpan();
         request.ResourceSpans[0].ScopeSpans[0].Scope = null;
         using var response =
-            await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
+            await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
         Assert.AreEqual("rich.operation", span.Name);
@@ -65,7 +65,7 @@ public sealed class OptionalWireTests
     public async Task OtlpReceiverMetrics_OptionalDistributionFieldsAbsent_StayNullInsteadOfZero(string kind)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var metric = MetricWireTests.Fixture(kind);
+        var metric = MetricFixture.Of(kind);
         if (kind == MetricShapes.Histogram)
         {
             var p = metric.Histogram.DataPoints[0];
@@ -84,7 +84,7 @@ public sealed class OptionalWireTests
         }
 
         var request = Metrics(null, metric);
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var observed = Assert.ContainsSingle(receiver.Snapshot().Metrics);
@@ -115,7 +115,7 @@ public sealed class OptionalWireTests
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = Logs(null, new InstrumentationScope { Name = "background" },
             new OpenTelemetry.Proto.Logs.V1.LogRecord { EventName = "BackgroundError", SeverityNumber = SeverityNumber.Error });
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Logs);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
@@ -139,7 +139,7 @@ public sealed class OptionalWireTests
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = Metrics(new Resource { Attributes = { Pair("qyl.test.id", new AnyValue { StringValue = "partition" }) } },
             new Metric { Name = "unspecified" });
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();

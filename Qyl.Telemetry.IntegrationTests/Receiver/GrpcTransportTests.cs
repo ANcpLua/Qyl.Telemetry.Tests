@@ -35,8 +35,8 @@ public sealed class GrpcTransportTests
         byte[] unknownFieldsDescendingWithNonMinimalVarint1 = [0xf8, 0x07, 0x81, 0x00, 0xf0, 0x07, 0x02];
         var headers = new Metadata();
         if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
-            new CallOptions(headers, cancellationToken: TestContext.CancellationToken), unknownFieldsDescendingWithNonMinimalVarint1);
+        using var call = OtlpGrpc.ExportAsync(channel, signal, unknownFieldsDescendingWithNonMinimalVarint1,
+            new CallOptions(headers, cancellationToken: TestContext.CancellationToken));
         Assert.IsEmpty(await call.ResponseAsync);
         Assert.AreEqual(gzip ? "gzip" : null, wire.Encoding);
         var snapshot = receiver.Snapshot();
@@ -63,8 +63,8 @@ public sealed class GrpcTransportTests
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
-            new CallOptions(cancellationToken: TestContext.CancellationToken), [0x80]);
+        using var call = OtlpGrpc.ExportAsync(channel, signal, [0x80],
+            new CallOptions(cancellationToken: TestContext.CancellationToken));
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => call.ResponseAsync);
         Assert.AreEqual(StatusCode.InvalidArgument, failure.StatusCode);
         Assert.IsFalse(string.IsNullOrWhiteSpace(failure.Status.Detail));
@@ -86,8 +86,8 @@ public sealed class GrpcTransportTests
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         var bytes = Request(signal, true, false).ToByteArray();
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
-            new CallOptions(cancellationToken: TestContext.CancellationToken), bytes);
+        using var call = OtlpGrpc.ExportAsync(channel, signal, bytes,
+            new CallOptions(cancellationToken: TestContext.CancellationToken));
         var acknowledgement = Signals.PartialSuccess(signal, await call.ResponseAsync);
         Assert.IsNotNull(acknowledgement);
         var (rejected, message) = acknowledgement.Value;
@@ -101,8 +101,8 @@ public sealed class GrpcTransportTests
         Assert.AreEqual(OtlpTransport.Grpc, receipt.Transport);
         Assert.AreEqual(1, snapshot.Spans.Count + snapshot.Logs.Count + snapshot.Metrics.Count);
         Assert.AreSequenceEqual(bytes, Assert.ContainsSingle(snapshot.Requests).Payload.ToArray());
-        using var callAfterRejection = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
-            new CallOptions(cancellationToken: TestContext.CancellationToken), []);
+        using var callAfterRejection = OtlpGrpc.ExportAsync(channel, signal, [],
+            new CallOptions(cancellationToken: TestContext.CancellationToken));
         Assert.IsEmpty(await callAfterRejection.ResponseAsync);
         Assert.IsNull(receiver.Snapshot().Receipts[1].Error);
         Assert.HasCount(1, snapshot.Receipts);
@@ -116,8 +116,8 @@ public sealed class GrpcTransportTests
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(signal), null,
-            new CallOptions(cancellationToken: TestContext.CancellationToken), Request(signal, false, true).ToByteArray());
+        using var call = OtlpGrpc.ExportAsync(channel, signal, Request(signal, false, true).ToByteArray(),
+            new CallOptions(cancellationToken: TestContext.CancellationToken));
         var acknowledgement = Signals.PartialSuccess(signal, await call.ResponseAsync);
         Assert.IsNotNull(acknowledgement);
         var (rejected, message) = acknowledgement.Value;
@@ -142,8 +142,8 @@ public sealed class GrpcTransportTests
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         var headers = new Metadata();
         if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-            new CallOptions(headers, cancellationToken: TestContext.CancellationToken), new byte[limit + 1]);
+        using var call = OtlpGrpc.ExportAsync(channel, Signals.Traces, new byte[limit + 1],
+            new CallOptions(headers, cancellationToken: TestContext.CancellationToken));
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => call.ResponseAsync);
         Assert.AreEqual(StatusCode.ResourceExhausted, failure.StatusCode, failure.Status.Detail);
         Assert.Contains($"{limit}-byte", failure.Status.Detail);
@@ -171,8 +171,8 @@ public sealed class GrpcTransportTests
             bytes[unknownLengthDelimitedField127Tag.Length + i] = (byte)((length >> (7 * i)) | (i < fourByteLengthVarint - 1 ? 0x80 : 0));
         var headers = new Metadata();
         if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-            new CallOptions(headers, cancellationToken: TestContext.CancellationToken), bytes);
+        using var call = OtlpGrpc.ExportAsync(channel, Signals.Traces, bytes,
+            new CallOptions(headers, cancellationToken: TestContext.CancellationToken));
         Assert.IsEmpty(await call.ResponseAsync);
         Assert.AreSequenceEqual(bytes, Assert.ContainsSingle(receiver.Snapshot().Requests).Payload.ToArray());
         Assert.IsNull(Assert.ContainsSingle(receiver.Snapshot().Receipts).Error);
@@ -186,7 +186,7 @@ public sealed class GrpcTransportTests
         cancellation.CancelAfter(TimeSpan.FromSeconds(10));
         using var content = new PausedGrpcContent(cancellation.Token);
         using var request = new HttpRequestMessage(HttpMethod.Post,
-            new Uri(receiver.GrpcEndpoint, "opentelemetry.proto.collector.trace.v1.TraceService/Export"));
+            new Uri(receiver.GrpcEndpoint, OtlpGrpc.Export(Signals.Traces).FullName));
         request.Version = HttpVersion.Version20;
         request.VersionPolicy = HttpVersionPolicy.RequestVersionExact;
         request.Content = content;
@@ -199,8 +199,8 @@ public sealed class GrpcTransportTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => sending);
         Assert.IsTrue(wasSuspended);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        using var next = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-            new CallOptions(cancellationToken: TestContext.CancellationToken), []);
+        using var next = OtlpGrpc.ExportAsync(channel, Signals.Traces, [],
+            new CallOptions(cancellationToken: TestContext.CancellationToken));
         Assert.IsEmpty(await next.ResponseAsync);
         Assert.IsEmpty(Assert.ContainsSingle(receiver.Snapshot().Requests).Payload.ToArray());
         Assert.IsNull(Assert.ContainsSingle(receiver.Snapshot().Receipts).Error);
@@ -211,8 +211,8 @@ public sealed class GrpcTransportTests
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-            new CallOptions(deadline: Clock.GetUtcNow().AddSeconds(-1).UtcDateTime, cancellationToken: TestContext.CancellationToken), []);
+        using var call = OtlpGrpc.ExportAsync(channel, Signals.Traces, [],
+            new CallOptions(deadline: Clock.GetUtcNow().AddSeconds(-1).UtcDateTime, cancellationToken: TestContext.CancellationToken));
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => call.ResponseAsync);
         Assert.AreEqual(StatusCode.DeadlineExceeded, failure.StatusCode);
         Assert.IsEmpty(receiver.Snapshot().Requests);
@@ -223,28 +223,19 @@ public sealed class GrpcTransportTests
     {
         var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        using (var live = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-                   new CallOptions(cancellationToken: TestContext.CancellationToken), []))
+        using (var live = OtlpGrpc.ExportAsync(channel, Signals.Traces, [],
+                   new CallOptions(cancellationToken: TestContext.CancellationToken)))
             Assert.IsEmpty(await live.ResponseAsync);
         var waiting = receiver.AwaitAsync(snapshot => snapshot.Spans.Count > 0, TimeSpan.FromSeconds(10), TestContext.CancellationToken);
         await receiver.DisposeAsync();
         await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => waiting);
         using var freshChannelToClosedListener = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        using var closed = freshChannelToClosedListener.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-            new CallOptions(deadline: Clock.GetUtcNow().AddSeconds(5).UtcDateTime, cancellationToken: TestContext.CancellationToken), []);
+        using var closed = OtlpGrpc.ExportAsync(freshChannelToClosedListener, Signals.Traces, [],
+            new CallOptions(deadline: Clock.GetUtcNow().AddSeconds(5).UtcDateTime, cancellationToken: TestContext.CancellationToken));
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => closed.ResponseAsync);
         Assert.AreEqual(StatusCode.Unavailable, failure.StatusCode, failure.Status.Detail);
         await Assert.ThrowsExactlyAsync<HttpRequestException>(() => TelemetryLifecycle.Http.GetAsync(receiver.Endpoint, TestContext.CancellationToken));
     }
-
-    private static Method<byte[], byte[]> Export(string signal) => new(MethodType.Unary, signal switch
-        {
-            Signals.Traces => "opentelemetry.proto.collector.trace.v1.TraceService",
-            Signals.Logs => "opentelemetry.proto.collector.logs.v1.LogsService",
-            _ => "opentelemetry.proto.collector.metrics.v1.MetricsService"
-        }, "Export",
-        Marshallers.Create<byte[]>(static (bytes, context) => context.Complete(bytes), static context => context.PayloadAsNewBuffer()),
-        Marshallers.Create<byte[]>(static (bytes, context) => context.Complete(bytes), static context => context.PayloadAsNewBuffer()));
 
     private static IMessage Request(string signal, bool invalid, bool warning)
     {

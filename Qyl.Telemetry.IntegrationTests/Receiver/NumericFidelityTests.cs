@@ -127,7 +127,7 @@ public sealed class NumericFidelityTests
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = OtlpEvidence.Metrics(null, metrics);
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);

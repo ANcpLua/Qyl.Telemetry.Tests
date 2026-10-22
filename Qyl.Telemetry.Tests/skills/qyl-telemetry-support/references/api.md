@@ -8,6 +8,7 @@
 | Typed evidence, trace selection, parentage, calls and store identities | [TraceEvidence](../../../TraceEvidence.cs) |
 | Exact captured arrays, including duplicates and empty strings | [Assert.HasCapturedValues](../../../CapturedAttributeAssertions.cs) |
 | One native span and preserved parent context | [SpanAssertions](../../../SpanAssertions.cs) |
+| The OTLP/HTTP error body (google.rpc.Status) of a failed export | [Assert.HasOtlpErrorAsync](../../../OtlpErrorAssertions.cs) |
 | Raw CLR array, parent/trace identity and disposal checks in native applications | [CapturedActivityAssertions](../../../../Qyl.Telemetry.Tests.Capture/CapturedActivityAssertions.cs) |
 | Detached Activity snapshots and source-filtered export | [ActivitySnapshot](../../../../Qyl.Telemetry.Tests.Capture/ActivitySnapshot.cs), [ActivitySnapshotExporter](../../../../Qyl.Telemetry.Tests.Capture/ActivitySnapshotExporter.cs) |
 | Versioned HTTP/gRPC fixture JSON | [ActivityCaptureReport](../../../../Qyl.Telemetry.Tests.Capture/ActivityCaptureReport.cs) |

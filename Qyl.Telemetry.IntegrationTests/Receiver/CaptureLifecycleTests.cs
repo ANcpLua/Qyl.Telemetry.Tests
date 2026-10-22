@@ -39,7 +39,7 @@ public sealed class CaptureLifecycleTests
             TestContext.CancellationToken);
         var second = receiver.AwaitAsync(s => s.Receipts.Count == 1, TimeSpan.FromSeconds(10),
             TestContext.CancellationToken);
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, RichSpan().ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, RichSpan().ToByteArray(),
             TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var results = await Task.WhenAll(first, second);
@@ -82,7 +82,7 @@ public sealed class CaptureLifecycleTests
                 request.ResourceSpans[0].ScopeSpans[0].Spans[0].TraceId = Id(capture.TraceId);
                 request.ResourceSpans[0].ScopeSpans[0].Spans[0].Name = "capture." + number;
                 request.ResourceSpans.Add(RichSpan().ResourceSpans[0]);
-                using var response = await ReceiverTests.PostAsync(capture.Endpoint, request.ToByteArray(),
+                using var response = await OtlpHttp.PostAsync(capture.Endpoint, request.ToByteArray(),
                     TestContext.CancellationToken);
                 response.EnsureSuccessStatusCode();
             }, trace => trace.Spans.Count == 1 && trace.Capture.Spans.Count == 2,

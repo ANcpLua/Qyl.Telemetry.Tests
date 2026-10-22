@@ -18,7 +18,7 @@ public sealed class WireMetadataTests
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = RichSpan();
         using var response =
-            await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
+            await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
         Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
@@ -86,7 +86,7 @@ public sealed class WireMetadataTests
                 KvlistValue = new KeyValueList { Values = { Pair("nested", new AnyValue { StringValue = "exact" }) } }
             }));
         using var response =
-            await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
+            await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
         Assert.AreEqual("rich.operation", span.Name);

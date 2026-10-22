@@ -1,7 +1,5 @@
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Net;
-using System.Net.Http.Headers;
 using Google.Protobuf;
 using JetBrains.Annotations;
 using OpenTelemetry.Proto.Common.V1;
@@ -25,7 +23,7 @@ public sealed class ReceiverTests
     public async Task HttpReceiver_MalformedProtobuf_ReturnsBadRequestAndRecordsTheError(string signal)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        using var response = await PostAsync(receiver.Endpoint, [0x80], TestContext.CancellationToken, signal);
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, [0x80], TestContext.CancellationToken, signal);
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
         Assert.AreEqual(signal, receipt.Signal);
@@ -34,7 +32,7 @@ public sealed class ReceiverTests
         var original = Assert.ContainsSingle(receiver.Snapshot().Requests);
         Assert.AreEqual(signal, original.Signal);
         Assert.AreSequenceEqual(new byte[] { 0x80 }, original.Payload.ToArray());
-        var error = await TransportTests.ReadErrorAsync(response, TestContext.CancellationToken);
+        var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
         Assert.AreEqual((int)Google.Rpc.Code.InvalidArgument, error.Code);
         Assert.AreEqual(receipt.Error, error.Message);
     }
@@ -50,7 +48,7 @@ public sealed class ReceiverTests
                 SpanId = OtlpEvidence.Id("2222222222222222"), Name = "valid"
             },
             new Span { Name = "invalid" });
-        using var response = await PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         var result =
             ExportTraceServiceResponse.Parser.ParseFrom(
@@ -115,13 +113,13 @@ public sealed class ReceiverTests
     public async Task HttpReceiver_InvalidMetricBatch_ReportsRejectedDataPointsNotMetricCount()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var metric = MetricWireTests.Fixture(MetricShapes.Gauge);
+        var metric = MetricFixture.Of(MetricShapes.Gauge);
         metric.Gauge.DataPoints.Add(metric.Gauge.DataPoints[0].Clone());
         var conflicting = metric.Gauge.DataPoints[0].Attributes[0].Clone();
         conflicting.Value = new AnyValue { StringValue = "conflicting" };
         metric.Gauge.DataPoints[0].Attributes.Add(conflicting);
         var request = OtlpEvidence.Metrics(null, metric);
-        using var response = await PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken,
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken,
             Signals.Metrics);
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         var result = ExportMetricsServiceResponse.Parser.ParseFrom(
@@ -138,18 +136,8 @@ public sealed class ReceiverTests
     public async Task HttpReceiver_GzipRequest_IsDecompressedBeforeProtobufParsing()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        using var output = new MemoryStream();
-        await using (var gzip = new GZipStream(output, CompressionLevel.SmallestSize, true))
-        {
-            await gzip.WriteAsync(OtlpEvidence.RichSpan().ToByteArray(), TestContext.CancellationToken);
-        }
-
-        var client = TelemetryLifecycle.Http;
-        using var content = new ByteArrayContent(output.ToArray());
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        content.Headers.ContentEncoding.Add("gzip");
-        using var response = await client.PostAsync(new Uri(receiver.Endpoint, "v1/traces"), content,
-            TestContext.CancellationToken);
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, OtlpHttp.Compress(OtlpEvidence.RichSpan().ToByteArray()),
+            TestContext.CancellationToken, Signals.Traces, "gzip");
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
         Assert.AreEqual("rich.operation", span.Name);
@@ -167,7 +155,7 @@ public sealed class ReceiverTests
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var empty = receiver.Snapshot();
         byte[] unknownField127Varint1 = [0xf8, 0x07, 0x01];
-        using var response = await PostAsync(receiver.Endpoint, unknownField127Varint1, TestContext.CancellationToken);
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, unknownField127Varint1, TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
         Assert.IsEmpty(empty.Requests);
@@ -176,18 +164,9 @@ public sealed class ReceiverTests
         var request = Assert.ContainsSingle(snapshot.Requests);
         Assert.AreEqual(Signals.Traces, request.Signal);
         Assert.AreSequenceEqual(unknownField127Varint1, request.Payload.ToArray());
-        using var second = await PostAsync(receiver.Endpoint, [], TestContext.CancellationToken);
+        using var second = await OtlpHttp.PostAsync(receiver.Endpoint, [], TestContext.CancellationToken);
         second.EnsureSuccessStatusCode();
         Assert.HasCount(1, snapshot.Requests);
         Assert.HasCount(2, receiver.Snapshot().Requests);
-    }
-
-    internal static async Task<HttpResponseMessage> PostAsync(Uri endpoint, byte[] bytes,
-        CancellationToken cancellationToken, string signal = Signals.Traces)
-    {
-        var client = TelemetryLifecycle.Http;
-        using var content = new ByteArrayContent(bytes);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        return await client.PostAsync(new Uri(endpoint, "v1/" + signal), content, cancellationToken);
     }
 }

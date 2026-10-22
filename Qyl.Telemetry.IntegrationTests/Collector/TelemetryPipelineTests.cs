@@ -182,9 +182,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         using var collector = CollectorClient(HttpStatusCode.OK, acknowledgement);
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
         await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
-        using var body = new ByteArrayContent([]);
-        body.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        using var response = await _client.PostAsync(new Uri(receiver.Address, $"/v1/{signal}"), body, testContext.CancellationToken);
+        using var response = await OtlpHttp.PostAsync(receiver.Address, [], testContext.CancellationToken, signal);
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         Assert.AreEqual("application/x-protobuf", response.Content.Headers.ContentType?.MediaType);
         Assert.AreSequenceEqual(acknowledgement, await response.Content.ReadAsByteArrayAsync(testContext.CancellationToken));
@@ -199,9 +197,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         using var collector = CollectorClient(HttpStatusCode.BadRequest, diagnostic);
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
         await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
-        using var body = new ByteArrayContent([0x0b]);
-        body.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        using var response = await _client.PostAsync(new Uri(receiver.Address, "/v1/traces"), body, testContext.CancellationToken);
+        using var response = await OtlpHttp.PostAsync(receiver.Address, [0x0b], testContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.AreEqual("Malformed OTLP request.", RpcStatus.Parser.ParseFrom(await response.Content.ReadAsByteArrayAsync(testContext.CancellationToken)).Message);
         var snapshot = capture.Snapshot();
@@ -254,9 +250,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
         using var release = handler.Releasing();
         using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
-        using var body = new ByteArrayContent([]);
-        body.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        var send = _client.PostAsync(new Uri(receiver.Address, $"v1/{signal}"), body, cancelled.Token);
+        var send = OtlpHttp.PostAsync(receiver.Address, [], cancelled.Token, signal);
         await handler.Started.Task.WaitAsync(testContext.CancellationToken);
         await cancelled.CancelAsync();
         _ = await Assert.ThrowsAsync<OperationCanceledException>(() => send);
@@ -279,9 +273,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         collector.BaseAddress = new Uri("https://collector.test/");
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
         await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
-        using var body = new ByteArrayContent([]);
-        body.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        var send = _client.PostAsync(new Uri(receiver.Address, "v1/logs"), body, testContext.CancellationToken);
+        var send = OtlpHttp.PostAsync(receiver.Address, [], testContext.CancellationToken, Signals.Logs);
         await handler.Started.Task.WaitAsync(testContext.CancellationToken);
         _ = handler.Complete.TrySetException(new HttpRequestException("upstream unavailable"));
         using var response = await send;

@@ -23,7 +23,7 @@ public sealed class MetricWireTests
     public async Task OtlpReceiverMetrics_EveryShape_KeepsIdentityMetadataAndArchivedDistribution(string shape)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var metric = Fixture(shape);
+        var metric = MetricFixture.Of(shape);
         var request = new ExportMetricsServiceRequest
         {
             ResourceMetrics =
@@ -45,7 +45,7 @@ public sealed class MetricWireTests
                 }
             }
         };
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var observed = Assert.ContainsSingle(receiver.Snapshot().Metrics);
@@ -80,10 +80,10 @@ public sealed class MetricWireTests
     public async Task MetricAttribution_ResourcePartitionOrExemplarPoint_MustMatch()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var metric = Fixture(MetricShapes.Gauge);
+        var metric = MetricFixture.Of(MetricShapes.Gauge);
         metric.Gauge.DataPoints.Add(new NumberDataPoint { AsInt = 99 });
         var request = Metrics(null, metric);
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
@@ -99,82 +99,6 @@ public sealed class MetricWireTests
         var mismatch = new TraceEvidence("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", snapshot,
             new MetricPartition("qyl.test.id", "wrong"));
         Assert.IsEmpty(mismatch.Metrics);
-    }
-
-    internal static Metric Fixture(string shape)
-    {
-        var metric = new Metric
-        {
-            Name = "metric." + shape, Description = "Exact distribution", Unit = "ms",
-            Metadata = { Pair("metadata", new AnyValue { StringValue = "original" }) }
-        };
-        var exemplar = new Exemplar
-        {
-            AsDouble = 2.5, TimeUnixNano = 103, TraceId = Id("11111111111111111111111111111111"),
-            SpanId = Id("2222222222222222"),
-            FilteredAttributes = { Pair("exemplar", new AnyValue { BoolValue = true }) }
-        };
-        var point = new NumberDataPoint
-        {
-            AsInt = -9, StartTimeUnixNano = 101, TimeUnixNano = 109, Flags = 0x80000001,
-            Attributes = { Pair("point", new AnyValue { StringValue = "exact" }) }, Exemplars = { exemplar }
-        };
-        switch (shape)
-        {
-            case MetricShapes.Gauge: metric.Gauge = new Gauge { DataPoints = { point } }; break;
-            case MetricShapes.Sum:
-                metric.Sum = new Sum
-                {
-                    AggregationTemporality = AggregationTemporality.Delta, IsMonotonic = false, DataPoints = { point }
-                }; break;
-            case MetricShapes.Histogram:
-                metric.Histogram = new Histogram
-                {
-                    AggregationTemporality = AggregationTemporality.Cumulative,
-                    DataPoints =
-                    {
-                        new HistogramDataPoint
-                        {
-                            Count = 3, Sum = 6.5, Min = 1, Max = 4, StartTimeUnixNano = 101, TimeUnixNano = 109,
-                            Flags = 3, BucketCounts = { 1, 2 }, ExplicitBounds = { 2 }, Exemplars = { exemplar }
-                        }
-                    }
-                }; break;
-            case MetricShapes.Exponential:
-                metric.ExponentialHistogram = new ExponentialHistogram
-                {
-                    AggregationTemporality = AggregationTemporality.Delta,
-                    DataPoints =
-                    {
-                        new ExponentialHistogramDataPoint
-                        {
-                            Count = 3, Sum = 2, Min = -2, Max = 4, Scale = -1, ZeroCount = 1, ZeroThreshold = 0.5,
-                            StartTimeUnixNano = 101, TimeUnixNano = 109, Flags = 5,
-                            Positive = new ExponentialHistogramDataPoint.Types.Buckets
-                                { Offset = -2, BucketCounts = { 1 } },
-                            Negative = new ExponentialHistogramDataPoint.Types.Buckets
-                                { Offset = 3, BucketCounts = { 1 } },
-                            Exemplars = { exemplar }
-                        }
-                    }
-                }; break;
-            case MetricShapes.Summary:
-                metric.Summary = new Summary
-                {
-                    DataPoints =
-                    {
-                        new SummaryDataPoint
-                        {
-                            Count = 3, Sum = 6.5, StartTimeUnixNano = 101, TimeUnixNano = 109, Flags = 7,
-                            QuantileValues =
-                                { new SummaryDataPoint.Types.ValueAtQuantile { Quantile = 0.5, Value = 2.5 } }
-                        }
-                    }
-                }; break;
-            default: throw new ArgumentOutOfRangeException(nameof(shape));
-        }
-
-        return metric;
     }
 
     private static void CheckShape(string shape, MetricData observed)

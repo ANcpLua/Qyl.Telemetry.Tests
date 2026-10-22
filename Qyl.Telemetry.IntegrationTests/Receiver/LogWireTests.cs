@@ -70,7 +70,7 @@ public sealed class LogWireTests
                 }
             }
         };
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Logs);
         response.EnsureSuccessStatusCode();
         var observed = Assert.ContainsSingle(receiver.Snapshot().Logs);

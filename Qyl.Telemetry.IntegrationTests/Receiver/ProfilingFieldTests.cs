@@ -42,7 +42,7 @@ public sealed class ProfilingFieldTests
             }
         };
         var bytes = Request(signal, resource).ToByteArray();
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, bytes, TestContext.CancellationToken, signal);
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, bytes, TestContext.CancellationToken, signal);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
         var receipt = Assert.ContainsSingle(snapshot.Receipts);
@@ -72,7 +72,7 @@ public sealed class ProfilingFieldTests
         Assert.AreEqual("application/x-protobuf", response.Content.Headers.ContentType?.MediaType);
         Assert.Contains("StringValueStrindex 7", warning);
         Assert.Contains("StringValueStrindex 8", warning);
-        using var nextExportWithItsOwnDecoder = await ReceiverTests.PostAsync(receiver.Endpoint, [], TestContext.CancellationToken, signal);
+        using var nextExportWithItsOwnDecoder = await OtlpHttp.PostAsync(receiver.Endpoint, [], TestContext.CancellationToken, signal);
         nextExportWithItsOwnDecoder.EnsureSuccessStatusCode();
         Assert.IsEmpty(receiver.Snapshot().Receipts[1].Warnings);
         Assert.HasCount(1, snapshot.Receipts);
@@ -90,7 +90,7 @@ public sealed class ProfilingFieldTests
                 new KeyValue { Key = "known", KeyStrindex = 4, Value = new AnyValue { StringValue = "literal" } }
             }
         };
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, Request(Signals.Logs, resource).ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, Request(Signals.Logs, resource).ToByteArray(),
             TestContext.CancellationToken, Signals.Logs);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
@@ -112,7 +112,7 @@ public sealed class ProfilingFieldTests
         var resource = new Resource { Attributes = { new KeyValue { KeyStrindex = 3, Value = new AnyValue { StringValue = "unknown key" } } } };
         var twoLogsOfOneResource = OtlpEvidence.Logs(resource,
             new ProtoLog { Body = new AnyValue { IntValue = 1 } }, new ProtoLog { Body = new AnyValue { IntValue = 2 } });
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, twoLogsOfOneResource.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, twoLogsOfOneResource.ToByteArray(),
             TestContext.CancellationToken, Signals.Logs);
         response.EnsureSuccessStatusCode();
         Assert.HasCount(1, Assert.ContainsSingle(receiver.Snapshot().Receipts).Warnings);
@@ -126,7 +126,7 @@ public sealed class ProfilingFieldTests
             Name = "preserved"
         }),
         Signals.Logs => OtlpEvidence.Logs(resource, new ProtoLog { Body = new AnyValue { IntValue = 42 } }),
-        Signals.Metrics => OtlpEvidence.Metrics(resource, MetricWireTests.Fixture(MetricShapes.Gauge)),
+        Signals.Metrics => OtlpEvidence.Metrics(resource, MetricFixture.Of(MetricShapes.Gauge)),
         _ => throw new ArgumentOutOfRangeException(nameof(signal))
     };
 }

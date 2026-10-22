@@ -1,10 +1,7 @@
-using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
 using JetBrains.Annotations;
-using Google.Protobuf;
-using RpcStatus = Google.Rpc.Status;
 
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
 
@@ -31,7 +28,7 @@ public sealed class TransportTests
         Assert.AreEqual(expected, response.StatusCode);
         if (expected != HttpStatusCode.OK)
         {
-            var error = await ReadErrorAsync(response, TestContext.CancellationToken,
+            var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken,
                 media == "application/json" ? "application/json" : "application/x-protobuf");
             Assert.AreEqual(expected == HttpStatusCode.NotFound ? (int)Google.Rpc.Code.NotFound : (int)Google.Rpc.Code.Unimplemented, error.Code);
             Assert.IsFalse(string.IsNullOrWhiteSpace(error.Message));
@@ -59,19 +56,10 @@ public sealed class TransportTests
     public async Task HttpReceiver_DecompressedRequestOverLimit_IsRejectedBeforeProtobufParsing()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        using var bytes = new MemoryStream();
-        await using (var gzip = new GZipStream(bytes, CompressionLevel.SmallestSize, true))
-        {
-            await gzip.WriteAsync(new byte[16 * 1024 * 1024 + 1], TestContext.CancellationToken);
-        }
-
-        using var content = new ByteArrayContent(bytes.ToArray());
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        content.Headers.ContentEncoding.Add("gzip");
-        using var response = await TelemetryLifecycle.Http.PostAsync(new Uri(receiver.Endpoint, "v1/traces"), content,
-            TestContext.CancellationToken);
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, OtlpHttp.Compress(new byte[16 * 1024 * 1024 + 1]),
+            TestContext.CancellationToken, Signals.Traces, "gzip");
         Assert.AreEqual(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
-        var error = await ReadErrorAsync(response, TestContext.CancellationToken);
+        var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
         Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
         Assert.Contains("16777216-byte", error.Message);
         Assert.AreEqual(error.Message, Assert.ContainsSingle(receiver.Snapshot().Receipts).Error);
@@ -82,17 +70,14 @@ public sealed class TransportTests
     public async Task HttpReceiver_InvalidGzip_ReturnsBadRequestWithItsErrorRecord()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        using var content = new ByteArrayContent([1, 2, 3]);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        content.Headers.ContentEncoding.Add("gzip");
-        using var response = await TelemetryLifecycle.Http.PostAsync(new Uri(receiver.Endpoint, "v1/logs"), content,
-            TestContext.CancellationToken);
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, [1, 2, 3], TestContext.CancellationToken,
+            Signals.Logs, "gzip");
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
         Assert.AreEqual(Signals.Logs, receipt.Signal);
         Assert.IsFalse(string.IsNullOrEmpty(receipt.Error));
         Assert.AreEqual(0L, receipt.Accepted);
-        var error = await ReadErrorAsync(response, TestContext.CancellationToken);
+        var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
         Assert.AreEqual((int)Google.Rpc.Code.InvalidArgument, error.Code);
         Assert.AreEqual(receipt.Error, error.Message);
     }
@@ -108,22 +93,11 @@ public sealed class TransportTests
         request.Headers.ExpectContinue = negotiateDeclaredLengthBeforeUploadToAvoidABrokenPipe;
         using var response = await TelemetryLifecycle.Http.SendAsync(request, TestContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
-        var error = await ReadErrorAsync(response, TestContext.CancellationToken);
+        var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
         Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
         Assert.IsFalse(string.IsNullOrWhiteSpace(error.Message));
         var snapshot = receiver.Snapshot();
         Assert.IsEmpty(snapshot.Spans);
         Assert.AreEqual(error.Message, Assert.ContainsSingle(snapshot.Receipts).Error);
-    }
-
-    internal static async Task<RpcStatus> ReadErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken,
-        string mediaType = "application/x-protobuf")
-    {
-        Assert.AreEqual(mediaType, response.Content.Headers.ContentType?.MediaType);
-        var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-        Assert.IsNotEmpty(body);
-        return mediaType == "application/json"
-            ? JsonParser.Default.Parse<RpcStatus>(System.Text.Encoding.UTF8.GetString(body))
-            : RpcStatus.Parser.ParseFrom(body);
     }
 }

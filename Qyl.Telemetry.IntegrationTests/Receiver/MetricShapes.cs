@@ -1,6 +1,6 @@
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
 
-/// <summary>Metric data kinds that select the fixture built by <see cref="MetricWireTests.Fixture"/>.</summary>
+/// <summary>Metric data kinds that select the fixture built by <see cref="MetricFixture.Of" />.</summary>
 internal static class MetricShapes
 {
     public const string Gauge = "gauge";

@@ -43,7 +43,7 @@ public sealed class TraceModelTests
         unrelated.ScopeSpans[0].Spans[0].TraceId = Id("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         request.ResourceSpans.Add(unrelated);
         using var response =
-            await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
+            await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var trace = new TraceEvidence("11111111111111111111111111111111", receiver.Snapshot());
         Assert.AreSequenceEqual(["orders", "payments"], trace.Services);
@@ -89,7 +89,7 @@ public sealed class TraceModelTests
         var bytes = request.ToByteArray();
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            using var response = await ReceiverTests.PostAsync(receiver.Endpoint, bytes, TestContext.CancellationToken);
+            using var response = await OtlpHttp.PostAsync(receiver.Endpoint, bytes, TestContext.CancellationToken);
             response.EnsureSuccessStatusCode();
         }
         var capture = receiver.Snapshot();

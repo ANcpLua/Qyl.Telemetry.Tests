@@ -29,7 +29,7 @@ public sealed class NumberAndSessionTests
                 }
             }
         });
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, "metrics");
         response.EnsureSuccessStatusCode();
         var metric = Assert.ContainsSingle(receiver.Snapshot().Metrics);
@@ -56,7 +56,7 @@ public sealed class NumberAndSessionTests
         spans.ResourceSpans[0].ScopeSpans[0].Spans[0].Attributes
             .Add(Pair("session.id", new AnyValue { StringValue = "span-session" }));
         using var first =
-            await ReceiverTests.PostAsync(receiver.Endpoint, spans.ToByteArray(), TestContext.CancellationToken);
+            await OtlpHttp.PostAsync(receiver.Endpoint, spans.ToByteArray(), TestContext.CancellationToken);
         first.EnsureSuccessStatusCode();
         var logs = Logs(new Resource { Attributes = { Pair("session.id", new AnyValue { StringValue = "log-resource-session" }) } },
             new InstrumentationScope { Name = "session-scope" },
@@ -66,7 +66,7 @@ public sealed class NumberAndSessionTests
                 SeverityNumber = SeverityNumber.Info,
                 Attributes = { Pair("session.id", new AnyValue { StringValue = "log-session" }) }
             });
-        using var second = await ReceiverTests.PostAsync(receiver.Endpoint, logs.ToByteArray(),
+        using var second = await OtlpHttp.PostAsync(receiver.Endpoint, logs.ToByteArray(),
             TestContext.CancellationToken, "logs");
         second.EnsureSuccessStatusCode();
         var trace = new TraceEvidence("11111111111111111111111111111111", receiver.Snapshot());
@@ -92,7 +92,7 @@ public sealed class NumberAndSessionTests
             EventName = "Invalid", Attributes = { Pair("duplicate", new AnyValue { StringValue = "first" }), Pair("duplicate", new AnyValue { StringValue = "second" }) }
         };
         var request = Logs(null, new InstrumentationScope { Name = "partial-scope" }, valid, invalid);
-        using var response = await ReceiverTests.PostAsync(receiver.Endpoint, request.ToByteArray(),
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, "logs");
         response.EnsureSuccessStatusCode();
         var result =
