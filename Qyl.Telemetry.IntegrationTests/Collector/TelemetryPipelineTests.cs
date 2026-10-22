@@ -223,19 +223,16 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         _ = await Assert.ThrowsAsync<FormatException>(() => OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken));
     }
 
-    private static HttpClient CollectorClient(HttpStatusCode status, byte[] bytes) => new(new CollectorHandler(status, bytes))
-    {
-        BaseAddress = new Uri("https://collector.test/")
-    };
+    private static HttpClient CollectorClient(HttpStatusCode status, byte[] bytes) =>
+        CollectorClient((_, _) => Task.FromResult(Reply(status, bytes)));
 
-    private sealed class CollectorHandler(HttpStatusCode status, byte[] bytes) : HttpMessageHandler
+    private static HttpClient CollectorClient(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond) =>
+        new(new StubHandler(respond)) { BaseAddress = new Uri("https://collector.test/") };
+
+    private static HttpResponseMessage Reply(HttpStatusCode status, byte[] bytes) => new(status)
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(status)
-            {
-                Content = new ByteArrayContent(bytes) { Headers = { ContentType = new MediaTypeHeaderValue("application/x-protobuf") } }
-            });
-    }
+        Content = new ByteArrayContent(bytes) { Headers = { ContentType = new MediaTypeHeaderValue("application/x-protobuf") } }
+    };
 
     [TestMethod]
     [DataRow(Signals.Traces)]
@@ -243,20 +240,19 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     [DataRow(Signals.Metrics)]
     public async Task OtlpRelay_ProducerDisconnectsDuringExport_ForwardsTheAcceptedExport(string signal)
     {
-        using var handler = new PendingCollectorHandler();
-        using var collector = new HttpClient(handler);
-        collector.BaseAddress = new Uri("https://collector.test/");
+        var pending = new PendingCollector();
+        using var collector = pending.Client();
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
         var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
-        using var release = handler.Releasing();
+        using var release = pending.Releasing();
         using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
         var send = OtlpHttp.PostAsync(receiver.Address, [], cancelled.Token, signal);
-        await handler.Started.Task.WaitAsync(testContext.CancellationToken);
+        await pending.Started.Task.WaitAsync(testContext.CancellationToken);
         await cancelled.CancelAsync();
         _ = await Assert.ThrowsAsync<OperationCanceledException>(() => send);
         var stop = receiver.DisposeAsync().AsTask();
         Assert.IsFalse(stop.IsCompleted, "Shutdown must join the active export.");
-        _ = handler.Complete.TrySetResult();
+        _ = pending.Complete.TrySetResult();
         await stop;
         var delivery = Assert.ContainsSingle(receiver.Deliveries);
         Assert.AreEqual(200, delivery.CaptureStatus);
@@ -268,14 +264,13 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     [TestMethod]
     public async Task OtlpRelay_UpstreamTransportFailure_IsRecordedInDeliveries()
     {
-        using var handler = new PendingCollectorHandler();
-        using var collector = new HttpClient(handler);
-        collector.BaseAddress = new Uri("https://collector.test/");
+        var pending = new PendingCollector();
+        using var collector = pending.Client();
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
         await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
         var send = OtlpHttp.PostAsync(receiver.Address, [], testContext.CancellationToken, Signals.Logs);
-        await handler.Started.Task.WaitAsync(testContext.CancellationToken);
-        _ = handler.Complete.TrySetException(new HttpRequestException("upstream unavailable"));
+        await pending.Started.Task.WaitAsync(testContext.CancellationToken);
+        _ = pending.Complete.TrySetException(new HttpRequestException("upstream unavailable"));
         using var response = await send;
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.AreEqual(14, RpcStatus.Parser.ParseFrom(await response.Content.ReadAsByteArrayAsync(testContext.CancellationToken)).Code);
@@ -286,7 +281,8 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.AreEqual(Signals.Logs, Assert.ContainsSingle(capture.Snapshot().Requests).Signal);
     }
 
-    private sealed class PendingCollectorHandler : HttpMessageHandler
+    /// <summary>A Collector whose export reply waits until the test completes or fails <see cref="Complete" />.</summary>
+    private sealed class PendingCollector
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Complete { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -294,19 +290,16 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         /// <summary>Completes a pending export on disposal so the relay can join it during cleanup.</summary>
         public Release Releasing() => new(Complete);
 
-        public sealed class Release(TaskCompletionSource complete) : IDisposable
-        {
-            public void Dispose() => _ = complete.TrySetResult();
-        }
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public HttpClient Client() => CollectorClient(async (request, cancellationToken) =>
         {
             _ = Started.TrySetResult();
             await Complete.Task.WaitAsync(cancellationToken);
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent([]) { Headers = { ContentType = new MediaTypeHeaderValue("application/x-protobuf") } }
-            };
+            return Reply(HttpStatusCode.OK, []);
+        });
+
+        public sealed class Release(TaskCompletionSource complete) : IDisposable
+        {
+            public void Dispose() => _ = complete.TrySetResult();
         }
     }
     public async ValueTask DisposeAsync()

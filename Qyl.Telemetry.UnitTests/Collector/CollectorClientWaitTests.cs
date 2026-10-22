@@ -128,7 +128,7 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
 
         public CollectorClient Client(TimeProvider clock)
         {
-            var client = new HttpClient(new Handler(Respond)) { BaseAddress = new Uri("https://qyl.test/") };
+            var client = new HttpClient(new StubHandler(_ => Respond())) { BaseAddress = new Uri("https://qyl.test/") };
             _clients.Add(client);
             return new CollectorClient(client, clock);
         }
@@ -154,15 +154,6 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
             return body is null
                 ? new HttpResponseMessage(HttpStatusCode.NotFound)
                 : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-        }
-    }
-
-    private sealed class Handler(Func<HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(respond());
         }
     }
 }

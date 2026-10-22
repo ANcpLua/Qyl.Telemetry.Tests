@@ -199,11 +199,5 @@ public sealed class CollectorClientTests(TestContext testContext)
     };
 
     private static HttpClient Client(Func<HttpRequestMessage, HttpResponseMessage> respond) =>
-        new(new Handler(respond)) { BaseAddress = new Uri("https://qyl.test/") };
-
-    private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(respond(request));
-    }
+        new(new StubHandler(respond)) { BaseAddress = new Uri("https://qyl.test/") };
 }
