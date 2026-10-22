@@ -23,7 +23,7 @@ public sealed class ConnectedTraceAttribute : TelemetryPolicyAttribute
             var known = spans.Select(span => span.SpanId).Append(trace.RootSpanId).ToHashSet(StringComparer.Ordinal);
             foreach (var span in spans)
             {
-                if (string.IsNullOrEmpty(span.ParentSpanId) || span.ParentSpanId.All(digit => digit == '0'))
+                if (TelemetryId.IsAbsent(span.ParentSpanId))
                 {
                     if (span.SpanId != trace.RootSpanId)
                         yield return $"{Describe(span)} starts a second root in trace {trace.Evidence.TraceId}.";

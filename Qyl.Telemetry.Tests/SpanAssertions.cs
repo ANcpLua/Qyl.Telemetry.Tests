@@ -37,9 +37,9 @@ public static class SpanAssertions
 
     private static void RequireIdentity(string trace, string span)
     {
-        Assert.IsTrue(trace.Length == 32 && trace.All(char.IsAsciiHexDigit) && trace.Any(value => value != '0'),
+        Assert.IsTrue(TelemetryId.IsValid(trace, 32),
             $"Expected a nonzero trace ID, observed '{trace}'.");
-        Assert.IsTrue(span.Length == 16 && span.All(char.IsAsciiHexDigit) && span.Any(value => value != '0'),
+        Assert.IsTrue(TelemetryId.IsValid(span, 16),
             $"Expected a nonzero span ID, observed '{span}'.");
     }
 }

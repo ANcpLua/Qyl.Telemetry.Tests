@@ -101,7 +101,7 @@ public sealed class PreservedByCollectorAttribute : TelemetryPolicyAttribute
                 yield return $"gained '{key}' = {TelemetryReport.Format(values[key])}.";
     }
 
-    private static string Parent(string? id) => string.IsNullOrEmpty(id) || id.All(digit => digit == '0') ? "" : id;
+    private static string Parent(string? id) => TelemetryId.IsAbsent(id) ? "" : id;
 
     internal static object? Plain(AttributeValue? value) => value switch
     {
