@@ -1,6 +1,6 @@
 ---
 name: qyl-telemetry-tests
-description: Binding rules for every test in the qyl family on MSTest 4.5.1 with the native Microsoft.Testing.Platform 2.5.1 runner: assertions chosen by their exact semantics, NativeAOT first, no VSTest, no weakened tests; and the test-code rules (the name is the specification, one behavior per test, DataRow constants, no try/catch/finally, time through TimeProvider, the gate decides). Load before writing, changing or reviewing any test in Qyl.Telemetry.Tests or in a repository that consumes it.
+description: "Binding rules for every test in the qyl family on MSTest 4.5.1 with the native Microsoft.Testing.Platform 2.5.1 runner: assertions chosen by their exact semantics, NativeAOT first, no VSTest, no weakened tests; and the test-code rules (the name is the specification, one behavior per test, DataRow constants, no try/catch/finally, time through TimeProvider, the gate decides). Load before writing, changing or reviewing any test in Qyl.Telemetry.Tests or in a repository that consumes it."
 ---
 
 # MSTest: assertions, equality semantics and NativeAOT
