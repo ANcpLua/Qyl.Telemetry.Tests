@@ -5,7 +5,6 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 [TestClass]
 public sealed class SpanAssertionTests
 {
-    private const string Trace = "00112233445566778899aabbccddeeff";
     private const string Parent = "0011223344556677";
     private const string Child = "8899aabbccddeeff";
     private const string Source = "native.source";
@@ -36,7 +35,7 @@ public sealed class SpanAssertionTests
     [TestMethod]
     public void SpanAssertions_SpanUnderItsParentContext_PassesParentCheck()
     {
-        Assert.HasParentContext(NativeSpan(), new SpanRecord(Trace, Parent, "parent"));
+        Assert.HasParentContext(NativeSpan(), new SpanRecord(TestSpan.TraceId, Parent, "parent"));
     }
 
     [TestMethod]
@@ -45,8 +44,8 @@ public sealed class SpanAssertionTests
     [DataRow(ContextMismatch.ReusedIdentity)]
     public void SpanAssertions_DisconnectedTraceWrongParentOrReusedIdentity_FailsParentCheck(ContextMismatch mismatch)
     {
-        var parent = new SpanRecord(Trace, Parent, "parent");
-        var changed = new SpanRecord(mismatch == ContextMismatch.Trace ? "ffeeddccbbaa99887766554433221100" : Trace,
+        var parent = new SpanRecord(TestSpan.TraceId, Parent, "parent");
+        var changed = new SpanRecord(mismatch == ContextMismatch.Trace ? TestSpan.UnrelatedTraceId : TestSpan.TraceId,
             mismatch == ContextMismatch.ReusedIdentity ? Parent : Child, Operation)
         {
             ParentSpanId = mismatch == ContextMismatch.Parent ? Child : Parent
@@ -54,7 +53,7 @@ public sealed class SpanAssertionTests
         Assert.ThrowsExactly<AssertFailedException>(() => Assert.HasParentContext(changed, parent));
     }
 
-    private static SpanRecord NativeSpan() => new(Trace, Child, Operation)
+    private static SpanRecord NativeSpan() => new(TestSpan.TraceId, Child, Operation)
     {
         ParentSpanId = Parent,
         Kind = SpanKind.Server,

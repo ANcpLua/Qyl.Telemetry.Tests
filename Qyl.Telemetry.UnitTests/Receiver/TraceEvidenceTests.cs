@@ -69,8 +69,8 @@ public sealed class TraceEvidenceTests
     private static (TelemetrySnapshot Capture, TraceEvidence Trace, SpanRecord Selected) SelectedTrace()
     {
         var selected = TestSpan.Create("orders", "selected");
-        var unrelated = new SpanRecord("ffeeddccbbaa99887766554433221100", "unrelated", "other operation");
-        var capture = new TelemetrySnapshot([selected, unrelated], [], [], []);
+        var unrelated = new SpanRecord(TestSpan.UnrelatedTraceId, "unrelated", "other operation");
+        var capture = TestSpan.Only(selected, unrelated);
         return (capture, new TraceEvidence(selected.TraceId, capture), selected);
     }
 
@@ -89,33 +89,4 @@ public sealed class TraceEvidenceTests
     private static TraceEvidence StoreTrace() => TestSpan.Trace(TestSpan.Create("z", "1", store: "second"),
         TestSpan.Create("a", "2", store: "first"), TestSpan.Create("a", "3", store: "first"),
         TestSpan.Create("a", "4", store: "another"), TestSpan.Create("test", "5"));
-}
-
-internal static class TestSpan
-{
-    private const string TraceId = "00112233445566778899aabbccddeeff";
-
-    public static SpanRecord Create(string service, string id, SpanKind kind = SpanKind.Internal,
-        string? parent = null, string? store = null, string? server = null)
-    {
-        var attributes = new Dictionary<string, object?>();
-        if (store is not null)
-        {
-            attributes["db.system.name"] = "memory";
-            attributes["db.namespace"] = store;
-        }
-        if (server is not null)
-        {
-            attributes["server.address"] = server;
-        }
-        return new SpanRecord(TraceId, id, "operation")
-        {
-            Kind = kind,
-            ParentSpanId = parent,
-            Attributes = attributes,
-            Resource = new ResourceRecord(new Dictionary<string, object?> { ["service.name"] = service })
-        };
-    }
-
-    public static TraceEvidence Trace(params SpanRecord[] spans) => new(TraceId, new TelemetrySnapshot(spans, [], [], []));
 }

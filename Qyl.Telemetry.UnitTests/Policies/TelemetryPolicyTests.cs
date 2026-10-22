@@ -15,7 +15,6 @@ namespace Qyl.Telemetry.UnitTests.Policies;
 [TestClass]
 public sealed class TelemetryPolicyTests
 {
-    private const string Trace = "00112233445566778899aabbccddeeff";
     private const string Root = "0000000000000001";
     private const string Server = "0000000000000002";
     private const string Client = "0000000000000003";
@@ -72,7 +71,7 @@ public sealed class TelemetryPolicyTests
     [TestMethod]
     public void ConnectedTrace_EmptyTrace_IsNamedInTheFailure()
     {
-        var empty = new PublishedTrace(new TraceEvidence(Trace, new TelemetrySnapshot([], [], [], [])), Root);
+        var empty = new PublishedTrace(new TraceEvidence(TestSpan.TraceId, TestSpan.Only()), Root);
         Assert.AreSequenceEqual(["[ConnectedTrace] Trace 00112233445566778899aabbccddeeff exported no span."],
             Violations(new ConnectedTraceAttribute(), empty));
     }
@@ -243,26 +242,26 @@ public sealed class TelemetryPolicyTests
         var capture = new TelemetrySnapshot([Span(Server, Root)], [Log(17, "Microsoft.AspNetCore.Server.Kestrel", null)], [], []);
         Assert.AreSequenceEqual(
             ["[NoErrorTelemetry] orders logged Error from Microsoft.AspNetCore.Server.Kestrel: ConnectionError"],
-            Violations(new NoErrorTelemetryAttribute(), new PublishedTrace(new TraceEvidence(Trace, capture), Root)));
+            Violations(new NoErrorTelemetryAttribute(), new PublishedTrace(new TraceEvidence(TestSpan.TraceId, capture), Root)));
     }
 
     [TestMethod]
     public void NoErrorTelemetry_InformationLogOfTheTrace_Passes()
     {
-        var capture = new TelemetrySnapshot([Span(Server, Root)], [Log(13, "Orders", Trace)], [], []);
-        Assert.IsEmpty(Violations(new NoErrorTelemetryAttribute(), new PublishedTrace(new TraceEvidence(Trace, capture), Root)));
+        var capture = new TelemetrySnapshot([Span(Server, Root)], [Log(13, "Orders", TestSpan.TraceId)], [], []);
+        Assert.IsEmpty(Violations(new NoErrorTelemetryAttribute(), new PublishedTrace(new TraceEvidence(TestSpan.TraceId, capture), Root)));
     }
 
     [TestMethod]
     public void NoErrorTelemetry_ErrorFixtureSpanOfAnotherTrace_Passes()
     {
-        var healthProbe = new SpanRecord("ffeeddccbbaa99887766554433221100", Client, "GET")
+        var healthProbe = new SpanRecord(TestSpan.UnrelatedTraceId, Client, "GET")
         {
             Kind = SpanKind.Client,
             Status = ActivityStatusCode.Error
         };
-        var capture = new TelemetrySnapshot([Span(Server, Root), healthProbe], [], [], []);
-        Assert.IsEmpty(Violations(new NoErrorTelemetryAttribute(), new PublishedTrace(new TraceEvidence(Trace, capture), Root)));
+        var capture = TestSpan.Only(Span(Server, Root), healthProbe);
+        Assert.IsEmpty(Violations(new NoErrorTelemetryAttribute(), new PublishedTrace(new TraceEvidence(TestSpan.TraceId, capture), Root)));
     }
 
     [TestMethod]
@@ -514,16 +513,16 @@ public sealed class TelemetryPolicyTests
         Attribute("http.response.status_code", new AttributeValue.ObjectValue(new AttributeIntValue { Value = 200 }));
 
     private static PublishedTrace WithReceipts(params ExportReceipt[] receipts) =>
-        new(new TraceEvidence(Trace, new TelemetrySnapshot([Span(Server, Root)], [], [], receipts)), Root);
+        new(new TraceEvidence(TestSpan.TraceId, new TelemetrySnapshot([Span(Server, Root)], [], [], receipts)), Root);
 
-    private static SpanRecord Failed(bool withException) => new(Trace, Server, "GET /orders")
+    private static SpanRecord Failed(bool withException) => new(TestSpan.TraceId, Server, "GET /orders")
     {
         ParentSpanId = Root,
         Kind = SpanKind.Server,
         Status = ActivityStatusCode.Error,
         StatusDescription = "boom",
         Scope = new InstrumentationScopeRecord { Name = "Microsoft.AspNetCore" },
-        Resource = new ResourceRecord(new Dictionary<string, object?> { ["service.name"] = "orders" }),
+        Resource = TestSpan.Orders,
         Events = withException
             ?
             [
@@ -547,10 +546,10 @@ public sealed class TelemetryPolicyTests
     }
 
     private static PublishedTrace Published(params SpanRecord[] spans) =>
-        new(new TraceEvidence(Trace, new TelemetrySnapshot(spans, [], [], [])), Root);
+        new(new TraceEvidence(TestSpan.TraceId, TestSpan.Only(spans)), Root);
 
     private static SpanRecord Span(string id, string parent, SpanKind kind = SpanKind.Server, string name = "GET /orders",
-        string scope = "Microsoft.AspNetCore", IReadOnlyDictionary<string, object?>? attributes = null) => new(Trace, id, name)
+        string scope = "Microsoft.AspNetCore", IReadOnlyDictionary<string, object?>? attributes = null) => new(TestSpan.TraceId, id, name)
     {
         ParentSpanId = parent,
         Kind = kind,
@@ -558,11 +557,11 @@ public sealed class TelemetryPolicyTests
         EndTimeUnixNano = 10,
         Scope = new InstrumentationScopeRecord { Name = scope },
         Attributes = attributes ?? new Dictionary<string, object?>(),
-        Resource = new ResourceRecord(new Dictionary<string, object?> { ["service.name"] = "orders" })
+        Resource = TestSpan.Orders
     };
 
     private static LogRecord Log(int severity, string scope, string? traceId) => new(
-        new ResourceRecord(new Dictionary<string, object?> { ["service.name"] = "orders" }),
+        TestSpan.Orders,
         new InstrumentationScopeRecord { Name = scope }, 1, 1, severity, severity >= 17 ? "Error" : "Information",
         null, new Dictionary<string, object?>(), 0, 0, traceId, null, "ConnectionError");
 
@@ -607,7 +606,7 @@ public sealed class UnverifiedPolicyTests
     [ConnectedTrace]
     public void TelemetryPolicy_EvidenceFromPlainTestClassWithPolicies_Fails()
     {
-        var trace = new PublishedTrace(new TraceEvidence("00112233445566778899aabbccddeeff", new TelemetrySnapshot([], [], [], [])), "0000000000000001");
+        var trace = new PublishedTrace(new TraceEvidence(TestSpan.TraceId, TestSpan.Only()), "0000000000000001");
         var error = Assert.ThrowsExactly<InvalidOperationException>(() => TelemetryInvocation.Publish(trace));
         Assert.AreEqual("Qyl.Telemetry.UnitTests.Policies.UnverifiedPolicyTests declares [ConnectedTrace], but only a "
             + "[TracePerTest] class verifies telemetry policies. Replace [TestClass] with [TracePerTest].", error.Message);

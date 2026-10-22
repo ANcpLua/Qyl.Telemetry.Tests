@@ -269,7 +269,7 @@ public sealed class RegistryConformanceTests
 
     private static RegistryReport Audit(TelemetrySnapshot capture) => RegistryConformance.Check(capture);
 
-    private static RegistryReport EmptyReport() => Audit(new TelemetrySnapshot([], [], [], []));
+    private static RegistryReport EmptyReport() => Audit(TestSpan.Only());
 
     private static RegistryReport CustomReport()
     {
@@ -330,7 +330,7 @@ public sealed class RegistryConformanceTests
     private static RegistryReport DeprecationReport()
     {
         var span = new SpanRecord("trace", "span", "custom") { Attributes = Attributes(("db.system", "postgresql")) };
-        return Audit(new TelemetrySnapshot([span], [], [], []));
+        return Audit(TestSpan.Only(span));
     }
 
     private static RegistryReport TemplateReport()
@@ -342,7 +342,7 @@ public sealed class RegistryConformanceTests
                 ("pprof.scope.sample_type_order", new object?[] { 1L }),
                 ("feature_flag.result.value", new Dictionary<string, object?>()))
         };
-        return Audit(new TelemetrySnapshot([span], [], [], []));
+        return Audit(TestSpan.Only(span));
     }
 
     private static MetricRecord Metric(string name, string unit, MetricData data)

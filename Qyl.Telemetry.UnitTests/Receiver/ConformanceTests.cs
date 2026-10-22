@@ -85,7 +85,7 @@ public sealed class ConformanceTests
     {
         var span = Model(new Dictionary<string, object?> { ["field"] = Literal(valueType) });
         var report =
-            new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(Definition(type),
+            new TraceEvidence(span.TraceId, TestSpan.Only(span)).Conformance(Definition(type),
                 _ => true);
         Assert.AreEqual(expected, report.IsConformant);
         Assert.HasCount(expected ? 0 : 1, report.Issues);
@@ -292,10 +292,10 @@ public sealed class ConformanceTests
     }
 
     private static ConformanceReport Check(SpanRecord span, SpanDefinition<Server> definition) =>
-        new TraceEvidence(span.TraceId, new TelemetrySnapshot([span], [], [], [])).Conformance(definition, _ => true);
+        new TraceEvidence(span.TraceId, TestSpan.Only(span)).Conformance(definition, _ => true);
 
     private static ConformanceReport EmptySelectionReport() =>
-        new TraceEvidence("trace", new TelemetrySnapshot([], [], [], [])).Conformance(Definition("string"), _ => true);
+        new TraceEvidence("trace", TestSpan.Only()).Conformance(Definition("string"), _ => true);
 
     private static ConformanceReport StringFieldReport() =>
         Check(Model(new Dictionary<string, object?> { ["field"] = Literal("string") }), Definition("string"));
