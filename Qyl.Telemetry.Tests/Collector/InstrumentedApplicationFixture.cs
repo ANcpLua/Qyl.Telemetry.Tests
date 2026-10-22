@@ -73,14 +73,8 @@ public sealed class InstrumentedApplicationFixture : IAsyncDisposable
         catch (Exception startupFailure)
         {
             var errors = new List<Exception> { startupFailure };
-            if (application is not null)
-            {
-                try { await application.DisposeAsync().ConfigureAwait(false); }
-                catch (Exception cleanupFailure) { errors.Add(cleanupFailure); }
-            }
-
-            try { await telemetry.DisposeAsync().ConfigureAwait(false); }
-            catch (Exception cleanupFailure) { errors.Add(cleanupFailure); }
+            if (application is not null) await errors.AttemptAsync(application.DisposeAsync).ConfigureAwait(false);
+            await errors.AttemptAsync(telemetry.DisposeAsync).ConfigureAwait(false);
             if (errors.Count > 1) throw new AggregateException("Application startup and cleanup failed.", errors);
             throw;
         }
@@ -91,10 +85,8 @@ public sealed class InstrumentedApplicationFixture : IAsyncDisposable
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         Client.Dispose();
         var errors = new List<Exception>();
-        try { await _application.DisposeAsync().ConfigureAwait(false); }
-        catch (Exception error) { errors.Add(error); }
-        try { await Telemetry.DisposeAsync().ConfigureAwait(false); }
-        catch (Exception error) { errors.Add(error); }
+        await errors.AttemptAsync(_application.DisposeAsync).ConfigureAwait(false);
+        await errors.AttemptAsync(Telemetry.DisposeAsync).ConfigureAwait(false);
         if (errors.Count > 0) throw new AggregateException("Application fixture cleanup failed.", errors);
     }
 }

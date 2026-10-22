@@ -108,14 +108,9 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
             return;
         }
         var errors = new List<Exception>();
-        try { await StopAsync().ConfigureAwait(false); }
-        catch (Exception error) { errors.Add(error); }
-        finally { _gate.Dispose(); }
-        foreach (var path in EvidenceFiles)
-        {
-            try { context.AddResultFile(path); }
-            catch (Exception error) { errors.Add(error); }
-        }
+        await errors.AttemptAsync(() => new ValueTask(StopAsync())).ConfigureAwait(false);
+        _gate.Dispose();
+        foreach (var path in EvidenceFiles) errors.Attempt(() => context.AddResultFile(path));
         if (errors.Count > 0) throw new AggregateException("Telemetry cleanup or evidence attachment failed.", errors);
     }
 
@@ -126,16 +121,11 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
         var capture = _capture; _capture = null;
         var collector = _collector; _collector = null;
         var errors = new List<Exception>();
-        try { provider?.Dispose(); }
-        catch (Exception error) { errors.Add(error); }
-        if (receiver is not null)
-        {
-            try { await receiver.DisposeAsync().ConfigureAwait(false); }
-            catch (Exception error) { errors.Add(error); }
-        }
+        errors.Attempt(() => provider?.Dispose());
+        if (receiver is not null) await errors.AttemptAsync(receiver.DisposeAsync).ConfigureAwait(false);
         if (capture is not null)
         {
-            try
+            await errors.AttemptAsync(async () =>
             {
                 _lastCapture = capture.Snapshot();
                 var stored = collector is not null && TelemetryInvocation.Requires<PreservedByCollectorAttribute>()
@@ -172,15 +162,12 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
                         Stored = stored?[root.TraceId]
                     });
                 }
-            }
-            catch (Exception error) { errors.Add(error); }
-            try { await capture.DisposeAsync().ConfigureAwait(false); }
-            catch (Exception error) { errors.Add(error); }
+            }).ConfigureAwait(false);
+            await errors.AttemptAsync(capture.DisposeAsync).ConfigureAwait(false);
         }
         if (collector is not null)
         {
-            try { await collector.DisposeAsync().ConfigureAwait(false); }
-            catch (Exception error) { errors.Add(error); }
+            await errors.AttemptAsync(collector.DisposeAsync).ConfigureAwait(false);
             foreach (var name in new[] { "shutdown.json", "collector.log" })
             {
                 var path = Path.Combine(collector.DataDirectory, name);
