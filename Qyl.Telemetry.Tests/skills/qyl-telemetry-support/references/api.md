@@ -20,6 +20,7 @@
 | Collector ingestion and investigation | [CollectorClient](../../../Collector/CollectorClient.cs) |
 | Capture, forwarding, persistence and diagnostic files | [TelemetryPipeline](../../../Collector/TelemetryPipeline.cs) |
 | Instrumented child application and complete delivery fixture | [InstrumentedApplicationFixture](../../../Collector/InstrumentedApplicationFixture.cs) |
+| One request to the instrumented application and where its server span sits | [RoundTripAsync, Assert.HasServerSpanUnderTheTestClient](../../../Collector/ApplicationRoundTrip.cs) |
 
 `[TracePerTest]` wraps the original method attribute once per invocation and data
 row, then verifies declared policies. `TelemetryPipeline` uses the invocation

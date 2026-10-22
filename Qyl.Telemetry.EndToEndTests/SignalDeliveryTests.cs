@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using Qyl.Api.Contracts.Common;
 using Qyl.Api.Contracts.OTel.Metrics;
+using Qyl.Telemetry.Tests.Collector;
 
 namespace Qyl.Telemetry.EndToEndTests;
 
@@ -15,7 +16,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     public async Task ApplicationEvent_StoredAsLog_KeepsTheServerSpanAndResource()
     {
         var evidence = await SendRequestAsync();
-        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
+        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName));
         var completed = Assert.ContainsSingle(server.Events.Where(item => item.Name == ProbeSignals.CompletedEvent));
         Assert.AreEqual(ProbeSignals.RequestId, completed.Attributes[ProbeSignals.RequestAttribute]);
         Assert.IsGreaterThanOrEqualTo(server.StartTimeUnixNano, completed.TimeUnixNano);
@@ -42,7 +43,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     {
         var start = Application.Telemetry.Collector.TimeProvider.GetUtcNow().AddSeconds(-1);
         var evidence = await SendRequestAsync();
-        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
+        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName));
         var instance = server.Resource.Attributes["service.instance.id"];
         var capture = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Metrics.Any(metric =>
             metric.Name == ProbeSignals.CounterName && Equals(metric.Resource.Attributes["service.instance.id"], instance)),
@@ -82,7 +83,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
             _ => throw new ArgumentOutOfRangeException(nameof(metric))
         };
         var evidence = await SendRequestAsync();
-        var instance = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService)).Resource.Attributes["service.instance.id"];
+        var instance = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName)).Resource.Attributes["service.instance.id"];
         var capture = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Metrics.Any(item =>
             item.Name == expected.Name && Equals(item.Resource.Attributes["service.instance.id"], instance)), Context.CancellationToken);
         var observed = capture.Metrics.Where(item => item.Name == expected.Name
@@ -101,7 +102,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     public async Task ApplicationRequest_Failed_KeepsErrorStatusAndExceptionEvidence()
     {
         var evidence = await SendRequestAsync("failure", HttpStatusCode.InternalServerError);
-        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
+        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName));
         Assert.AreEqual(ActivityStatusCode.Error, server.Status);
         var completed = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Logs.Any(log =>
             log.TraceId == evidence.TraceId && log.Scope?.Name == "Microsoft.AspNetCore.Server.Kestrel"), Context.CancellationToken);

@@ -12,7 +12,6 @@ namespace Qyl.Telemetry.EndToEndTests;
 [PreservedByCollector]
 public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDisposable
 {
-    protected const string ProbeService = "telemetry-probe";
     protected const string RequestIdHeader = "X-Request-Id";
     protected const string UnderscoreHeader = "X_Request_Id";
     protected const string AuthorizationHeader = "Authorization";
@@ -43,35 +42,22 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
 
     protected async Task<TraceEvidence> SendRequestAsync(string route = "capture", HttpStatusCode expectedStatus = HttpStatusCode.OK)
     {
-        using var root = Application.Telemetry.Begin(context.TestName);
-        var traceId = root.TraceId.ToHexString();
-        using (Application.Telemetry.Ending(root))
+        using var request = new HttpRequestMessage(HttpMethod.Get, route);
+        Assert.IsTrue(request.Headers.TryAddWithoutValidation(ProbeSignals.RequestHeader, ProbeSignals.RequestId));
+        Assert.IsTrue(request.Headers.TryAddWithoutValidation(RequestIdHeader, RequestValues));
+        Assert.IsTrue(request.Headers.TryAddWithoutValidation(UnderscoreHeader, UnderscoreValues));
+        Assert.IsTrue(request.Headers.TryAddWithoutValidation(AuthorizationHeader, AuthorizationValues));
+        var roundTrip = await Application.RoundTripAsync(request, async response =>
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, route);
-            Assert.IsTrue(request.Headers.TryAddWithoutValidation(ProbeSignals.RequestHeader, ProbeSignals.RequestId));
-            Assert.IsTrue(request.Headers.TryAddWithoutValidation(RequestIdHeader, RequestValues));
-            Assert.IsTrue(request.Headers.TryAddWithoutValidation(UnderscoreHeader, UnderscoreValues));
-            Assert.IsTrue(request.Headers.TryAddWithoutValidation(AuthorizationHeader, AuthorizationValues));
-            using var response = await Application.Client.SendAsync(request, context.CancellationToken);
             Assert.AreEqual(expectedStatus, response.StatusCode);
             if (route == "capture")
             {
                 using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.CancellationToken));
                 Assert.IsTrue(body.RootElement.GetProperty("informationLoggingEnabled").GetBoolean());
             }
-        }
-
-        var capture = await Application.Telemetry.AwaitAsync(
-            snapshot => snapshot.Spans.Any(span => span.TraceId == traceId && span is { Service: ProbeService, Kind: SpanKind.Server }), context.CancellationToken);
-        var evidence = new TraceEvidence(traceId, capture);
-        var server = Assert.HasSingleNativeSpan(evidence.Spans.Where(span => span.Service == ProbeService),
-            "Microsoft.AspNetCore", "GET /" + route, SpanKind.Server);
-        var client = Assert.ContainsSingle(evidence.Spans.Where(span => span.Kind == SpanKind.Client
-            && span.SpanId == server.ParentSpanId));
-        Assert.AreEqual(TelemetryPipeline.TestProcess, client.Service);
-        Assert.HasParentContext(server, client);
-        Assert.HasParentContext(client, root.Context);
-        return evidence;
+        }, context);
+        _ = Assert.HasServerSpanUnderTheTestClient(roundTrip, "GET /" + route);
+        return roundTrip.Evidence;
     }
 
     public async ValueTask DisposeAsync()
@@ -100,7 +86,7 @@ public sealed class SelectedHeaderDeliveryTests(TestContext context) : CaptureDe
     public async Task HeaderCapture_SelectedArrays_KeepNamesValuesAndOrderThroughStorage()
     {
         var evidence = await SendRequestAsync();
-        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
+        var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName));
         Assert.AreEqual(SpanKind.Server, server.Kind);
         Assert.AreSequenceEqual(CapturedRequestValues, server.GetStrings(RequestIdAttribute)!);
         Assert.AreSequenceEqual(UnderscoreValues, server.GetStrings(UnderscoreAttribute)!);

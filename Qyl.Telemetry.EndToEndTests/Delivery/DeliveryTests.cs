@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Qyl.Telemetry.SemanticConventions.Attributes.Http;
 using Qyl.Telemetry.Tests.Collector;
-using SpanKind = Qyl.Telemetry.SemanticConventions.SpanKind;
 
 namespace Qyl.Telemetry.EndToEndTests.Delivery;
 
@@ -36,27 +35,16 @@ public sealed class DeliveryTests(TestContext context)
             {
                 ["OTEL_DOTNET_AUTO_TRACES_ASPNETCORE_INSTRUMENTATION_CAPTURE_REQUEST_HEADERS"] = ProbeSignals.RequestHeader
             });
-        using var root = application.Telemetry.Begin(context.TestName);
-        var traceId = root.TraceId.ToHexString();
-        using (application.Telemetry.Ending(root))
+        using var request = new HttpRequestMessage(HttpMethod.Get, "capture");
+        request.Headers.Add(ProbeSignals.RequestHeader, ProbeSignals.RequestId);
+        var roundTrip = await application.RoundTripAsync(request, async response =>
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, "capture");
-            request.Headers.Add(ProbeSignals.RequestHeader, ProbeSignals.RequestId);
-            using var response = await application.Client.SendAsync(request, context.CancellationToken);
             Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.CancellationToken));
             Assert.AreEqual(format == ExecutableFormat.ManagedAssembly, body.RootElement.GetProperty("isDynamicCodeSupported").GetBoolean());
-        }
-
-        var capture = await application.Telemetry.AwaitAsync(snapshot => snapshot.Spans.Any(span =>
-            span.TraceId == traceId && span is { Kind: SpanKind.Server, Service: "telemetry-probe" }), context.CancellationToken);
-        var trace = new TraceEvidence(traceId, capture);
-        var server = Assert.HasSingleNativeSpan(trace.Spans.Where(span => span.Service == "telemetry-probe"),
-            "Microsoft.AspNetCore", "GET /capture", SpanKind.Server);
-        var client = Assert.ContainsSingle(trace.Spans.Where(span => span.SpanId == server.ParentSpanId));
-        Assert.AreEqual(SpanKind.Client, client.Kind);
-        Assert.HasParentContext(server, client);
-        Assert.HasParentContext(client, root.Context);
+        }, context);
+        var traceId = roundTrip.Evidence.TraceId;
+        var server = Assert.HasServerSpanUnderTheTestClient(roundTrip, "GET /capture");
         Assert.AreSequenceEqual([ProbeSignals.RequestId], server.GetStrings(CapturedKey)!);
         _ = await application.Telemetry.Collector.Client.WaitForSpansAsync(traceId, [server.SpanId], context.CancellationToken);
 

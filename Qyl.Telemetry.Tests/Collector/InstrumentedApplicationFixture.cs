@@ -1,4 +1,5 @@
 using Qyl.Orchestration;
+using Qyl.Telemetry.SemanticConventions;
 
 namespace Qyl.Telemetry.Tests.Collector;
 
@@ -6,7 +7,7 @@ namespace Qyl.Telemetry.Tests.Collector;
 [JetBrains.Annotations.PublicAPI]
 public sealed class InstrumentedApplicationFixture : IAsyncDisposable
 {
-    private const string ServiceName = "telemetry-probe";
+    public const string ServiceName = "telemetry-probe";
     private readonly QylApplication _application;
     private int _disposed;
 
@@ -78,6 +79,29 @@ public sealed class InstrumentedApplicationFixture : IAsyncDisposable
             if (errors.Count > 1) throw new AggregateException("Application startup and cleanup failed.", errors);
             throw;
         }
+    }
+
+    /// <summary>
+    ///     Sends <paramref name="request" /> to the application under a new pipeline root, lets <paramref name="inspect" />
+    ///     read the response before the root ends, and waits until the application's server span of that trace is captured.
+    /// </summary>
+    public async Task<ApplicationRoundTrip> RoundTripAsync(HttpRequestMessage request, Func<HttpResponseMessage, Task> inspect,
+        TestContext context)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(inspect);
+        ArgumentNullException.ThrowIfNull(context);
+        using var root = Telemetry.Begin(context.TestName);
+        var traceId = root.TraceId.ToHexString();
+        using (Telemetry.Ending(root))
+        {
+            using var response = await Client.SendAsync(request, context.CancellationToken).ConfigureAwait(false);
+            await inspect(response).ConfigureAwait(false);
+        }
+
+        var capture = await Telemetry.AwaitAsync(snapshot => snapshot.Spans.Any(span =>
+            span.TraceId == traceId && span is { Service: ServiceName, Kind: SpanKind.Server }), context.CancellationToken).ConfigureAwait(false);
+        return new ApplicationRoundTrip(root.Context, new TraceEvidence(traceId, capture));
     }
 
     public async ValueTask DisposeAsync()
