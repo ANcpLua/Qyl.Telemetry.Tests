@@ -45,7 +45,7 @@ public sealed class QylHostingTests(TestContext context)
 
         var snapshot = await receiver.AwaitAsync(
             evidence => evidence.Spans.Any(span => span.TraceId == traceId),
-            TimeSpan.FromSeconds(10), context.CancellationToken);
+            OtlpReceiver.DefaultEvidenceTimeout, context.CancellationToken);
         var span = Assert.ContainsSingle(snapshot.Spans.Where(span => span.TraceId == traceId));
         Assert.AreEqual(OperationName, span.Name);
         Assert.AreEqual(SourceName, span.Scope?.Name);

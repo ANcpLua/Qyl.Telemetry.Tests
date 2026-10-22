@@ -36,7 +36,7 @@ public sealed class WireSchemaTests
         activity.SetStatus(ActivityStatusCode.Ok).SetTag(HttpAttributes.RequestMethod, "POST");
         var traceId = activity.TraceId.ToHexString();
         activity.Stop();
-        var capture = await receiver.AwaitAsync(s => s.Spans.Count == 1, TimeSpan.FromSeconds(10),
+        var capture = await receiver.AwaitAsync(s => s.Spans.Count == 1, OtlpReceiver.DefaultEvidenceTimeout,
             TestContext.CancellationToken);
         var span = Assert.ContainsSingle(capture.Spans);
         Assert.AreEqual(traceId, span.TraceId);
@@ -46,7 +46,7 @@ public sealed class WireSchemaTests
         Assert.AreEqual(source.Name, span.Scope?.Name);
         Assert.AreEqual("1.2.3", span.Scope?.Version);
         Assert.AreEqual(schemaUrl, span.Resource.SchemaUrl);
-        Assert.AreEqual("https://attribute.invalid/", span.Resource.Attributes["telemetry.schema_url"]);
+        Assert.AreEqual(MisleadingSchemaUrlAttribute, span.Resource.Attributes["telemetry.schema_url"]);
         Assert.AreEqual("schema-producer", span.Service);
         Assert.AreEqual("POST", span.GetString("http.request.method"));
     }

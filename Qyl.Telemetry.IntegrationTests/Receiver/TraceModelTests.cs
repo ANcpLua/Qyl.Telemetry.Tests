@@ -25,7 +25,7 @@ public sealed class TraceModelTests
         payments.Resource.Attributes[0].Value.StringValue = "payments";
         var server = payments.ScopeSpans[0].Spans[0];
         server.Kind = ProtoSpan.Types.SpanKind.Server;
-        server.ParentSpanId = Id("2222222222222222");
+        server.ParentSpanId = Id(SpanId);
         server.SpanId = Id("3333333333333333");
         var database = server.Clone();
         database.Kind = ProtoSpan.Types.SpanKind.Client;
@@ -39,12 +39,12 @@ public sealed class TraceModelTests
         payments.ScopeSpans[0].Spans.Add(database);
         request.ResourceSpans.Add(payments);
         var unrelated = orders.Clone();
-        unrelated.ScopeSpans[0].Spans[0].TraceId = Id("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        unrelated.ScopeSpans[0].Spans[0].TraceId = Id(UnrelatedTraceId);
         request.ResourceSpans.Add(unrelated);
         using var response =
             await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
-        var trace = new TraceEvidence("11111111111111111111111111111111", receiver.Snapshot());
+        var trace = new TraceEvidence(TraceId, receiver.Snapshot());
         Assert.AreSequenceEqual(["orders", "payments"], trace.Services);
         Assert.AreEqual("business-session", trace.SessionId);
         Assert.AreSequenceEqual(["business-session"], trace.SessionIds);
@@ -53,7 +53,7 @@ public sealed class TraceModelTests
         var call = Assert.ContainsSingle(trace.Calls);
         Assert.AreEqual("orders", call.From);
         Assert.AreEqual("payments", call.To);
-        Assert.AreEqual("2222222222222222", call.Client.SpanId);
+        Assert.AreEqual(SpanId, call.Client.SpanId);
         Assert.AreEqual("3333333333333333", call.Server.SpanId);
         Assert.AreEqual(trace.TraceId, call.Client.TraceId);
         Assert.AreEqual(trace.TraceId, call.Server.TraceId);
@@ -92,7 +92,7 @@ public sealed class TraceModelTests
             response.EnsureSuccessStatusCode();
         }
         var capture = receiver.Snapshot();
-        var trace = new TraceEvidence("11111111111111111111111111111111", capture);
+        var trace = new TraceEvidence(TraceId, capture);
         Assert.HasCount(8, capture.Spans);
         Assert.HasCount(8, trace.Spans);
         Assert.HasCount(2, capture.Requests);

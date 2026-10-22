@@ -62,14 +62,14 @@ public sealed class NumberAndSessionTests
             new InstrumentationScope { Name = "session-scope" },
             new OpenTelemetry.Proto.Logs.V1.LogRecord
             {
-                TraceId = Id("11111111111111111111111111111111"), EventName = "SessionObserved",
+                TraceId = Id(TraceId), EventName = "SessionObserved",
                 SeverityNumber = SeverityNumber.Info,
                 Attributes = { Pair("session.id", "log-session") }
             });
         using var second = await OtlpHttp.PostAsync(receiver.Endpoint, logs.ToByteArray(),
             TestContext.CancellationToken, "logs");
         second.EnsureSuccessStatusCode();
-        var trace = new TraceEvidence("11111111111111111111111111111111", receiver.Snapshot());
+        var trace = new TraceEvidence(TraceId, receiver.Snapshot());
         Assert.AreEqual("rich.operation", Assert.ContainsSingle(trace.Spans).Name);
         var log = Assert.ContainsSingle(trace.Logs);
         Assert.AreEqual("SessionObserved", log.EventName);

@@ -19,7 +19,7 @@ internal static class OtlpHttp
     internal static HttpContent Content(byte[] payload, string? encoding = null, bool chunked = false)
     {
         HttpContent content = chunked ? new UnknownLengthContent(payload) : new ByteArrayContent(payload);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
+        content.Headers.ContentType = new MediaTypeHeaderValue(OtlpReceiver.ProtobufMediaType);
         if (encoding is not null) content.Headers.ContentEncoding.Add(encoding);
         return content;
     }

@@ -66,7 +66,7 @@ public sealed class MetricWireTests
         var payload = archive.RootElement.GetProperty("Requests")[0];
         Assert.AreEqual(Signals.Metrics, payload.GetProperty("Signal").GetString());
         Assert.AreSequenceEqual(request.ToByteArray(), payload.GetProperty("Payload").GetBytesFromBase64());
-        var partitioned = new TraceEvidence("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", receiver.Snapshot(),
+        var partitioned = new TraceEvidence(UnrelatedTraceId, receiver.Snapshot(),
             new MetricPartition("service.name", "metric-service"));
         var attributed = Assert.ContainsSingle(partitioned.Metrics);
         Assert.AreEqual(MetricCorrelation.ResourcePartition, attributed.Correlation);
@@ -87,17 +87,17 @@ public sealed class MetricWireTests
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var snapshot = receiver.Snapshot();
-        var unrelated = new TraceEvidence("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", snapshot);
+        var unrelated = new TraceEvidence(UnrelatedTraceId, snapshot);
         Assert.IsEmpty(unrelated.Metrics);
         Assert.HasCount(1, unrelated.Capture.Metrics);
-        var related = new TraceEvidence("11111111111111111111111111111111", snapshot);
+        var related = new TraceEvidence(TraceId, snapshot);
         var evidence = Assert.ContainsSingle(related.Metrics);
         Assert.AreEqual("metric.gauge", evidence.Metric.Name);
         Assert.AreEqual(MetricCorrelation.Exemplar, evidence.Correlation);
         Assert.AreSequenceEqual([0], evidence.PointIndexes);
         Assert.HasCount(2, Assert.IsInstanceOfType<GaugeData>(evidence.Metric.Data).Points);
-        var mismatch = new TraceEvidence("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", snapshot,
-            new MetricPartition("qyl.test.id", "wrong"));
+        var mismatch = new TraceEvidence(UnrelatedTraceId, snapshot,
+            new MetricPartition(MetricPartition.TestIdAttribute, "wrong"));
         Assert.IsEmpty(mismatch.Metrics);
     }
 
@@ -173,8 +173,8 @@ public sealed class MetricWireTests
     private static void CheckExemplar(IReadOnlyList<ExemplarRecord> exemplars)
     {
         var exemplar = Assert.ContainsSingle(exemplars);
-        Assert.AreEqual("11111111111111111111111111111111", exemplar.TraceId);
-        Assert.AreEqual("2222222222222222", exemplar.SpanId);
+        Assert.AreEqual(TraceId, exemplar.TraceId);
+        Assert.AreEqual(SpanId, exemplar.SpanId);
         Assert.AreEqual(103UL, exemplar.TimeUnixNano);
         Assert.AreEqual(2.5, exemplar.Value);
         Assert.IsTrue(Assert.IsInstanceOfType<bool>(exemplar.FilteredAttributes["exemplar"]));

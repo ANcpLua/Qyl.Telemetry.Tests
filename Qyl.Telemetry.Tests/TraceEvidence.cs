@@ -11,7 +11,11 @@ public sealed record Call(SpanRecord Client, SpanRecord Server)
 }
 
 [PublicAPI]
-public sealed record MetricPartition(string ResourceAttribute, string Value);
+public sealed record MetricPartition(string ResourceAttribute, string Value)
+{
+    /// <summary>The resource attribute that carries a capture's trace id as its metric partition.</summary>
+    internal const string TestIdAttribute = "qyl.test.id";
+}
 
 [PublicAPI]
 public enum MetricCorrelation

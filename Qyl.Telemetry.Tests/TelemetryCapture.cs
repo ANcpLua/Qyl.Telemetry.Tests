@@ -22,7 +22,7 @@ public static class TelemetryCapture
         var capture = new CaptureContext(receiver, root.TraceId.ToHexString(), root.Id!);
         await action(capture).ConfigureAwait(false);
         var snapshot = await receiver
-            .AwaitAsync(s => until(capture.Read(s)), timeout ?? TimeSpan.FromSeconds(10), cancellationToken)
+            .AwaitAsync(s => until(capture.Read(s)), timeout ?? OtlpReceiver.DefaultEvidenceTimeout, cancellationToken)
             .ConfigureAwait(false);
         var evidence = capture.Read(snapshot);
         TelemetryInvocation.Publish(new PublishedTrace(evidence, root.SpanId.ToHexString()));
@@ -40,7 +40,7 @@ public sealed class CaptureContext
         _receiver = receiver;
         TraceId = traceId;
         TraceParent = traceParent;
-        Partition = new MetricPartition("qyl.test.id", traceId);
+        Partition = new MetricPartition(MetricPartition.TestIdAttribute, traceId);
     }
 
     public Uri Endpoint => _receiver.Endpoint;

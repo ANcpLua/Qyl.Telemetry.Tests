@@ -14,7 +14,6 @@ public sealed class CollectorClientTests(TestContext testContext)
 {
     private const string Repeated = "repeated";
     private const string ExportRoute = "v1/traces";
-    private const string Protobuf = "application/x-protobuf";
     private static readonly DateTimeOffset WindowStart = new(2026, 10, 16, 12, 0, 0, TimeSpan.FromHours(2));
 
     [TestMethod]
@@ -181,7 +180,7 @@ public sealed class CollectorClientTests(TestContext testContext)
     }
 
     private Task<HttpResponseMessage> ExportAsync(HttpClient client) =>
-        new CollectorClient(client).ExportAsync(ExportRoute, ReadOnlyMemory<byte>.Empty, Protobuf, null, testContext.CancellationToken);
+        new CollectorClient(client).ExportAsync(ExportRoute, ReadOnlyMemory<byte>.Empty, OtlpReceiver.ProtobufMediaType, null, testContext.CancellationToken);
 
     private static HttpResponseMessage Json(string text) => new(HttpStatusCode.OK)
     {

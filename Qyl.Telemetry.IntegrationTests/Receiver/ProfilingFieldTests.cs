@@ -69,7 +69,7 @@ public sealed class ProfilingFieldTests
         Assert.IsNotNull(acknowledgement);
         var (rejected, warning) = acknowledgement.Value;
         Assert.AreEqual(0L, rejected);
-        Assert.AreEqual("application/x-protobuf", response.Content.Headers.ContentType?.MediaType);
+        Assert.AreEqual(OtlpReceiver.ProtobufMediaType, response.Content.Headers.ContentType?.MediaType);
         Assert.Contains("StringValueStrindex 7", warning);
         Assert.Contains("StringValueStrindex 8", warning);
         using var nextExportWithItsOwnDecoder = await OtlpHttp.PostAsync(receiver.Endpoint, [], TestContext.CancellationToken, signal);
@@ -122,7 +122,7 @@ public sealed class ProfilingFieldTests
     {
         Signals.Traces => OtlpEvidence.Traces(resource, new Span
         {
-            TraceId = OtlpEvidence.Id("11111111111111111111111111111111"), SpanId = OtlpEvidence.Id("2222222222222222"),
+            TraceId = OtlpEvidence.Id(OtlpEvidence.TraceId), SpanId = OtlpEvidence.Id(OtlpEvidence.SpanId),
             Name = "preserved"
         }),
         Signals.Logs => OtlpEvidence.Logs(resource, new ProtoLog { Body = new AnyValue { IntValue = 42 } }),

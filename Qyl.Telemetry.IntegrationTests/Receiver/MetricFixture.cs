@@ -16,8 +16,8 @@ internal static class MetricFixture
         };
         var exemplar = new Exemplar
         {
-            AsDouble = 2.5, TimeUnixNano = 103, TraceId = Id("11111111111111111111111111111111"),
-            SpanId = Id("2222222222222222"),
+            AsDouble = 2.5, TimeUnixNano = 103, TraceId = Id(TraceId),
+            SpanId = Id(SpanId),
             FilteredAttributes = { Pair("exemplar", true) }
         };
         var point = new NumberDataPoint

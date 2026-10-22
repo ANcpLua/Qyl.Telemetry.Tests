@@ -52,10 +52,10 @@ public sealed class IsolationTests
             span.SetStatus(ActivityStatusCode.Ok).SetTag("checkout.row", row)
                 .SetTag("test.row", row).SetTag("checkout.accepted", false).SetTag("checkout.labels", labels);
             span.Stop();
-            await test.AwaitAsync(s => s.Spans.Count == 1, TimeSpan.FromSeconds(10), TestContext.CancellationToken);
+            await test.AwaitAsync(s => s.Spans.Count == 1, OtlpReceiver.DefaultEvidenceTimeout, TestContext.CancellationToken);
             Assert.AreEqual(test.TraceId, test.Read().TraceId);
             Assert.StartsWith("00-" + test.TraceId + "-", test.TraceParent);
-        }, trace => trace.Spans.Count == 1, TimeSpan.FromSeconds(10), TestContext.CancellationToken);
+        }, trace => trace.Spans.Count == 1, OtlpReceiver.DefaultEvidenceTimeout, TestContext.CancellationToken);
         var observed = Assert.ContainsSingle(capture.Spans);
         Assert.AreEqual(root.TraceId.ToHexString(), observed.TraceId);
         Assert.AreEqual(root.SpanId.ToHexString(), observed.ParentSpanId);

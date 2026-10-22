@@ -11,10 +11,10 @@ public sealed class TransportTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow("unknown", "application/x-protobuf", null, HttpStatusCode.NotFound)]
+    [DataRow("unknown", OtlpReceiver.ProtobufMediaType, null, HttpStatusCode.NotFound)]
     [DataRow(Signals.Traces, "application/json", null, HttpStatusCode.UnsupportedMediaType)]
     [DataRow(Signals.Traces, null, null, HttpStatusCode.UnsupportedMediaType)]
-    [DataRow(Signals.Traces, "application/x-protobuf", "br", HttpStatusCode.UnsupportedMediaType)]
+    [DataRow(Signals.Traces, OtlpReceiver.ProtobufMediaType, "br", HttpStatusCode.UnsupportedMediaType)]
     [DataRow(Signals.Traces, "application/x-protobuf; charset=utf-8", null, HttpStatusCode.OK)]
     public async Task HttpReceiver_RouteMediaTypeAndEncoding_ReturnTheExactStatus(string signal, string? media,
         string? encoding, HttpStatusCode expected)
@@ -29,7 +29,7 @@ public sealed class TransportTests
         if (expected != HttpStatusCode.OK)
         {
             var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken,
-                media == "application/json" ? "application/json" : "application/x-protobuf");
+                media == "application/json" ? "application/json" : OtlpReceiver.ProtobufMediaType);
             Assert.AreEqual(expected == HttpStatusCode.NotFound ? (int)Google.Rpc.Code.NotFound : (int)Google.Rpc.Code.Unimplemented, error.Code);
             Assert.IsFalse(string.IsNullOrWhiteSpace(error.Message));
             Assert.AreEqual(error.Message, Assert.ContainsSingle(receiver.Snapshot().Receipts).Error);

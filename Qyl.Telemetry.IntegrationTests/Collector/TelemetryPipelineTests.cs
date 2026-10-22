@@ -179,7 +179,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
         using var response = await OtlpHttp.PostAsync(receiver.Address, [], testContext.CancellationToken, signal);
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-        Assert.AreEqual("application/x-protobuf", response.Content.Headers.ContentType?.MediaType);
+        Assert.AreEqual(OtlpReceiver.ProtobufMediaType, response.Content.Headers.ContentType?.MediaType);
         Assert.AreSequenceEqual(acknowledgement, await response.Content.ReadAsByteArrayAsync(testContext.CancellationToken));
         Assert.AreEqual(signal, Assert.ContainsSingle(capture.Snapshot().Requests).Signal);
         Assert.AreSequenceEqual(acknowledgement, Assert.ContainsSingle(receiver.Deliveries).CollectorResponse);
@@ -226,7 +226,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
 
     private static HttpResponseMessage Reply(HttpStatusCode status, byte[] bytes) => new(status)
     {
-        Content = new ByteArrayContent(bytes) { Headers = { ContentType = new MediaTypeHeaderValue("application/x-protobuf") } }
+        Content = new ByteArrayContent(bytes) { Headers = { ContentType = new MediaTypeHeaderValue(OtlpReceiver.ProtobufMediaType) } }
     };
 
     [TestMethod]

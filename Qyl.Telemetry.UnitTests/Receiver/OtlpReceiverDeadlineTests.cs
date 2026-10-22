@@ -7,15 +7,13 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 [TestClass]
 public sealed class OtlpReceiverDeadlineTests(TestContext testContext)
 {
-    private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
-
     [TestMethod]
     public async Task OtlpReceiverAwait_EvidenceMissingAtTheDeadline_ThrowsTimeoutException()
     {
         var clock = new FakeTimeProvider();
         await using var receiver = await OtlpReceiver.StartAsync(OtlpReceiver.DefaultMaxPayloadBytes, clock, testContext.CancellationToken);
-        var waiting = receiver.AwaitAsync(_ => false, Deadline, testContext.CancellationToken);
-        clock.Advance(Deadline);
+        var waiting = receiver.AwaitAsync(_ => false, OtlpReceiver.DefaultEvidenceTimeout, testContext.CancellationToken);
+        clock.Advance(OtlpReceiver.DefaultEvidenceTimeout);
         _ = await Assert.ThrowsExactlyAsync<TimeoutException>(() => waiting);
     }
 
@@ -24,8 +22,8 @@ public sealed class OtlpReceiverDeadlineTests(TestContext testContext)
     {
         var clock = new FakeTimeProvider();
         await using var receiver = await OtlpReceiver.StartAsync(OtlpReceiver.DefaultMaxPayloadBytes, clock, testContext.CancellationToken);
-        var waiting = receiver.AwaitAsync(_ => false, Deadline, testContext.CancellationToken);
-        clock.Advance(Deadline - TimeSpan.FromTicks(1));
+        var waiting = receiver.AwaitAsync(_ => false, OtlpReceiver.DefaultEvidenceTimeout, testContext.CancellationToken);
+        clock.Advance(OtlpReceiver.DefaultEvidenceTimeout - TimeSpan.FromTicks(1));
         Assert.IsFalse(waiting.IsCompleted);
     }
 }

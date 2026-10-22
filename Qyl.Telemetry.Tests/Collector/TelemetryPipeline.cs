@@ -226,7 +226,7 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
                 var rejected = snapshot.Receipts.FirstOrDefault(receipt => receipt.Rejected > 0);
                 return rejected is null ? until(snapshot)
                     : throw new InvalidDataException(Rejection(rejected));
-            }, TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
+            }, OtlpReceiver.DefaultEvidenceTimeout, cancellationToken).ConfigureAwait(false);
         }
         catch (TimeoutException error)
         {

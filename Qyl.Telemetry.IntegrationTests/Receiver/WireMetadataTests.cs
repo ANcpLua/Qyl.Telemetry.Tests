@@ -21,9 +21,9 @@ public sealed class WireMetadataTests
             await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
-        Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
-        Assert.AreEqual("2222222222222222", span.SpanId);
-        Assert.AreEqual("3333333333333333", span.ParentSpanId);
+        Assert.AreEqual(TraceId, span.TraceId);
+        Assert.AreEqual(SpanId, span.SpanId);
+        Assert.AreEqual(ParentSpanId, span.ParentSpanId);
         Assert.AreEqual("rich.operation", span.Name);
         Assert.AreEqual(SpanKind.Consumer, span.Kind);
         Assert.AreEqual(ActivityStatusCode.Error, span.Status);
@@ -90,7 +90,7 @@ public sealed class WireMetadataTests
         response.EnsureSuccessStatusCode();
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
         Assert.AreEqual("rich.operation", span.Name);
-        Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
+        Assert.AreEqual(TraceId, span.TraceId);
         Assert.AreSequenceEqual(new byte[] { 0, 127, 255 }, Assert.IsInstanceOfType<byte[]>(span.Attributes["bytes"]));
         var array = Assert.IsInstanceOfType<IReadOnlyList<object?>>(span.Attributes["array"]);
         Assert.AreSequenceEqual([-7L, true, 0.125, null], array);

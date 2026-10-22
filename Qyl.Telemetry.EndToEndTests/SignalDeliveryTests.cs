@@ -10,6 +10,8 @@ namespace Qyl.Telemetry.EndToEndTests;
 [DoNotParallelize]
 public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFixture(context)
 {
+    private const string ServiceInstanceId = "service.instance.id";
+
     [TestMethod]
     [NoErrorTelemetry]
     [ExportsCleanly]
@@ -27,7 +29,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
         var original = Assert.ContainsSingle(capture.Logs.Where(log => log.TraceId == evidence.TraceId
             && log.EventName == ProbeSignals.CompletedLog));
         Assert.AreEqual(server.SpanId, original.SpanId);
-        Assert.AreEqual(server.Resource.Attributes["service.instance.id"], original.Resource.Attributes["service.instance.id"]);
+        Assert.AreEqual(server.Resource.Attributes[ServiceInstanceId], original.Resource.Attributes[ServiceInstanceId]);
         var stored = await Application.Telemetry.Collector.Client.WaitForLogsAsync(evidence.TraceId,
             logs => logs.Any(log => log.EventName == ProbeSignals.CompletedLog), Context.CancellationToken);
         var log = Assert.ContainsSingle(stored.Where(log => log.EventName == ProbeSignals.CompletedLog));
@@ -44,12 +46,12 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
         var start = Application.Telemetry.Collector.TimeProvider.GetUtcNow().AddSeconds(-1);
         var evidence = await SendRequestAsync();
         var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName));
-        var instance = server.Resource.Attributes["service.instance.id"];
+        var instance = server.Resource.Attributes[ServiceInstanceId];
         var capture = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Metrics.Any(metric =>
-            metric.Name == ProbeSignals.CounterName && Equals(metric.Resource.Attributes["service.instance.id"], instance)),
+            metric.Name == ProbeSignals.CounterName && Equals(metric.Resource.Attributes[ServiceInstanceId], instance)),
             Context.CancellationToken);
         var counter = capture.Metrics.Last(metric => metric.Name == ProbeSignals.CounterName
-            && Equals(metric.Resource.Attributes["service.instance.id"], instance));
+            && Equals(metric.Resource.Attributes[ServiceInstanceId], instance));
         Assert.AreEqual(ProbeSignals.CounterUnit, counter.Unit);
         Assert.AreEqual(ProbeSignals.MeterName, counter.Scope?.Name);
         var sum = Assert.IsInstanceOfType<SumData>(counter.Data);
@@ -83,11 +85,11 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
             _ => throw new ArgumentOutOfRangeException(nameof(metric))
         };
         var evidence = await SendRequestAsync();
-        var instance = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName)).Resource.Attributes["service.instance.id"];
+        var instance = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName)).Resource.Attributes[ServiceInstanceId];
         var capture = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Metrics.Any(item =>
-            item.Name == expected.Name && Equals(item.Resource.Attributes["service.instance.id"], instance)), Context.CancellationToken);
+            item.Name == expected.Name && Equals(item.Resource.Attributes[ServiceInstanceId], instance)), Context.CancellationToken);
         var observed = capture.Metrics.Where(item => item.Name == expected.Name
-            && Equals(item.Resource.Attributes["service.instance.id"], instance)).ToArray();
+            && Equals(item.Resource.Attributes[ServiceInstanceId], instance)).ToArray();
         Assert.IsNotEmpty(observed);
         foreach (var item in observed)
         {

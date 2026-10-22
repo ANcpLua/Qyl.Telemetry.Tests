@@ -21,13 +21,13 @@ public sealed class OptionalWireTests
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = Traces(null,
-            new Span { Name = "minimal", TraceId = Id("11111111111111111111111111111111"), SpanId = Id("2222222222222222") });
+            new Span { Name = "minimal", TraceId = Id(TraceId), SpanId = Id(SpanId) });
         using var response =
             await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
         Assert.AreEqual("minimal", span.Name);
-        Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
+        Assert.AreEqual(TraceId, span.TraceId);
         Assert.AreEqual(SpanKind.Unspecified, span.Kind);
         Assert.AreEqual(ActivityStatusCode.Unset, span.Status);
         Assert.IsNull(span.Scope);
@@ -50,7 +50,7 @@ public sealed class OptionalWireTests
         response.EnsureSuccessStatusCode();
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
         Assert.AreEqual("rich.operation", span.Name);
-        Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
+        Assert.AreEqual(TraceId, span.TraceId);
         Assert.IsNotNull(span.Scope);
         Assert.AreEqual("scope-schema", span.Scope.SchemaUrl);
         Assert.IsNull(span.Scope.Name);
@@ -127,7 +127,7 @@ public sealed class OptionalWireTests
         Assert.IsNull(log.SpanId);
         Assert.IsNull(log.Body);
         Assert.IsNull(log.Resource.SchemaUrl);
-        var trace = new TraceEvidence("11111111111111111111111111111111", snapshot);
+        var trace = new TraceEvidence(TraceId, snapshot);
         Assert.IsEmpty(trace.Logs);
         Assert.HasCount(1, trace.Capture.Logs);
         Assert.IsNull(trace.SessionId);
@@ -137,7 +137,7 @@ public sealed class OptionalWireTests
     public async Task OtlpReceiverMetrics_UnspecifiedData_StaysVisibleButIsNeverAMeasurement()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var request = Metrics(new Resource { Attributes = { Pair("qyl.test.id", "partition") } },
+        var request = Metrics(new Resource { Attributes = { Pair(MetricPartition.TestIdAttribute, "partition") } },
             new Metric { Name = "unspecified" });
         using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
@@ -146,8 +146,8 @@ public sealed class OptionalWireTests
         var metric = Assert.ContainsSingle(snapshot.Metrics);
         Assert.AreEqual("unspecified", metric.Name);
         Assert.IsInstanceOfType<UnspecifiedMetricData>(metric.Data);
-        Assert.IsEmpty(new TraceEvidence("11111111111111111111111111111111", snapshot,
-            new MetricPartition("qyl.test.id", "partition")).Metrics);
+        Assert.IsEmpty(new TraceEvidence(TraceId, snapshot,
+            new MetricPartition(MetricPartition.TestIdAttribute, "partition")).Metrics);
         Assert.AreEqual(0L, Assert.ContainsSingle(snapshot.Receipts).Accepted);
     }
 }

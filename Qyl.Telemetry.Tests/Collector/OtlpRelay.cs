@@ -37,7 +37,7 @@ internal sealed class OtlpRelay : IAsyncDisposable
     {
         var builder = LoopbackHost.CreateBuilder();
         _ = builder.WebHost.UseUrls("http://127.0.0.1:0");
-        _ = builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 16 * 1024 * 1024);
+        _ = builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = OtlpReceiver.DefaultMaxPayloadBytes);
         var app = builder.Build();
         var deliveries = new ConcurrentQueue<OtlpDelivery>();
         foreach (var signal in new[] { "traces", "metrics", "logs" })
@@ -89,7 +89,7 @@ internal sealed class OtlpRelay : IAsyncDisposable
                         Failure = error.GetType().Name
                     });
                     response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-                    response.ContentType = "application/x-protobuf";
+                    response.ContentType = OtlpReceiver.ProtobufMediaType;
                     collectorReply = new RpcStatus { Code = (int)Code.Unavailable, Message = "OTLP forwarding did not complete; see retained delivery evidence." }.ToByteArray();
                 }
                 await response.Body.WriteAsync(collectorReply, token).ConfigureAwait(false);

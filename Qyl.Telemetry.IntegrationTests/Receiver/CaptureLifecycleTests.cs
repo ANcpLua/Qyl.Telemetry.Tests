@@ -35,9 +35,9 @@ public sealed class CaptureLifecycleTests
     public async Task TelemetryCapture_MultipleWaiters_AreNotifiedByOneRealExport()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var first = receiver.AwaitAsync(s => s.Spans.Count == 1, TimeSpan.FromSeconds(10),
+        var first = receiver.AwaitAsync(s => s.Spans.Count == 1, OtlpReceiver.DefaultEvidenceTimeout,
             TestContext.CancellationToken);
-        var second = receiver.AwaitAsync(s => s.Receipts.Count == 1, TimeSpan.FromSeconds(10),
+        var second = receiver.AwaitAsync(s => s.Receipts.Count == 1, OtlpReceiver.DefaultEvidenceTimeout,
             TestContext.CancellationToken);
         using var response = await OtlpHttp.PostAsync(receiver.Endpoint, RichSpan().ToByteArray(),
             TestContext.CancellationToken);
@@ -47,7 +47,7 @@ public sealed class CaptureLifecycleTests
         {
             var span = Assert.ContainsSingle(result.Spans);
             Assert.AreEqual("rich.operation", span.Name);
-            Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
+            Assert.AreEqual(TraceId, span.TraceId);
             Assert.AreEqual(SpanKind.Consumer, span.Kind);
             Assert.AreEqual(ActivityStatusCode.Error, span.Status);
             Assert.AreEqual("rich-scope", span.Scope?.Name);

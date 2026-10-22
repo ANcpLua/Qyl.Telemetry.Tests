@@ -21,16 +21,16 @@ public sealed class PayloadLimitTests
     }
 
     [TestMethod]
-    [DataRow(16 * 1024 * 1024, false, false)]
-    [DataRow(16 * 1024 * 1024, true, false)]
-    [DataRow(16 * 1024 * 1024, true, true)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, false, false)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, true, false)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, true, true)]
     [DataRow(1024, false, false)]
     [DataRow(1024, true, false)]
     [DataRow(1024, true, true)]
     public async Task HttpReceiver_DefaultOrConfiguredLimit_IsEnforcedWithAndWithoutContentLength(
         int limit, bool gzip, bool chunked)
     {
-        await using var receiver = limit == 16 * 1024 * 1024
+        await using var receiver = limit == OtlpReceiver.DefaultMaxPayloadBytes
             ? await OtlpReceiver.StartAsync(TestContext.CancellationToken)
             : await OtlpReceiver.StartAsync(limit, TestContext.CancellationToken);
         foreach (var size in new[] { limit - 1, limit, limit + 1 })

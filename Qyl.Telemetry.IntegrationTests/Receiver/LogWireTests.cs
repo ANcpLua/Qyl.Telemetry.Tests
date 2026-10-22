@@ -40,7 +40,7 @@ public sealed class LogWireTests
             EventName = "OrderFailed", TimeUnixNano = 101, ObservedTimeUnixNano = 102,
             SeverityNumber = SeverityNumber.Error2,
             SeverityText = "ERROR-DETAIL", Flags = 0x80000001, DroppedAttributesCount = 9,
-            TraceId = Id("11111111111111111111111111111111"), SpanId = Id("2222222222222222"),
+            TraceId = Id(TraceId), SpanId = Id(SpanId),
             Body = Body(bodyKind),
             Attributes =
             {
@@ -76,8 +76,8 @@ public sealed class LogWireTests
         var observed = Assert.ContainsSingle(receiver.Snapshot().Logs);
         Assert.AreEqual("OrderFailed", observed.EventName);
         Assert.AreEqual("attribute-event", observed.Attributes["event.name"]);
-        Assert.AreEqual("11111111111111111111111111111111", observed.TraceId);
-        Assert.AreEqual("2222222222222222", observed.SpanId);
+        Assert.AreEqual(TraceId, observed.TraceId);
+        Assert.AreEqual(SpanId, observed.SpanId);
         Assert.AreEqual(101UL, observed.TimeUnixNano);
         Assert.AreEqual(102UL, observed.ObservedTimeUnixNano);
         Assert.AreEqual(18, observed.SeverityNumber);

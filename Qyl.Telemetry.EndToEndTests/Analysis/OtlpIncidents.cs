@@ -102,7 +102,7 @@ internal sealed class OtlpIncidents
 
     private static async Task<byte[]> ExportAsync(CollectorClient client, string route, IMessage request, CancellationToken cancellationToken)
     {
-        using var response = await client.ExportAsync(route, request.ToByteArray(), "application/x-protobuf", null, cancellationToken);
+        using var response = await client.ExportAsync(route, request.ToByteArray(), OtlpReceiver.ProtobufMediaType, null, cancellationToken);
         var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
         Assert.IsTrue(response.IsSuccessStatusCode, $"{route} returned {(int)response.StatusCode}: {Encoding.UTF8.GetString(body)}");
         return body;

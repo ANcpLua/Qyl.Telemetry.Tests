@@ -15,6 +15,7 @@ namespace Qyl.Telemetry.IntegrationTests.Receiver;
 [TestClass]
 public sealed class SdkSignalTests
 {
+    private const string SchemaUrl = "https://opentelemetry.io/schemas/1.44.0";
     private static readonly Action<ILogger, int, Exception?> OrderCreated =
         LoggerMessage.Define<int>(LogLevel.Information, new EventId(19, "OrderCreated"), "Created {OrderId}");
 
@@ -30,7 +31,7 @@ public sealed class SdkSignalTests
             {
                 var resource = ResourceBuilder.CreateEmpty().AddAttributes(new Dictionary<string, object>
                         { [ServiceAttributes.Name] = "sdk-service", [test.Partition.ResourceAttribute] = test.Partition.Value },
-                    "https://opentelemetry.io/schemas/1.44.0");
+                    SchemaUrl);
                 var receiver = transport == OtlpTransport.Grpc ? test.GrpcEndpoint : test.Endpoint;
                 using var source = new ActivitySource(sourceName, "2.0.1");
                 using var traces = Sdk.CreateTracerProviderBuilder().AddSource(sourceName).SetResourceBuilder(resource)
@@ -41,7 +42,7 @@ public sealed class SdkSignalTests
                 using var logs = LoggerFactory.Create(b => b.AddOpenTelemetry(o =>
                 {
                     o.Version = "2.0.1";
-                    o.SchemaUrl = "https://opentelemetry.io/schemas/1.44.0";
+                    o.SchemaUrl = SchemaUrl;
                     o.SetResourceBuilder(resource).AddOtlpCapture(receiver, transport);
                 }));
                 using var activity = source.CreateActivity("sdk.operation", ActivityKind.Server)!.Start();
@@ -62,7 +63,7 @@ public sealed class SdkSignalTests
         Assert.AreEqual(SpanKind.Server, span.Kind);
         Assert.AreEqual(ActivityStatusCode.Ok, span.Status);
         Assert.AreEqual(sourceName, span.Scope?.Name);
-        Assert.AreEqual("https://opentelemetry.io/schemas/1.44.0", span.Resource.SchemaUrl);
+        Assert.AreEqual(SchemaUrl, span.Resource.SchemaUrl);
         var log = Assert.ContainsSingle(result.Logs);
         Assert.AreEqual(result.TraceId, log.TraceId);
         Assert.AreEqual(span.SpanId, log.SpanId);
@@ -70,14 +71,14 @@ public sealed class SdkSignalTests
         Assert.AreEqual(9, log.SeverityNumber);
         Assert.AreEqual(sourceName, log.Scope?.Name);
         Assert.AreEqual("2.0.1", log.Scope?.Version);
-        Assert.AreEqual("https://opentelemetry.io/schemas/1.44.0", log.Scope?.SchemaUrl);
+        Assert.AreEqual(SchemaUrl, log.Scope?.SchemaUrl);
         Assert.AreEqual("sdk-service", log.Resource.Attributes["service.name"]);
-        Assert.AreEqual("https://opentelemetry.io/schemas/1.44.0", log.Resource.SchemaUrl);
+        Assert.AreEqual(SchemaUrl, log.Resource.SchemaUrl);
         var metric = result.Metrics.First(m => m.Metric.Name == "orders.created");
         Assert.AreEqual(MetricCorrelation.ResourcePartition, metric.Correlation);
         Assert.AreEqual(sourceName, metric.Metric.Scope?.Name);
         Assert.AreEqual("{order}", metric.Metric.Unit);
-        Assert.AreEqual("https://opentelemetry.io/schemas/1.44.0", metric.Metric.Resource.SchemaUrl);
+        Assert.AreEqual(SchemaUrl, metric.Metric.Resource.SchemaUrl);
         var sum = Assert.IsInstanceOfType<SumData>(metric.Metric.Data);
         Assert.IsTrue(sum.IsMonotonic);
         Assert.AreEqual(7L, Assert.ContainsSingle(sum.Points).Value);

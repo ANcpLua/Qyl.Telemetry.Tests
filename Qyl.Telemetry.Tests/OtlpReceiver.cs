@@ -36,6 +36,12 @@ namespace Qyl.Telemetry.Tests;
 public sealed class OtlpReceiver : IAsyncDisposable
 {
     internal const int DefaultMaxPayloadBytes = 16 * 1024 * 1024;
+
+    /// <summary>The OTLP/HTTP protobuf media type, of requests and of their responses.</summary>
+    internal const string ProtobufMediaType = "application/x-protobuf";
+
+    /// <summary>How long a capture waits for its required evidence unless the caller says otherwise.</summary>
+    internal static readonly TimeSpan DefaultEvidenceTimeout = TimeSpan.FromSeconds(10);
     private readonly int _maxPayloadBytes;
     private readonly TimeProvider _timeProvider;
     private readonly Lock _gate = new();
@@ -201,9 +207,9 @@ public sealed class OtlpReceiver : IAsyncDisposable
             return;
         }
 
-        if (!HasMediaType(context.Request.ContentType, "application/x-protobuf"))
+        if (!HasMediaType(context.Request.ContentType, ProtobufMediaType))
         {
-            await FailAsync(context, signal, 415, Code.Unimplemented, "This receiver accepts application/x-protobuf requests.");
+            await FailAsync(context, signal, 415, Code.Unimplemented, $"This receiver accepts {ProtobufMediaType} requests.");
             return;
         }
 
@@ -232,7 +238,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
             await context.Request.Body.CopyToAsync(buffer, context.RequestAborted).ConfigureAwait(false);
 
             var response = ProcessExport(signal, buffer.ToArray(), OtlpTransport.HttpProtobuf);
-            context.Response.ContentType = "application/x-protobuf";
+            context.Response.ContentType = ProtobufMediaType;
             await context.Response.Body.WriteAsync(response, context.RequestAborted)
                 .ConfigureAwait(false);
         }
@@ -383,7 +389,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
         }
         else
         {
-            context.Response.ContentType = "application/x-protobuf";
+            context.Response.ContentType = ProtobufMediaType;
             await context.Response.Body.WriteAsync(status.ToByteArray(), context.RequestAborted).ConfigureAwait(false);
         }
     }

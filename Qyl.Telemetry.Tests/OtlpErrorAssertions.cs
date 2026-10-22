@@ -11,7 +11,7 @@ internal static class OtlpErrorAssertions
     {
         /// <summary>Requires a nonempty Status body of <paramref name="mediaType" /> on <paramref name="response" /> and returns it.</summary>
         internal static async Task<RpcStatus> HasOtlpErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken,
-            string mediaType = "application/x-protobuf")
+            string mediaType = OtlpReceiver.ProtobufMediaType)
         {
             ArgumentNullException.ThrowIfNull(response);
             Assert.AreEqual(mediaType, response.Content.Headers.ContentType?.MediaType);

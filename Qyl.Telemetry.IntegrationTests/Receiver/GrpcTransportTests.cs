@@ -130,11 +130,11 @@ public sealed class GrpcTransportTests
     [TestMethod]
     [DataRow(1024, false)]
     [DataRow(1024, true)]
-    [DataRow(16 * 1024 * 1024, false)]
-    [DataRow(16 * 1024 * 1024, true)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, false)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, true)]
     public async Task GrpcReceiver_DecompressedMessageOverLimit_IsRejectedBeforeDecoding(int limit, bool gzip)
     {
-        await using var receiver = limit == 16 * 1024 * 1024
+        await using var receiver = limit == OtlpReceiver.DefaultMaxPayloadBytes
             ? await OtlpReceiver.StartAsync(TestContext.CancellationToken)
             : await OtlpReceiver.StartAsync(limit, TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
@@ -152,11 +152,11 @@ public sealed class GrpcTransportTests
     [TestMethod]
     [DataRow(1024, false)]
     [DataRow(1024, true)]
-    [DataRow(16 * 1024 * 1024, false)]
-    [DataRow(16 * 1024 * 1024, true)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, false)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, true)]
     public async Task GrpcReceiver_MessageExactlyAtDecompressedLimit_IsAccepted(int limit, bool gzip)
     {
-        await using var receiver = limit == 16 * 1024 * 1024
+        await using var receiver = limit == OtlpReceiver.DefaultMaxPayloadBytes
             ? await OtlpReceiver.StartAsync(TestContext.CancellationToken)
             : await OtlpReceiver.StartAsync(limit, TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
@@ -224,7 +224,7 @@ public sealed class GrpcTransportTests
         using (var live = OtlpGrpc.ExportAsync(channel, Signals.Traces, [],
                    new CallOptions(cancellationToken: TestContext.CancellationToken)))
             Assert.IsEmpty(await live.ResponseAsync);
-        var waiting = receiver.AwaitAsync(snapshot => snapshot.Spans.Count > 0, TimeSpan.FromSeconds(10), TestContext.CancellationToken);
+        var waiting = receiver.AwaitAsync(snapshot => snapshot.Spans.Count > 0, OtlpReceiver.DefaultEvidenceTimeout, TestContext.CancellationToken);
         await receiver.DisposeAsync();
         await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => waiting);
         using var freshChannelToClosedListener = GrpcChannel.ForAddress(receiver.GrpcEndpoint);

@@ -14,6 +14,18 @@ namespace Qyl.Telemetry.Tests.Evidence;
 
 internal static class OtlpEvidence
 {
+    /// <summary>The trace of <see cref="RichSpan" />, which the other wire fixtures share.</summary>
+    internal const string TraceId = "11111111111111111111111111111111";
+
+    /// <summary>The span id of <see cref="RichSpan" />.</summary>
+    internal const string SpanId = "2222222222222222";
+
+    /// <summary>The parent span id of <see cref="RichSpan" />.</summary>
+    internal const string ParentSpanId = "3333333333333333";
+
+    /// <summary>A trace that no fixture exports.</summary>
+    internal const string UnrelatedTraceId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
     internal static ExportTraceServiceRequest RichSpan()
     {
         var resource = new ProtoResource
@@ -44,8 +56,7 @@ internal static class OtlpEvidence
         };
         scope.Spans.Add(new Span
         {
-            Name = "rich.operation", TraceId = Id("11111111111111111111111111111111"), SpanId = Id("2222222222222222"),
-            ParentSpanId = Id("3333333333333333"),
+            Name = "rich.operation", TraceId = Id(TraceId), SpanId = Id(SpanId), ParentSpanId = Id(ParentSpanId),
             Kind = Span.Types.SpanKind.Consumer, Flags = 0x80000301, TraceState = "vendor=value",
             StartTimeUnixNano = 1000000001, EndTimeUnixNano = 1000000099,
             Status = new Status { Code = Status.Types.StatusCode.Error, Message = "failed exactly" },

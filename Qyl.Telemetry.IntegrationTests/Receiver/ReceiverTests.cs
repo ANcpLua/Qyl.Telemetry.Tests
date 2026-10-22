@@ -44,8 +44,8 @@ public sealed class ReceiverTests
         var request = OtlpEvidence.Traces(null,
             new Span
             {
-                TraceId = OtlpEvidence.Id("11111111111111111111111111111111"),
-                SpanId = OtlpEvidence.Id("2222222222222222"), Name = "valid"
+                TraceId = OtlpEvidence.Id(OtlpEvidence.TraceId),
+                SpanId = OtlpEvidence.Id(OtlpEvidence.SpanId), Name = "valid"
             },
             new Span { Name = "invalid" });
         using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(), TestContext.CancellationToken);
@@ -56,8 +56,8 @@ public sealed class ReceiverTests
         Assert.AreEqual(1L, result.PartialSuccess.RejectedSpans);
         Assert.Contains("16", result.PartialSuccess.ErrorMessage);
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
-        Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
-        Assert.AreEqual("2222222222222222", span.SpanId);
+        Assert.AreEqual(OtlpEvidence.TraceId, span.TraceId);
+        Assert.AreEqual(OtlpEvidence.SpanId, span.SpanId);
         Assert.AreEqual("valid", span.Name);
         var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
         Assert.AreEqual(1L, receipt.Accepted);
@@ -78,7 +78,7 @@ public sealed class ReceiverTests
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var cancellation = new CancellationTokenSource();
-        var pending = receiver.AwaitAsync(s => s.Spans.Count > 0, TimeSpan.FromSeconds(10), cancellation.Token);
+        var pending = receiver.AwaitAsync(s => s.Spans.Count > 0, OtlpReceiver.DefaultEvidenceTimeout, cancellation.Token);
         await cancellation.CancelAsync();
         await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => pending);
     }
@@ -93,7 +93,7 @@ public sealed class ReceiverTests
         await cancellation.CancelAsync();
         var evaluated = false;
         var failure = await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            receiver.AwaitAsync(_ => { evaluated = true; return ready; }, TimeSpan.FromSeconds(10), cancellation.Token));
+            receiver.AwaitAsync(_ => { evaluated = true; return ready; }, OtlpReceiver.DefaultEvidenceTimeout, cancellation.Token));
         Assert.AreEqual(cancellation.Token, failure.CancellationToken);
         Assert.IsFalse(evaluated);
     }
@@ -102,7 +102,7 @@ public sealed class ReceiverTests
     public async Task OtlpReceiver_DisposedRepeatedly_WakesAPendingCondition()
     {
         var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var pending = receiver.AwaitAsync(s => s.Spans.Count > 0, TimeSpan.FromSeconds(10),
+        var pending = receiver.AwaitAsync(s => s.Spans.Count > 0, OtlpReceiver.DefaultEvidenceTimeout,
             TestContext.CancellationToken);
         await receiver.DisposeAsync();
         await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => pending);
@@ -141,7 +141,7 @@ public sealed class ReceiverTests
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         var span = Assert.ContainsSingle(receiver.Snapshot().Spans);
         Assert.AreEqual("rich.operation", span.Name);
-        Assert.AreEqual("11111111111111111111111111111111", span.TraceId);
+        Assert.AreEqual(OtlpEvidence.TraceId, span.TraceId);
         Assert.AreEqual(SpanKind.Consumer, span.Kind);
         Assert.AreEqual(ActivityStatusCode.Error, span.Status);
         Assert.AreEqual("rich-scope", span.Scope?.Name);
