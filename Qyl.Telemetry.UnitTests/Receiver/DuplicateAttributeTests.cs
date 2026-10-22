@@ -45,17 +45,12 @@ public sealed class DuplicateAttributeTests
     }
 
     [TestMethod]
-    public void DuplicateAttributes_IdenticalStrings_KeepTheString()
+    [DataRow(AttributeShape.String, "connection-1")]
+    [DataRow(AttributeShape.Integer, 1L)]
+    public void DuplicateAttributes_IdenticalScalars_KeepTheTypedValue(AttributeShape shape, object expected)
     {
-        var (observed, _, _, _) = DecodeIdenticalDuplicates(AttributeShape.String);
-        Assert.AreEqual("connection-1", observed.Attributes[Key]);
-    }
-
-    [TestMethod]
-    public void DuplicateAttributes_IdenticalIntegers_KeepTheInt64()
-    {
-        var (observed, _, _, _) = DecodeIdenticalDuplicates(AttributeShape.Integer);
-        Assert.AreEqual(1L, observed.Attributes[Key]);
+        var (observed, _, _, _) = DecodeIdenticalDuplicates(shape);
+        Assert.AreEqual(expected, observed.Attributes[Key]);
     }
 
     [TestMethod]

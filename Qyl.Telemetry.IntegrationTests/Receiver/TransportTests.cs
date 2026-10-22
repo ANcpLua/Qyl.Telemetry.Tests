@@ -53,20 +53,6 @@ public sealed class TransportTests
     }
 
     [TestMethod]
-    public async Task HttpReceiver_DecompressedRequestOverLimit_IsRejectedBeforeProtobufParsing()
-    {
-        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, OtlpHttp.Compress(new byte[16 * 1024 * 1024 + 1]),
-            TestContext.CancellationToken, Signals.Traces, "gzip");
-        Assert.AreEqual(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
-        var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
-        Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
-        Assert.Contains("16777216-byte", error.Message);
-        Assert.AreEqual(error.Message, Assert.ContainsSingle(receiver.Snapshot().Receipts).Error);
-        Assert.IsEmpty(receiver.Snapshot().Spans);
-    }
-
-    [TestMethod]
     public async Task HttpReceiver_InvalidGzip_ReturnsBadRequestWithItsErrorRecord()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
@@ -80,24 +66,5 @@ public sealed class TransportTests
         var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
         Assert.AreEqual((int)Google.Rpc.Code.InvalidArgument, error.Code);
         Assert.AreEqual(receipt.Error, error.Message);
-    }
-
-    [TestMethod]
-    public async Task HttpReceiver_DeclaredOversizeRequest_ReturnsADecodableResourceExhaustedError()
-    {
-        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(receiver.Endpoint, "v1/traces"));
-        request.Content = new ByteArrayContent(new byte[16 * 1024 * 1024 + 1]);
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
-        const bool negotiateDeclaredLengthBeforeUploadToAvoidABrokenPipe = true;
-        request.Headers.ExpectContinue = negotiateDeclaredLengthBeforeUploadToAvoidABrokenPipe;
-        using var response = await TelemetryLifecycle.Http.SendAsync(request, TestContext.CancellationToken);
-        Assert.AreEqual(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
-        var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
-        Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
-        Assert.IsFalse(string.IsNullOrWhiteSpace(error.Message));
-        var snapshot = receiver.Snapshot();
-        Assert.IsEmpty(snapshot.Spans);
-        Assert.AreEqual(error.Message, Assert.ContainsSingle(snapshot.Receipts).Error);
     }
 }

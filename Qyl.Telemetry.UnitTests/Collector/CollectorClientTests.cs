@@ -115,19 +115,17 @@ public sealed class CollectorClientTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task CollectorClientExport_EmptyAcknowledgement_IsForwardedAsOk()
+    [DataRow(HttpStatusCode.OK, false)]
+    [DataRow(HttpStatusCode.OK, true)]
+    [DataRow(HttpStatusCode.BadRequest, false)]
+    public async Task CollectorClientExport_CollectorReply_IsForwardedWithItsStatus(HttpStatusCode status, bool nonemptyAcknowledgement)
     {
-        using var accepted = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([]) });
-        using var reply = await ExportAsync(accepted);
-        Assert.AreEqual(HttpStatusCode.OK, reply.StatusCode);
-    }
-
-    [TestMethod]
-    public async Task CollectorClientExport_NonemptyAcknowledgement_IsForwardedAsOk()
-    {
-        using var partial = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(NonemptyAcknowledgement) });
-        using var reply = await ExportAsync(partial);
-        Assert.AreEqual(HttpStatusCode.OK, reply.StatusCode);
+        using var collector = Client(_ => new HttpResponseMessage(status)
+        {
+            Content = new ByteArrayContent(nonemptyAcknowledgement ? NonemptyAcknowledgement : [])
+        });
+        using var reply = await ExportAsync(collector);
+        Assert.AreEqual(status, reply.StatusCode);
     }
 
     [TestMethod]
@@ -136,14 +134,6 @@ public sealed class CollectorClientTests(TestContext testContext)
         using var partial = Client(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(NonemptyAcknowledgement) });
         using var reply = await ExportAsync(partial);
         Assert.AreSequenceEqual(NonemptyAcknowledgement, await reply.Content.ReadAsByteArrayAsync(testContext.CancellationToken));
-    }
-
-    [TestMethod]
-    public async Task CollectorClientExport_HttpError_IsForwardedWithItsStatus()
-    {
-        using var failed = Client(_ => new HttpResponseMessage(HttpStatusCode.BadRequest));
-        using var reply = await ExportAsync(failed);
-        Assert.AreEqual(HttpStatusCode.BadRequest, reply.StatusCode);
     }
 
     private static byte[] NonemptyAcknowledgement => [.. "\n\0"u8];

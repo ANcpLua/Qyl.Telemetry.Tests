@@ -207,19 +207,12 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void RawActivityCaptureDisposal_LeftoverCapture_FailsAsOutlived()
+    [DataRow(Key)]
+    [DataRow(DeprecatedGrpcMetadata)]
+    public void RawActivityCaptureDisposal_LeftoverCapturedField_FailsAsOutlived(string field)
     {
         using var activity = new Activity("after-disposal").SetIdFormat(ActivityIdFormat.W3C).Start();
-        var captured = NativeHttpSnapshot(activity) with { Tags = new Dictionary<string, object?> { [Key] = new[] { "leftover" } } };
-        var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireCaptureStopped([captured], NativeHttpSource));
-        Assert.Contains("outlived", error.Message);
-    }
-
-    [TestMethod]
-    public void RawActivityCaptureDisposal_LeftoverDeprecatedGrpcMetadata_FailsAsOutlived()
-    {
-        using var activity = new Activity("after-disposal").SetIdFormat(ActivityIdFormat.W3C).Start();
-        var captured = NativeHttpSnapshot(activity) with { Tags = new Dictionary<string, object?> { [DeprecatedGrpcMetadata] = new[] { "leftover" } } };
+        var captured = NativeHttpSnapshot(activity) with { Tags = new Dictionary<string, object?> { [field] = new[] { "leftover" } } };
         var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireCaptureStopped([captured], NativeHttpSource));
         Assert.Contains("outlived", error.Message);
     }

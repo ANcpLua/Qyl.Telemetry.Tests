@@ -21,6 +21,7 @@ public sealed class TelemetryPolicyTests
     private const string Missing = "00000000000000ff";
     private const string Selected = "http.request.header.x-request-id";
     private const string DeprecatedGrpcMetadata = "rpc.grpc.request.metadata.authorization";
+    private const string AuthorizationHeader = "http.request.header.authorization";
 
     [TestMethod]
     [DynamicData(nameof(EveryPolicy))]
@@ -137,30 +138,14 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void CapturesExactly_UnselectedCapturedHeader_IsReported()
+    [DataRow(AuthorizationHeader)]
+    [DataRow(DeprecatedGrpcMetadata)]
+    public void CapturesExactly_UnselectedCapturedField_IsReported(string field)
     {
-        var server = Span(Server, Root, attributes: new Dictionary<string, object?>
-        {
-            ["http.request.header.authorization"] = new object?[] { "secret" }
-        });
+        var server = Span(Server, Root, attributes: new Dictionary<string, object?> { [field] = new object?[] { "secret" } });
         Assert.AreSequenceEqual(
         [
-            "[CapturesExactly] 'GET /orders' (Server, orders, Microsoft.AspNetCore) captured unselected "
-            + "'http.request.header.authorization'."
-        ], Violations(new CapturesExactlyAttribute(), server));
-    }
-
-    [TestMethod]
-    public void CapturesExactly_UnselectedDeprecatedGrpcMetadata_IsReported()
-    {
-        var server = Span(Server, Root, attributes: new Dictionary<string, object?>
-        {
-            [DeprecatedGrpcMetadata] = new object?[] { "secret" }
-        });
-        Assert.AreSequenceEqual(
-        [
-            "[CapturesExactly] 'GET /orders' (Server, orders, Microsoft.AspNetCore) captured unselected "
-            + "'rpc.grpc.request.metadata.authorization'."
+            $"[CapturesExactly] 'GET /orders' (Server, orders, Microsoft.AspNetCore) captured unselected '{field}'."
         ], Violations(new CapturesExactlyAttribute(), server));
     }
 
@@ -178,13 +163,15 @@ public sealed class TelemetryPolicyTests
     }
 
     [TestMethod]
-    public void ConformsToSemanticConventions_StringStatusCode_IsLocatedAsTypeViolation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ConformsToSemanticConventions_StringStatusCode_IsLocatedAsTypeViolation(bool allowDeprecated)
     {
         Assert.AreSequenceEqual(
         [
             "[ConformsToSemanticConventions] spans[0] 'GET /orders' (Server, orders, Microsoft.AspNetCore) "
             + "'http.response.status_code': Expected Integer."
-        ], Violations(new ConformsToSemanticConventionsAttribute(), StatusCodeAsString()));
+        ], Violations(new ConformsToSemanticConventionsAttribute { AllowDeprecated = allowDeprecated }, StatusCodeAsString()));
     }
 
     [TestMethod]
@@ -201,16 +188,6 @@ public sealed class TelemetryPolicyTests
     public void ConformsToSemanticConventions_DeprecatedAttributeWithAllowDeprecated_Passes()
     {
         Assert.IsEmpty(Violations(new ConformsToSemanticConventionsAttribute { AllowDeprecated = true }, DeprecatedDbSystem()));
-    }
-
-    [TestMethod]
-    public void ConformsToSemanticConventions_TypeViolationWithAllowDeprecated_IsStillLocated()
-    {
-        Assert.AreSequenceEqual(
-        [
-            "[ConformsToSemanticConventions] spans[0] 'GET /orders' (Server, orders, Microsoft.AspNetCore) "
-            + "'http.response.status_code': Expected Integer."
-        ], Violations(new ConformsToSemanticConventionsAttribute { AllowDeprecated = true }, StatusCodeAsString()));
     }
 
     [TestMethod]
