@@ -59,7 +59,7 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
                 var executable = collectorExecutable ?? PublishedExecutable.Identify(
                     Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll"),
                     ExecutableFormat.ManagedAssembly, System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
-                _collector = await CollectorFixture.StartAsync(executable, context.TestTempDirectory, cancellationToken).ConfigureAwait(false);
+                _collector = await CollectorFixture.StartAsync(executable, context.TestTempDirectory, cancellationToken: cancellationToken).ConfigureAwait(false);
                 _capture = await OtlpReceiver.StartAsync(cancellationToken).ConfigureAwait(false);
                 _receiver = await OtlpRelay.StartAsync(_capture, _collector.Client, cancellationToken).ConfigureAwait(false);
                 _provider = Sdk.CreateTracerProviderBuilder()

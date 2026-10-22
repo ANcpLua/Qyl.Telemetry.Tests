@@ -34,7 +34,7 @@ public sealed class RestartTests(TestContext context)
     [Timeout(180_000, CooperativeCancellation = true)]
     public async Task Collector_Restart_KeepsExactValuesIdsAndAFailureCursor(AnalysisPath path)
     {
-        var now = Nanoseconds(DateTimeOffset.UtcNow);
+        var now = Nanoseconds(Session.TimeProvider.GetUtcNow());
         var incidents = new OtlpIncidents();
         var root = incidents.Span("durable-root", Service, "durable", now - 10 * Minute, 50, attributes: new Dictionary<string, object>
         {

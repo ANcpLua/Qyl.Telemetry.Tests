@@ -55,7 +55,7 @@ internal sealed class OtlpRelay : IAsyncDisposable
                 using var suppression = SuppressInstrumentationScope.Begin();
                 // A fully received export remains our responsibility if its producer exits.
                 // Bound forwarding independently of RequestAborted, then drain it on StopAsync.
-                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15), collector.TimeProvider);
                 using var body = new ByteArrayContent(payload);
                 if (request.ContentType is not null)
                 {

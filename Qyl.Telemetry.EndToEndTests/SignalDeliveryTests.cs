@@ -40,7 +40,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
     [ExportsCleanly]
     public async Task ApplicationCounter_Stored_IsAttributedByResource()
     {
-        var start = DateTimeOffset.UtcNow.AddSeconds(-1);
+        var start = Application.Telemetry.Collector.TimeProvider.GetUtcNow().AddSeconds(-1);
         var evidence = await SendRequestAsync();
         var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == ProbeService));
         var instance = server.Resource.Attributes["service.instance.id"];
@@ -54,7 +54,7 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
         var sum = Assert.IsInstanceOfType<SumData>(counter.Data);
         Assert.IsTrue(sum.IsMonotonic);
         Assert.AreEqual(1L, Assert.IsInstanceOfType<long>(Assert.ContainsSingle(sum.Points).Value));
-        var end = DateTimeOffset.UtcNow.AddSeconds(1);
+        var end = Application.Telemetry.Collector.TimeProvider.GetUtcNow().AddSeconds(1);
         var stored = await Application.Telemetry.Collector.Client.WaitForMetricAsync(ProbeSignals.CounterName, start, end,
             metric => metric.Series.Any(series => series.Buckets.Any(bucket => bucket.Value is not null)),
             cancellationToken: Context.CancellationToken);

@@ -43,7 +43,7 @@ public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
         var assembly = Path.Combine(AppContext.BaseDirectory, "missing-qyl-collector.dll");
         var workspace = Path.Combine(testContext.TestTempDirectory!, "not-created");
         var failure = await Assert.ThrowsExactlyAsync<FileNotFoundException>(() =>
-            CollectorFixture.StartAsync(assembly, workspace, testContext.CancellationToken));
+            CollectorFixture.StartAsync(assembly, workspace, cancellationToken: testContext.CancellationToken));
         Assert.AreEqual(assembly, failure.FileName);
         Assert.IsFalse(Directory.Exists(workspace));
     }
@@ -54,7 +54,7 @@ public sealed class CollectorFixtureTests(TestContext testContext) : IDisposable
         var assembly = Path.Combine(testContext.TestTempDirectory!, "invalid-qyl-collector.dll");
         await File.WriteAllTextAsync(assembly, "not a managed executable", testContext.CancellationToken);
         var failure = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
-            CollectorFixture.StartAsync(assembly, testContext.TestTempDirectory, testContext.CancellationToken));
+            CollectorFixture.StartAsync(assembly, testContext.TestTempDirectory, cancellationToken: testContext.CancellationToken));
         Assert.Contains("qyl exited with code", failure.Message);
         var workspace = Assert.ContainsSingle(Directory.GetDirectories(testContext.TestTempDirectory!, "qyl-collector-*"));
         using var shutdown = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(workspace, "shutdown.json"), testContext.CancellationToken));

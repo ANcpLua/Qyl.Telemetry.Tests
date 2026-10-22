@@ -19,6 +19,8 @@ namespace Qyl.Telemetry.IntegrationTests.Receiver;
 [TestClass]
 public sealed class GrpcTransportTests
 {
+    private static readonly TimeProvider Clock = TimeProvider.System;
+
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
@@ -209,7 +211,7 @@ public sealed class GrpcTransportTests
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         using var call = channel.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-            new CallOptions(deadline: DateTime.UtcNow.AddSeconds(-1), cancellationToken: TestContext.CancellationToken), []);
+            new CallOptions(deadline: Clock.GetUtcNow().AddSeconds(-1).UtcDateTime, cancellationToken: TestContext.CancellationToken), []);
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => call.ResponseAsync);
         Assert.AreEqual(StatusCode.DeadlineExceeded, failure.StatusCode);
         Assert.IsEmpty(receiver.Snapshot().Requests);
@@ -228,7 +230,7 @@ public sealed class GrpcTransportTests
         await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => waiting);
         using var freshChannelToClosedListener = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         using var closed = freshChannelToClosedListener.CreateCallInvoker().AsyncUnaryCall(Export(Signals.Traces), null,
-            new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: TestContext.CancellationToken), []);
+            new CallOptions(deadline: Clock.GetUtcNow().AddSeconds(5).UtcDateTime, cancellationToken: TestContext.CancellationToken), []);
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => closed.ResponseAsync);
         Assert.AreEqual(StatusCode.Unavailable, failure.StatusCode, failure.Status.Detail);
         await Assert.ThrowsExactlyAsync<HttpRequestException>(() => TelemetryLifecycle.Http.GetAsync(receiver.Endpoint, TestContext.CancellationToken));

@@ -21,7 +21,7 @@ public sealed class ScanBudgetTests(TestContext context)
     public static async Task SeedAsync(TestContext context)
     {
         _session = await AnalysisSession.StartAsync(context);
-        _since = Nanoseconds(DateTimeOffset.UtcNow) - 40 * Minute;
+        _since = Nanoseconds(_session.TimeProvider.GetUtcNow()) - 40 * Minute;
         var incidents = new OtlpIncidents();
         incidents.Span("coverage-recurrence", Service, "checkout", _since + Minute, error: true,
             attributes: new Dictionary<string, object> { ["error.type"] = "coverage" });

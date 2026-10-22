@@ -30,11 +30,14 @@ internal sealed class AnalysisSession : IAsyncDisposable
 
     internal CollectorClient Client => _collector.Client;
 
+    /// <summary>The clock the seeded incidents and their windows are placed on.</summary>
+    internal TimeProvider TimeProvider => _collector.TimeProvider;
+
     internal static async Task<AnalysisSession> StartAsync(TestContext context)
     {
         var entryPoint = await new DeliveryArtifacts(context).InstallMcpAsync();
         var collector = await CollectorFixture.StartAsync(Path.Combine(AppContext.BaseDirectory, "qyl", "collector", "qyl.collector.dll"),
-            cancellationToken: context.CancellationToken);
+            timeProvider: TimeProvider.System, cancellationToken: context.CancellationToken);
         try
         {
             return new AnalysisSession(entryPoint, collector, await ConnectAsync(entryPoint, collector, context.CancellationToken));

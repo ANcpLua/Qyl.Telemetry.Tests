@@ -19,47 +19,52 @@ public sealed class CollectorFixture : IAsyncDisposable
 
     private readonly PublishedExecutable _executable;
 
-    private CollectorFixture(Process process, PublishedExecutable executable, Uri address, string directory)
+    private CollectorFixture(Process process, PublishedExecutable executable, Uri address, string directory,
+        TimeProvider timeProvider)
     {
         _process = process;
         _executable = executable;
         Address = address;
         DataDirectory = directory;
+        TimeProvider = timeProvider;
         _client = new HttpClient { BaseAddress = address };
         _output = process.StandardOutput.ReadToEndAsync();
         _error = process.StandardError.ReadToEndAsync();
-        Client = new CollectorClient(_client);
+        Client = new CollectorClient(_client, timeProvider);
     }
 
     public Uri Address { get; }
     public CollectorClient Client { get; }
     public string DataDirectory { get; }
 
+    /// <summary>The clock this Collector's startup, shutdown and evidence waits run on.</summary>
+    public TimeProvider TimeProvider { get; }
+
     public static Task<CollectorFixture> StartAsync(string assembly, string? workspace = null,
-        CancellationToken cancellationToken = default)
+        TimeProvider? timeProvider = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return StartAsync(PublishedExecutable.Identify(assembly, ExecutableFormat.ManagedAssembly,
-            System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier), workspace, cancellationToken);
+            System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier), workspace, timeProvider, cancellationToken);
     }
 
     public static Task<CollectorFixture> StartAsync(PublishedExecutable executable, string? workspace = null,
-        CancellationToken cancellationToken = default)
+        TimeProvider? timeProvider = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var directory = Path.Combine(workspace ?? Path.GetTempPath(), "qyl-collector-" + Guid.NewGuid().ToString("N"));
-        return StartAsync(executable, directory, created: true, cancellationToken);
+        return StartAsync(executable, directory, created: true, timeProvider ?? TimeProvider.System, cancellationToken);
     }
 
     /// <summary>Stops this Collector gracefully and starts the same executable on the same data directory.</summary>
     public async Task<CollectorFixture> RestartAsync(CancellationToken cancellationToken = default)
     {
         await DisposeAsync().ConfigureAwait(false);
-        return await StartAsync(_executable, DataDirectory, created: false, cancellationToken).ConfigureAwait(false);
+        return await StartAsync(_executable, DataDirectory, created: false, TimeProvider, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<CollectorFixture> StartAsync(PublishedExecutable executable, string directory, bool created,
-        CancellationToken cancellationToken)
+        TimeProvider timeProvider, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var start = executable.StartInfo();
@@ -88,9 +93,9 @@ public sealed class CollectorFixture : IAsyncDisposable
         start.Environment["Logging__LogLevel__Default"] = "Warning";
         reservation.Stop();
         var process = Process.Start(start)!;
-        var collector = new CollectorFixture(process, executable, new Uri($"http://127.0.0.1:{port}/"), directory);
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        var collector = new CollectorFixture(process, executable, new Uri($"http://127.0.0.1:{port}/"), directory, timeProvider);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30), timeProvider);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         var startup = WaitUntilReadyAsync(deadline.Token);
         try
         {
@@ -124,7 +129,7 @@ public sealed class CollectorFixture : IAsyncDisposable
                 }
                 catch (HttpRequestException)
                 {
-                    await Task.Delay(100, token).ConfigureAwait(false);
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), timeProvider, token).ConfigureAwait(false);
                 }
             }
         }
@@ -158,7 +163,7 @@ public sealed class CollectorFixture : IAsyncDisposable
                 {
                     _ = _process.CloseMainWindow();
                 }
-                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10), TimeProvider);
                 try { await _process.WaitForExitAsync(deadline.Token).ConfigureAwait(false); }
                 catch (OperationCanceledException)
                 {

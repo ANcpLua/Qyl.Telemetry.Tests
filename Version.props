@@ -7,6 +7,7 @@
   </PropertyGroup>
   <PropertyGroup Label="Runtime and telemetry dependencies">
     <DotNetRuntimeVersion>10.0.13</DotNetRuntimeVersion>
+    <DotNetExtensionsVersion>10.11.0</DotNetExtensionsVersion>
     <OpenTelemetryVersion>1.20.0</OpenTelemetryVersion>
     <ModelContextProtocolVersion>2.2.0</ModelContextProtocolVersion>
     <GrpcVersion>2.84.0</GrpcVersion>

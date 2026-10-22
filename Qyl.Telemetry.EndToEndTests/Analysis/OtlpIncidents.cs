@@ -17,8 +17,9 @@ internal readonly record struct SpanKey(string TraceId, string SpanId);
 /// <summary>Builds incidents as OTLP protobuf and sends them through the Collector's real ingestion routes.</summary>
 internal sealed class OtlpIncidents
 {
-    internal const ulong Millisecond = 1_000_000;
-    internal const ulong Minute = 60_000 * Millisecond;
+    internal const ulong Millisecond = TimeSpan.TicksPerMillisecond * TimeSpan.NanosecondsPerTick;
+    internal const ulong Second = TimeSpan.TicksPerSecond * TimeSpan.NanosecondsPerTick;
+    internal const ulong Minute = TimeSpan.TicksPerMinute * TimeSpan.NanosecondsPerTick;
     private readonly List<ResourceSpans> _spans = [];
     private readonly List<ResourceMetrics> _metrics = [];
     private readonly Dictionary<string, SpanKey> _keys = new(StringComparer.Ordinal);

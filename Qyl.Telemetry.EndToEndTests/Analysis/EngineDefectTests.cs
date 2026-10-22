@@ -21,7 +21,7 @@ public sealed class EngineDefectTests(TestContext context)
     public static async Task StartAsync(TestContext context)
     {
         _session = await AnalysisSession.StartAsync(context);
-        _now = Nanoseconds(DateTimeOffset.UtcNow);
+        _now = Nanoseconds(_session.TimeProvider.GetUtcNow());
     }
 
     [ClassCleanup]
@@ -109,12 +109,12 @@ public sealed class EngineDefectTests(TestContext context)
     public async Task QueryMetricLast_SeveralSeries_TakesTheLatestPointOfEachBucket(AnalysisPath path)
     {
         var name = $"queue.depth.{path}".ToLowerInvariant();
-        var start = Nanoseconds(DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddMinutes(-10).ToUnixTimeSeconds() / 60 * 60));
+        var start = (Nanoseconds(Session.TimeProvider.GetUtcNow()) - 10 * Minute) / Minute * Minute;
         var gauge = new Gauge();
         foreach (var (shard, seconds, value) in new[] { ("b", 10UL, 3d), ("a", 40UL, 7d), ("a", 70UL, 4d), ("b", 100UL, 9d) })
             gauge.DataPoints.Add(new NumberDataPoint
             {
-                Attributes = { Pair("shard", shard) }, TimeUnixNano = start + seconds * 1000 * Millisecond, AsDouble = value
+                Attributes = { Pair("shard", shard) }, TimeUnixNano = start + seconds * Second, AsDouble = value
             });
         var incidents = new OtlpIncidents();
         incidents.Metric("metric-last", new Metric { Name = name, Unit = "{item}", Gauge = gauge });
@@ -166,9 +166,9 @@ public sealed class EngineDefectTests(TestContext context)
         var service = $"paging-{path}".ToLowerInvariant();
         var start = _now - 5 * Minute;
         var incidents = new OtlpIncidents();
-        var root = incidents.Span($"{service}-root", service, "root", start + 10_000 * Millisecond, 30_000);
+        var root = incidents.Span($"{service}-root", service, "root", start + 10 * Second, 30_000);
         foreach (var seconds in new ulong[] { 20, 30 })
-            incidents.Span($"{service}-child-{seconds}", service, "child", start + seconds * 1000 * Millisecond, 1,
+            incidents.Span($"{service}-child-{seconds}", service, "child", start + seconds * Second, 1,
                 parent: root.SpanId, trace: root.TraceId);
         await SendAsync(incidents, $"{service}-child-30");
         var input = Window(("trace_id", root.TraceId), ("max_spans", 2));

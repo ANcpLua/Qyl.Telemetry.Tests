@@ -20,7 +20,7 @@ public sealed class AnswerKeyTests(TestContext context)
     public static async Task SeedAsync(TestContext context)
     {
         _session = await AnalysisSession.StartAsync(context);
-        _key = new AnswerKey(DateTimeOffset.UtcNow);
+        _key = new AnswerKey(_session.TimeProvider.GetUtcNow());
         await _key.Incidents.SendAsync(_session.Client, context.CancellationToken);
         _ = await _session.Client.WaitForTraceAsync(_key["db-root"].TraceId,
             trace => trace.GetProperty("spans").GetArrayLength() == 7, context.CancellationToken);
@@ -84,7 +84,7 @@ public sealed class AnswerKeyTests(TestContext context)
     {
         var incidents = new OtlpIncidents();
         var arrival = incidents.Span($"arrival-{path}-{Guid.NewGuid():N}", "arrival-test", "arrival",
-            Nanoseconds(DateTimeOffset.UtcNow) - Millisecond, 1, error: true);
+            Nanoseconds(Session.TimeProvider.GetUtcNow()) - Millisecond, 1, error: true);
         await incidents.SendAsync(Session.Client, context.CancellationToken);
         var output = await AskAsync<GetFailureContextOutput>(path, "get_failure_context",
             new JsonObject { ["trace_id"] = arrival.TraceId, ["lookback_minutes"] = 60 });

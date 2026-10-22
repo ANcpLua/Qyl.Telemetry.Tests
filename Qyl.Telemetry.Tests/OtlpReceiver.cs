@@ -30,6 +30,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
 {
     internal const int DefaultMaxPayloadBytes = 16 * 1024 * 1024;
     private readonly int _maxPayloadBytes;
+    private readonly TimeProvider _timeProvider;
     private readonly Lock _gate = new();
     private readonly List<LogRecord> _logs = [];
     private readonly List<MetricRecord> _metrics = [];
@@ -40,7 +41,11 @@ public sealed class OtlpReceiver : IAsyncDisposable
     private TaskCompletionSource _changed = NewSignal();
     private bool _disposed;
 
-    private OtlpReceiver(int maxPayloadBytes) => _maxPayloadBytes = maxPayloadBytes;
+    private OtlpReceiver(int maxPayloadBytes, TimeProvider timeProvider)
+    {
+        _maxPayloadBytes = maxPayloadBytes;
+        _timeProvider = timeProvider;
+    }
 
     public Uri Endpoint { get; private set; } = null!;
     public Uri GrpcEndpoint { get; private set; } = null!;
@@ -54,7 +59,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
             _changed.TrySetResult();
         }
 
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10), _timeProvider);
         try
         {
             await _application.StopAsync(timeout.Token).ConfigureAwait(false);
@@ -66,14 +71,19 @@ public sealed class OtlpReceiver : IAsyncDisposable
     }
 
     public static Task<OtlpReceiver> StartAsync(CancellationToken cancellationToken = default) =>
-        StartAsync(DefaultMaxPayloadBytes, cancellationToken);
+        StartAsync(DefaultMaxPayloadBytes, TimeProvider.System, cancellationToken);
 
     /// <summary>Starts both transports with the same positive byte limit. The default overload uses 16 MiB.</summary>
-    public static async Task<OtlpReceiver> StartAsync(int maxPayloadBytes,
+    public static Task<OtlpReceiver> StartAsync(int maxPayloadBytes, CancellationToken cancellationToken = default) =>
+        StartAsync(maxPayloadBytes, TimeProvider.System, cancellationToken);
+
+    /// <summary>Starts both transports with the same positive byte limit; its evidence and shutdown deadlines run on <paramref name="timeProvider" />.</summary>
+    public static async Task<OtlpReceiver> StartAsync(int maxPayloadBytes, TimeProvider timeProvider,
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxPayloadBytes);
-        var receiver = new OtlpReceiver(maxPayloadBytes);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        var receiver = new OtlpReceiver(maxPayloadBytes, timeProvider);
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
         ListenOptions? http = null, grpc = null;
@@ -159,7 +169,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(condition);
-        using var deadline = new CancellationTokenSource(timeout);
+        using var deadline = new CancellationTokenSource(timeout, _timeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
         try
         {

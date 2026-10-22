@@ -14,9 +14,21 @@ namespace Qyl.Telemetry.Tests.Collector;
 
 /// <summary>Reads telemetry persisted by the qyl platform. The caller owns the supplied HTTP client.</summary>
 /// <param name="client">A client whose base address is the qyl collector.</param>
+/// <param name="timeProvider">The clock that paces each wait and ends it at its deadline.</param>
 [JetBrains.Annotations.PublicAPI]
-public sealed class CollectorClient(HttpClient client)
+public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider)
 {
+    internal static readonly TimeSpan WaitDeadline = TimeSpan.FromSeconds(20);
+    internal static readonly TimeSpan PollingInterval = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>Reads through <paramref name="client" /> on the system clock.</summary>
+    /// <param name="client">A client whose base address is the qyl collector.</param>
+    public CollectorClient(HttpClient client) : this(client, TimeProvider.System)
+    {
+    }
+
+    public TimeProvider TimeProvider { get; } = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+
     public Task<JsonElement> ReadTraceAsync(string traceId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(traceId);
@@ -60,13 +72,13 @@ public sealed class CollectorClient(HttpClient client)
         return stored;
     }
 
-    private static async Task<T> WaitUntilAsync<T>(Func<CancellationToken, Task<T>> read, Func<T, bool> until,
+    private async Task<T> WaitUntilAsync<T>(Func<CancellationToken, Task<T>> read, Func<T, bool> until,
         string operation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(until);
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(TimeSpan.FromSeconds(20));
-        using var polling = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+        using var timeout = new CancellationTokenSource(WaitDeadline, TimeProvider);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        using var polling = new PeriodicTimer(PollingInterval, TimeProvider);
         try
         {
             do
