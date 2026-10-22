@@ -6,7 +6,7 @@
 | Telemetry obligations verified after a passing test | [Telemetry policies](telemetry-policies.md), [Policies](../../../Policies) |
 | Capture one operation with an owned OTLP receiver | [TelemetryCapture.TraceAsync and CaptureContext](../../../TelemetryCapture.cs) |
 | Typed evidence, trace selection, parentage, calls and store identities | [TraceEvidence](../../../TraceEvidence.cs) |
-| Exact captured arrays, including duplicates and empty strings | [Assert.That.HasCapturedValues](../../../CapturedAttributeAssertions.cs) |
+| Exact captured arrays, including duplicates and empty strings | [Assert.HasCapturedValues](../../../CapturedAttributeAssertions.cs) |
 | One native span and preserved parent context | [SpanAssertions](../../../SpanAssertions.cs) |
 | Raw CLR array, parent/trace identity and disposal checks in native applications | [CapturedActivityAssertions](../../../../Qyl.Telemetry.Tests.Capture/CapturedActivityAssertions.cs) |
 | Detached Activity snapshots and source-filtered export | [ActivitySnapshot](../../../../Qyl.Telemetry.Tests.Capture/ActivitySnapshot.cs), [ActivitySnapshotExporter](../../../../Qyl.Telemetry.Tests.Capture/ActivitySnapshotExporter.cs) |

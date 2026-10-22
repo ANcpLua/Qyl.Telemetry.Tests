@@ -97,7 +97,7 @@ public sealed class DeliveryTests(TestContext context)
         Assert.IsFalse(string.IsNullOrEmpty(compactRowServiceNotInstrumentationScope));
         var attributes = observed.GetProperty("attributes").Deserialize<Qyl.Api.Contracts.Common.Attribute[]>();
         Assert.IsNotNull(attributes);
-        Assert.That.HasCapturedValues(attributes, CapturedKey, ProbeSignals.RequestId);
+        Assert.HasCapturedValues(attributes, CapturedKey, ProbeSignals.RequestId);
         Assert.IsFalse(output.GetProperty("has_more").GetBoolean());
         context.WriteLine($"Executed {format} application {artifact.Sha256} with native Collector {_delivery.NativeCollector.Sha256}.");
     }

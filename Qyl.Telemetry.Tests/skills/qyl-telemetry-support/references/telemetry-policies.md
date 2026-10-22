@@ -20,7 +20,7 @@ outcome.
    declaration of the same policy.
 4. Keep scenario values in the test: expected header values, metric points and
    specific parentage (`Assert.HasSingleNativeSpan`, `Assert.HasParentContext`,
-   `Assert.That.HasCapturedValues`).
+   `Assert.HasCapturedValues`).
 
 ## Policies
 

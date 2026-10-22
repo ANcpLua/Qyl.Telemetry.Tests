@@ -16,7 +16,7 @@ public sealed class CapturedAttributeAssertionTests
         [
             new() { Key = Key, Value = new AttributeValue.ArrayValue([.. expected.Select(value => new AttributeValue.StringValue(value))]) }
         ];
-        Assert.That.HasCapturedValues(attributes, Key, expected);
+        Assert.HasCapturedValues(attributes, Key, expected);
     }
 
     [TestMethod]
@@ -41,7 +41,7 @@ public sealed class CapturedAttributeAssertionTests
             InvalidCapturedArray.Reordered => [new ContractAttribute { Key = Key, Value = new AttributeValue.ArrayValue([new AttributeValue.StringValue("second"), new AttributeValue.StringValue("first")]) }],
             _ => throw new ArgumentOutOfRangeException(nameof(violation))
         };
-        var failure = Assert.ThrowsExactly<AssertFailedException>(() => Assert.That.HasCapturedValues(attributes, Key, "first", "second"));
+        var failure = Assert.ThrowsExactly<AssertFailedException>(() => Assert.HasCapturedValues(attributes, Key, "first", "second"));
         Assert.Contains(Key, failure.Message);
     }
 
