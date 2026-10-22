@@ -3,8 +3,6 @@ using System.Diagnostics.Metrics;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
-using OpenTelemetry.Exporter;
-using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -33,35 +31,18 @@ public sealed class SdkSignalTests
                 var resource = ResourceBuilder.CreateEmpty().AddAttributes(new Dictionary<string, object>
                         { [ServiceAttributes.Name] = "sdk-service", [test.Partition.ResourceAttribute] = test.Partition.Value },
                     "https://opentelemetry.io/schemas/1.44.0");
+                var receiver = transport == OtlpTransport.Grpc ? test.GrpcEndpoint : test.Endpoint;
                 using var source = new ActivitySource(sourceName, "2.0.1");
                 using var traces = Sdk.CreateTracerProviderBuilder().AddSource(sourceName).SetResourceBuilder(resource)
-                    .AddOtlpExporter(o =>
-                    {
-                        o.Endpoint = transport == OtlpTransport.Grpc ? test.GrpcEndpoint : new Uri(test.Endpoint, "v1/traces");
-                        o.Protocol = transport == OtlpTransport.Grpc ? OtlpExportProtocol.Grpc : OtlpExportProtocol.HttpProtobuf;
-                        o.Compression = OtlpExportCompression.GZip;
-                        o.ExportProcessorType = ExportProcessorType.Simple;
-                    }).Build();
+                    .AddOtlpCapture(receiver, transport).Build();
                 using var meter = new Meter(sourceName, "2.0.1");
                 using var metrics = Sdk.CreateMeterProviderBuilder().AddMeter(sourceName).SetResourceBuilder(resource)
-                    .AddOtlpExporter(o =>
-                    {
-                        o.Endpoint = transport == OtlpTransport.Grpc ? test.GrpcEndpoint : new Uri(test.Endpoint, "v1/metrics");
-                        o.Protocol = transport == OtlpTransport.Grpc ? OtlpExportProtocol.Grpc : OtlpExportProtocol.HttpProtobuf;
-                        o.Compression = OtlpExportCompression.GZip;
-                        o.ExportProcessorType = ExportProcessorType.Simple;
-                    }).Build();
+                    .AddOtlpCapture(receiver, transport).Build();
                 using var logs = LoggerFactory.Create(b => b.AddOpenTelemetry(o =>
                 {
                     o.Version = "2.0.1";
                     o.SchemaUrl = "https://opentelemetry.io/schemas/1.44.0";
-                    o.SetResourceBuilder(resource).AddOtlpExporter(e =>
-                    {
-                        e.Endpoint = transport == OtlpTransport.Grpc ? test.GrpcEndpoint : new Uri(test.Endpoint, "v1/logs");
-                        e.Protocol = transport == OtlpTransport.Grpc ? OtlpExportProtocol.Grpc : OtlpExportProtocol.HttpProtobuf;
-                        e.Compression = OtlpExportCompression.GZip;
-                        e.ExportProcessorType = ExportProcessorType.Simple;
-                    });
+                    o.SetResourceBuilder(resource).AddOtlpCapture(receiver, transport);
                 }));
                 using var activity = source.CreateActivity("sdk.operation", ActivityKind.Server)!.Start();
                 activity.SetStatus(ActivityStatusCode.Ok).SetTag(HttpAttributes.RequestMethod, "POST");

@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using OpenTelemetry;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Qyl.Telemetry.Tests;
@@ -46,13 +45,7 @@ public sealed class PolicyCases(TestContext context)
             using var source = new ActivitySource(name);
             using var provider = Sdk.CreateTracerProviderBuilder().AddSource(name)
                 .SetResourceBuilder(ResourceBuilder.CreateEmpty().AddService("policy-probe"))
-                .AddOtlpExporter(options =>
-                {
-                    options.Protocol = OtlpExportProtocol.HttpProtobuf;
-                    options.Compression = OtlpExportCompression.GZip;
-                    options.Endpoint = new Uri(capture.Endpoint, "v1/traces");
-                    options.ExportProcessorType = ExportProcessorType.Simple;
-                }).Build();
+                .AddOtlpCapture(capture.Endpoint).Build();
             operation(source);
             return Task.CompletedTask;
         }, trace => trace.Spans.Count > 0, cancellationToken: context.CancellationToken).ConfigureAwait(false);

@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using JetBrains.Annotations;
 using OpenTelemetry;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using SpanKind = Qyl.Telemetry.SemanticConventions.SpanKind;
@@ -47,13 +46,7 @@ public sealed class IsolationTests
             using var source = new ActivitySource("isolated-" + Guid.NewGuid().ToString("N"));
             using var provider = Sdk.CreateTracerProviderBuilder().AddSource(source.Name)
                 .SetResourceBuilder(ResourceBuilder.CreateEmpty().AddService("isolated"))
-                .AddOtlpExporter(o =>
-                {
-                    o.Protocol = OtlpExportProtocol.HttpProtobuf;
-                    o.Compression = OtlpExportCompression.GZip;
-                    o.Endpoint = new Uri(test.Endpoint, "v1/traces");
-                    o.ExportProcessorType = ExportProcessorType.Simple;
-                }).Build();
+                .AddOtlpCapture(test.Endpoint).Build();
             using var span = source.StartActivity("row." + row, ActivityKind.Client)!;
             string[] labels = ["first", "second"];
             span.SetStatus(ActivityStatusCode.Ok).SetTag("checkout.row", row)

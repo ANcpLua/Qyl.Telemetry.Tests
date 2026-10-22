@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using OpenTelemetry;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Qyl.Telemetry.SemanticConventions;
@@ -67,14 +66,10 @@ public sealed class TelemetryPipeline(TestContext context, PublishedExecutable? 
                     .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(TestProcess,
                         serviceVersion: typeof(TelemetryPipeline).Assembly.GetName().Version!.ToString(3)))
                     .AddSource(QylTelemetryNames.Scopes.QylTelemetryApplication, "System.Net.Http")
-                    .AddOtlpExporter(options =>
+                    .AddOtlpCapture(_receiver.Address, configure: options =>
                     {
-                        options.Endpoint = new Uri(_receiver.Address, "/v1/traces");
-                        options.Protocol = OtlpExportProtocol.HttpProtobuf;
-                        options.Compression = OtlpExportCompression.GZip;
                         options.Headers = "";
                         options.TimeoutMilliseconds = 10_000;
-                        options.ExportProcessorType = ExportProcessorType.Simple;
                     })
                     .Build();
             }

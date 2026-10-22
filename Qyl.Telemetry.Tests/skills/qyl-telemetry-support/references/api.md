@@ -12,6 +12,8 @@
 | Detached Activity snapshots and source-filtered export | [ActivitySnapshot](../../../../Qyl.Telemetry.Tests.Capture/ActivitySnapshot.cs), [ActivitySnapshotExporter](../../../../Qyl.Telemetry.Tests.Capture/ActivitySnapshotExporter.cs) |
 | Versioned HTTP/gRPC fixture JSON | [ActivityCaptureReport](../../../../Qyl.Telemetry.Tests.Capture/ActivityCaptureReport.cs) |
 | Protocol and registry conformance | [OtlpReceiver](../../../OtlpReceiver.cs), [RegistryConformance](../../../RegistryConformance.cs) |
+| OpenTelemetry SDK exporter aimed at a test receiver over OTLP/HTTP or gRPC | [AddOtlpCapture](../../../OtlpCaptureExporter.cs) |
+| OTLP export requests built from records, and the fully populated reference span | [OtlpEvidence](../../../Evidence/OtlpEvidence.cs) |
 | Isolated published Collector process and cleanup | [CollectorFixture](../../../Collector/CollectorFixture.cs) |
 | Managed or native executable identity and integrity | [PublishedExecutable](../../../Collector/PublishedExecutable.cs) |
 | Collector ingestion and investigation | [CollectorClient](../../../Collector/CollectorClient.cs) |

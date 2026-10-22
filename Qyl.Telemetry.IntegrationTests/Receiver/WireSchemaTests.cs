@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using JetBrains.Annotations;
 using OpenTelemetry;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Qyl.Telemetry.SemanticConventions.Attributes.Http;
@@ -31,15 +30,8 @@ public sealed class WireSchemaTests
                 { [ServiceAttributes.Name] = "schema-producer", ["telemetry.schema_url"] = MisleadingSchemaUrlAttribute },
             schemaUrl);
 #pragma warning restore QYL0006
-        var endpoint = new Uri(receiver.Endpoint, "v1/traces");
         using var provider = Sdk.CreateTracerProviderBuilder().SetResourceBuilder(resource).AddSource(sourceName)
-            .AddOtlpExporter(options =>
-            {
-                options.Protocol = OtlpExportProtocol.HttpProtobuf;
-                options.Compression = OtlpExportCompression.GZip;
-                options.Endpoint = endpoint;
-                options.ExportProcessorType = ExportProcessorType.Simple;
-            }).Build();
+            .AddOtlpCapture(receiver.Endpoint).Build();
         using var activity = source.CreateActivity("wire.operation", ActivityKind.Server)!.Start();
         activity.SetStatus(ActivityStatusCode.Ok).SetTag(HttpAttributes.RequestMethod, "POST");
         var traceId = activity.TraceId.ToHexString();
