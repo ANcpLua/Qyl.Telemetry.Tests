@@ -1,6 +1,6 @@
 {
   "$comment": "The one place the eval binds qyl's tool and argument names. Cases name tools by the logical names on the left (the 17.0.3 names, kept so the cases read like the reviewer prompts); the runner maps them to the server's names on the right. Bound to the final 24-tool surface of qyl main 80ce3a55 (17.0.5): list_failures is triage with a status filter, get_metric_series is list_metrics or query_metric with raw, list_saved_queries is run_saved_query without an id, create and update of a saved query are save_query, create and update of an annotation are annotate.",
-  "bound_to": "qyl 17.0.12 (c632a50e, contract sha256:b194b79e8e74e8d4, 24 tools; names unchanged since 80ce3a55; ci_log gained phase_limit, list_metrics rows gained monotonic)",
+  "bound_to": "qyl 17.0.13 (cb0a1944, contract sha256:b194b79e8e74e8d4, 24 tools; names and contract unchanged since 17.0.12)",
   "server": "qyl",
   "tools": {
     "triage": "triage",
