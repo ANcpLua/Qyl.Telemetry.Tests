@@ -7,6 +7,7 @@
 | Capture one operation with an owned OTLP receiver | [TelemetryCapture.TraceAsync and CaptureContext](../../../TelemetryCapture.cs) |
 | Typed evidence, trace selection, parentage, calls and store identities | [TraceEvidence](../../../TraceEvidence.cs) |
 | Exact captured arrays, including duplicates and empty strings | [Assert.HasCapturedValues](../../../CapturedAttributeAssertions.cs) |
+| Successful completion of concurrent calls within one injected-clock deadline | [Assert.AllCompleteAsync](../../../TaskCompletionAssertions.cs) |
 | One native span and preserved parent context | [SpanAssertions](../../../SpanAssertions.cs) |
 | Raw CLR array, parent/trace identity and disposal checks in native applications | [CapturedActivityAssertions](../../../../Qyl.Telemetry.Tests.Capture/CapturedActivityAssertions.cs) |
 | Detached Activity snapshots and source-filtered export | [ActivitySnapshot](../../../../Qyl.Telemetry.Tests.Capture/ActivitySnapshot.cs), [ActivitySnapshotExporter](../../../../Qyl.Telemetry.Tests.Capture/ActivitySnapshotExporter.cs) |
@@ -23,3 +24,19 @@ row, then verifies declared policies. `TelemetryPipeline` uses the invocation
 TestContext workspace and attaches its evidence files on disposal.
 `InvocationContractTests` runs a real child runner to check rows, outcomes,
 source locations and policy verdicts.
+
+## Concurrent call completion
+
+`Assert.AllCompleteAsync(calls, timeout, timeProvider, cancellationToken)` awaits every call within one
+deadline on the injected clock:
+
+```csharp
+await Assert.AllCompleteAsync(calls, TimeSpan.FromSeconds(30), timeProvider, testContext.CancellationToken);
+```
+
+- A call's exception or cancellation propagates unchanged. To expect a failure, pass the task
+  `Assert.ThrowsExactlyAsync` returns.
+- When the deadline passes first, it fails with `AssertFailedException` naming each call's index and state.
+- The deadline stops the waiting, not the calls; the fixture owns their cancellation and cleanup.
+- Keep the deadline shorter than the test's `[Timeout]`, so the diagnostic arrives before MSTest cancels.
+- With `FakeTimeProvider`, the test advances the clock; a frozen fake clock never expires.
