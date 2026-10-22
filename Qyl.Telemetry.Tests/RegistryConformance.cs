@@ -134,7 +134,7 @@ public static class RegistryConformance
             var location = $"metrics[{i}]";
             foreach (var set in Context(location, metric.Resource, metric.Scope)) yield return set;
             var pointIndex = 0;
-            foreach (var (attributes, exemplars) in Points(metric.Data))
+            foreach (var (attributes, exemplars) in metric.Data.Points())
             {
                 var pointLocation = $"{location}.points[{pointIndex++}]";
                 yield return (pointLocation, attributes);
@@ -149,20 +149,5 @@ public static class RegistryConformance
     {
         yield return ($"{location}.resource", resource.Attributes);
         if (scope is not null) yield return ($"{location}.scope", scope.Attributes);
-    }
-
-    private static
-        IEnumerable<(IReadOnlyDictionary<string, object?> Attributes, IReadOnlyList<ExemplarRecord> Exemplars)> Points(
-            MetricData data)
-    {
-        return data switch
-        {
-            GaugeData gauge => gauge.Points.Select(p => (p.Attributes, p.Exemplars)),
-            SumData sum => sum.Points.Select(p => (p.Attributes, p.Exemplars)),
-            HistogramData histogram => histogram.Points.Select(p => (p.Attributes, p.Exemplars)),
-            ExponentialHistogramData exponential => exponential.Points.Select(p => (p.Attributes, p.Exemplars)),
-            SummaryData summary => summary.Points.Select(p => (p.Attributes, (IReadOnlyList<ExemplarRecord>)[])),
-            _ => []
-        };
     }
 }

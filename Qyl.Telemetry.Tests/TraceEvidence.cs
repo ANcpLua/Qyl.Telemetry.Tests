@@ -90,7 +90,7 @@ public sealed class TraceEvidence
 
     private static MetricEvidence? Correlate(MetricRecord metric, string traceId, MetricPartition? partition)
     {
-        var points = PointExemplars(metric.Data).ToArray();
+        var points = metric.Data.Points().Select(point => point.Exemplars).ToArray();
         if (partition is not null &&
             metric.Resource.Attributes.TryGetValue(partition.ResourceAttribute, out var value) &&
             value is string text && text == partition.Value)
@@ -102,19 +102,6 @@ public sealed class TraceEvidence
         return matching.Length == 0
             ? null
             : new MetricEvidence(metric, MetricCorrelation.Exemplar, matching.AsReadOnlySnapshot());
-    }
-
-    private static IEnumerable<IReadOnlyList<ExemplarRecord>> PointExemplars(MetricData data)
-    {
-        return data switch
-        {
-            GaugeData gauge => gauge.Points.Select(p => p.Exemplars),
-            SumData sum => sum.Points.Select(p => p.Exemplars),
-            HistogramData histogram => histogram.Points.Select(p => p.Exemplars),
-            ExponentialHistogramData exponential => exponential.Points.Select(p => p.Exemplars),
-            SummaryData summary => summary.Points.Select(IReadOnlyList<ExemplarRecord> (_) => []),
-            _ => []
-        };
     }
 }
 
