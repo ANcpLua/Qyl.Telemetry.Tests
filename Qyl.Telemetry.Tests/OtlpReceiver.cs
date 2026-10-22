@@ -67,14 +67,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
         }
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10), _timeProvider);
-        try
-        {
-            await _application.StopAsync(timeout.Token).ConfigureAwait(false);
-        }
-        finally
-        {
-            await _application.DisposeAsync().ConfigureAwait(false);
-        }
+        await _application.StopAndDisposeAsync(timeout.Token).ConfigureAwait(false);
     }
 
     public static Task<OtlpReceiver> StartAsync(CancellationToken cancellationToken = default) =>
@@ -91,8 +84,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxPayloadBytes);
         ArgumentNullException.ThrowIfNull(timeProvider);
         var receiver = new OtlpReceiver(maxPayloadBytes, timeProvider);
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.Logging.ClearProviders();
+        var builder = LoopbackHost.CreateBuilder();
         ListenOptions? http = null, grpc = null;
         builder.WebHost.ConfigureKestrel(options =>
         {
@@ -145,19 +137,12 @@ public sealed class OtlpReceiver : IAsyncDisposable
             static httpBranch => httpBranch.UseRequestDecompression());
         receiver._application.MapPost("/v1/{signal}", receiver.ReceiveAsync);
         receiver._application.MapGrpcService<OtlpGrpcService>();
-        var transferred = false;
-        try
+        return await receiver._application.StartOwnedAsync(() =>
         {
-            await receiver._application.StartAsync(cancellationToken).ConfigureAwait(false);
             receiver.Endpoint = new UriBuilder("http", IPAddress.Loopback.ToString(), http!.IPEndPoint!.Port).Uri;
             receiver.GrpcEndpoint = new UriBuilder("http", IPAddress.Loopback.ToString(), grpc!.IPEndPoint!.Port).Uri;
-            transferred = true;
             return receiver;
-        }
-        finally
-        {
-            if (!transferred) await receiver._application.DisposeAsync().ConfigureAwait(false);
-        }
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     public TelemetrySnapshot Snapshot()

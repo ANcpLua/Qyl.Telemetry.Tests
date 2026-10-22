@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using Google.Protobuf;
 using Code = Google.Rpc.Code;
@@ -36,8 +35,7 @@ internal sealed class OtlpRelay : IAsyncDisposable
     public static async Task<OtlpRelay> StartAsync(OtlpReceiver capture, CollectorClient collector,
         CancellationToken cancellationToken = default)
     {
-        var builder = WebApplication.CreateSlimBuilder();
-        _ = builder.Logging.ClearProviders();
+        var builder = LoopbackHost.CreateBuilder();
         _ = builder.WebHost.UseUrls("http://127.0.0.1:0");
         _ = builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 16 * 1024 * 1024);
         var app = builder.Build();
@@ -98,21 +96,9 @@ internal sealed class OtlpRelay : IAsyncDisposable
             });
         }
 
-        var transferred = false;
-        try
-        {
-            await app.StartAsync(cancellationToken).ConfigureAwait(false);
-            var receiver = new OtlpRelay(app, BoundAddress(app.Services.GetRequiredService<IServer>().Features), deliveries);
-            transferred = true;
-            return receiver;
-        }
-        finally
-        {
-            if (!transferred)
-            {
-                await app.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+        return await app.StartOwnedAsync(
+            () => new OtlpRelay(app, BoundAddress(app.Services.GetRequiredService<IServer>().Features), deliveries),
+            cancellationToken).ConfigureAwait(false);
     }
 
     internal static Uri BoundAddress(IFeatureCollection features)
@@ -128,14 +114,7 @@ internal sealed class OtlpRelay : IAsyncDisposable
         {
             return;
         }
-        try
-        {
-            await _app.StopAsync().ConfigureAwait(false);
-        }
-        finally
-        {
-            await _app.DisposeAsync().ConfigureAwait(false);
-        }
+        await _app.StopAndDisposeAsync(CancellationToken.None).ConfigureAwait(false);
     }
 }
 
