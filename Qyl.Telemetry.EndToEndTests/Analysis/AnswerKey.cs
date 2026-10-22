@@ -98,8 +98,8 @@ internal sealed class AnswerKey
                 }
             });
         var counter = new Sum { AggregationTemporality = AggregationTemporality.Cumulative, IsMonotonic = true };
-        foreach (var (value, i) in new[] { 100L, 150, 190 }.Select((value, i) => (value, (ulong)i)))
-            counter.DataPoints.Add(new NumberDataPoint { StartTimeUnixNano = T - Minute, TimeUnixNano = T + i * Minute, AsInt = value });
+        foreach (var (i, value) in new[] { 100L, 150, 190 }.Index())
+            counter.DataPoints.Add(new NumberDataPoint { StartTimeUnixNano = T - Minute, TimeUnixNano = T + (ulong)i * Minute, AsInt = value });
         Incidents.Metric("counter", new Metric { Name = "requests.total", Unit = "{request}", Sum = counter });
     }
 

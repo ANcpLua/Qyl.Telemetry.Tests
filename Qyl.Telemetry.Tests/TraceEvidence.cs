@@ -99,8 +99,7 @@ public sealed class TraceEvidence
                 ? null
                 : new MetricEvidence(metric, MetricCorrelation.ResourcePartition,
                     Enumerable.Range(0, points.Length).AsReadOnlySnapshot());
-        var matching = points.Select((exemplars, index) => (exemplars, index))
-            .Where(p => p.exemplars.Any(e => e.TraceId == traceId)).Select(p => p.index).ToArray();
+        var matching = points.Index().Where(p => p.Item.Any(e => e.TraceId == traceId)).Select(p => p.Index).ToArray();
         return matching.Length == 0
             ? null
             : new MetricEvidence(metric, MetricCorrelation.Exemplar, matching.AsReadOnlySnapshot());
