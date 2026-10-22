@@ -15,11 +15,12 @@ public sealed class NoDuplicateSpansAttribute : TelemetryPolicyAttribute
     {
         foreach (var trace in invocation.Traces)
         {
-            foreach (var repeated in trace.Evidence.Spans.GroupBy(span => span.SpanId, StringComparer.Ordinal)
-                         .Where(group => group.Skip(1).Any()))
-                yield return $"{Describe(repeated.First())} was exported {repeated.Count()} times as span {repeated.Key}.";
+            var spans = trace.Evidence.Spans;
+            foreach (var (spanId, count) in spans.CountBy(span => span.SpanId, StringComparer.Ordinal)
+                         .Where(pair => pair.Value > 1))
+                yield return $"{Describe(spans.First(span => span.SpanId == spanId))} was exported {count} times as span {spanId}.";
 
-            var remote = trace.Evidence.Spans.DistinctBy(span => span.SpanId)
+            var remote = spans.DistinctBy(span => span.SpanId)
                 .Where(span => span.Kind is SpanKind.Server or SpanKind.Client or SpanKind.Producer or SpanKind.Consumer)
                 .ToArray();
             var byId = remote.ToDictionary(span => span.SpanId, StringComparer.Ordinal);

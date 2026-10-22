@@ -28,8 +28,8 @@ public sealed class PreservedByCollectorAttribute : TelemetryPolicyAttribute
                 continue;
             }
 
-            var storedById = stored.GroupBy(span => span.SpanId, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            var storedById = stored.DistinctBy(span => span.SpanId, StringComparer.Ordinal)
+                .ToDictionary(span => span.SpanId, StringComparer.Ordinal);
             foreach (var span in trace.Evidence.Spans.DistinctBy(span => span.SpanId))
             {
                 if (!storedById.TryGetValue(span.SpanId, out var kept))
@@ -79,10 +79,11 @@ public sealed class PreservedByCollectorAttribute : TelemetryPolicyAttribute
     private static IEnumerable<string> Differences(IReadOnlyDictionary<string, object?> captured,
         IReadOnlyList<ContractAttribute>? stored, IReadOnlyDictionary<string, object?>? resource)
     {
-        var kept = (stored ?? []).GroupBy(attribute => attribute.Key, StringComparer.Ordinal).ToArray();
-        foreach (var repeated in kept.Where(group => group.Skip(1).Any()))
-            yield return $"stored '{repeated.Key}' {repeated.Count()} times.";
-        var values = kept.ToDictionary(group => group.Key, group => Plain(group.First().Value), StringComparer.Ordinal);
+        var kept = stored ?? [];
+        foreach (var (key, count) in kept.CountBy(attribute => attribute.Key, StringComparer.Ordinal).Where(pair => pair.Value > 1))
+            yield return $"stored '{key}' {count} times.";
+        var values = kept.DistinctBy(attribute => attribute.Key, StringComparer.Ordinal)
+            .ToDictionary(attribute => attribute.Key, attribute => Plain(attribute.Value), StringComparer.Ordinal);
         foreach (var (key, value) in captured.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             var persisted = RegistryPolicy.IsPersisted(key);
