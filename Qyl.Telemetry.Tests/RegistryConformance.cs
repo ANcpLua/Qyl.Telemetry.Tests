@@ -7,7 +7,8 @@ namespace Qyl.Telemetry.Tests;
 public enum RegistryIssueLevel
 {
     Improvement,
-    Violation
+    Violation,
+    Unevaluated
 }
 
 [PublicAPI]
@@ -26,14 +27,16 @@ public sealed record RegistryReport(
     public Uri UpstreamSchemaUrl { get; } = new(SchemaUrl.Current);
     public string RegistrySha256 { get; } = RegistrySnapshot.Sha256;
 
-    public bool IsConformant => RecordsChecked > 0 && Issues.All(issue => issue.Level != RegistryIssueLevel.Violation);
+    public bool IsConformant => RecordsChecked > 0 && Issues.All(issue => issue.Level == RegistryIssueLevel.Improvement);
 }
 
 /// <summary>Checks observed attribute types and deprecations, and registered metric units and deprecations.</summary>
 /// <remarks>
 ///     Unknown custom names are valid and reported separately. This does not infer required attributes,
 ///     close enum value sets, assign names to scopes, or infer an SDK instrument from an OTLP aggregation.
-///     Signal-specific requirements belong to an explicitly selected definition.
+///     Types that differ between registry definitions remain unevaluated and prevent a conformance verdict.
+///     Select a definition with <see cref="TraceEvidence.Conformance{TKind}"/> to check those types and
+///     signal-specific requirements.
 /// </remarks>
 [PublicAPI]
 public static class RegistryConformance
@@ -41,6 +44,7 @@ public static class RegistryConformance
     public static RegistryReport Check(TelemetrySnapshot capture)
     {
         ArgumentNullException.ThrowIfNull(capture);
+        VerifyRegistrySnapshot(RegistrySnapshot.Sha256);
         var issues = new List<RegistryIssue>();
         var customAttributes = new SortedSet<string>(StringComparer.Ordinal);
         var customMetrics = new SortedSet<string>(StringComparer.Ordinal);
@@ -59,7 +63,10 @@ public static class RegistryConformance
             if (attribute.Deprecation.IsDeprecated)
                 issues.Add(new RegistryIssue(location, name, RegistryIssueLevel.Improvement,
                     "The pinned registry marks this attribute deprecated."));
-            if (!Matches(attribute.ValueKind, value))
+            if (RegistryTypeContext.RequiresDefinition(attribute.Name))
+                issues.Add(new RegistryIssue(location, name, RegistryIssueLevel.Unevaluated,
+                    "The registered value type depends on the selected signal definition; run explicit definition conformance."));
+            else if (!Matches(attribute.ValueKind, value))
                 issues.Add(new RegistryIssue(location, name, RegistryIssueLevel.Violation,
                     $"Expected {attribute.ValueKind}."));
         }
@@ -86,6 +93,15 @@ public static class RegistryConformance
         return new RegistryReport(capture.Spans.Count + capture.Logs.Count + capture.Metrics.Count,
             attributesChecked, metricsChecked, issues.AsReadOnly(), customAttributes.AsReadOnlySnapshot(),
             customMetrics.AsReadOnlySnapshot());
+    }
+
+    internal static void VerifyRegistrySnapshot(string registrySha256)
+    {
+        if (registrySha256 != RegistryTypeContext.RegistrySha256)
+            throw new InvalidOperationException(
+                $"Registry type-context metadata was generated for registry '{RegistryTypeContext.RegistrySha256}', "
+                + $"but the loaded registry is '{registrySha256}'. "
+                + "Regenerate it with python3 eng/generate-registry-type-context.py.");
     }
 
     internal static bool Matches(RegistryAttributeValueKind kind, object? value)

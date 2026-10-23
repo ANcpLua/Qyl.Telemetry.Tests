@@ -55,6 +55,11 @@ public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider
         WaitUntilAsync(token => QueryMetricAsync(name, start, end, aggregation, token), until,
             $"metric '{name}'", cancellationToken);
 
+    /// <summary>Polls the stored series for a metric until their metadata satisfies <paramref name="until" />.</summary>
+    public Task<IReadOnlyList<MetricSeries>> WaitForMetricSeriesAsync(string name,
+        Func<IReadOnlyList<MetricSeries>, bool> until, CancellationToken cancellationToken = default) =>
+        WaitUntilAsync(token => MetricSeriesAsync(name, token), until, $"series for metric '{name}'", cancellationToken);
+
     /// <summary>Polls until the trace stores every span in <paramref name="spanIds" /> and returns its stored spans.</summary>
     /// <exception cref="TimeoutException">A span is still not stored at the deadline.</exception>
     public Task<IReadOnlyList<StoredSpan>> WaitForSpansAsync(string traceId, IReadOnlyCollection<string> spanIds,
@@ -159,6 +164,35 @@ public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider
             if (string.IsNullOrEmpty(cursor) || !cursors.Add(cursor))
             {
                 throw new InvalidDataException("qyl returned an invalid log continuation cursor.");
+            }
+
+            next = $"{route}&cursor={Uri.EscapeDataString(cursor)}";
+        }
+    }
+
+    /// <summary>Reads every page of stored series for a metric, including resource and instrumentation metadata.</summary>
+    public async Task<IReadOnlyList<MetricSeries>> MetricSeriesAsync(string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var series = new List<MetricSeries>();
+        var cursors = new HashSet<string>(StringComparer.Ordinal);
+        var route = $"api/v1/metrics/{Uri.EscapeDataString(name)}/series?limit=1000";
+        var next = route;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var page = await ReadAsync<CursorPageMetricSeries>(next, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            series.AddRange(page.Items);
+            if (!page.HasMore)
+            {
+                return series;
+            }
+
+            var cursor = page.NextCursor;
+            if (string.IsNullOrEmpty(cursor) || !cursors.Add(cursor))
+            {
+                throw new InvalidDataException("qyl returned an invalid metric series continuation cursor.");
             }
 
             next = $"{route}&cursor={Uri.EscapeDataString(cursor)}";

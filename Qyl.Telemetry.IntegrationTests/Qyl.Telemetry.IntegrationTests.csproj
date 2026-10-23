@@ -13,6 +13,7 @@
     <TestFixtureProject Include="Fixtures/TelemetryInvocation.Probe/TelemetryInvocation.Probe.csproj" />
     <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
   <ItemGroup>
     <None Update="Contracts/Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />

@@ -115,7 +115,8 @@ internal sealed class DeliveryArtifacts(TestContext context)
         IReadOnlyList<RestoredPackage> packages = [.. RestoredPackages(appAssets, project), .. RestoredPackages(appAssets, semanticProject)];
 
         var collector = await CheckoutAsync("collector", inputs.Collector);
-        var nativeCollector = Path.Combine(_directory, "native-collector");
+        var collectorArtifacts = Path.Combine(_directory, "collectors", key);
+        var nativeCollector = Path.Combine(collectorArtifacts, "native");
         var collectorIdentity = Path.Combine(nativeCollector, "identity.json");
         if (!File.Exists(collectorIdentity))
         {
@@ -123,7 +124,7 @@ internal sealed class DeliveryArtifacts(TestContext context)
             Path.Combine(collector, "services", "qyl.collector", "qyl.collector.csproj"),
             "--configuration", "Release", "--runtime", rid, "--self-contained", "true",
             "-maxcpucount:1", "-nodeReuse:false", "-p:UseSharedCompilation=false", "-p:ConcurrentBuild=false",
-            "--output", nativeCollector, "--artifacts-path", Path.Combine(_directory, "collector-build") + Path.DirectorySeparatorChar,
+            "--output", nativeCollector, "--artifacts-path", Path.Combine(collectorArtifacts, "build") + Path.DirectorySeparatorChar,
             "-p:QylAot=true"], collector);
             var identified = PublishedExecutable.Identify(Path.Combine(nativeCollector, "qyl.collector" + (OperatingSystem.IsWindows() ? ".exe" : "")), ExecutableFormat.NativeAot, rid);
             await File.WriteAllTextAsync(collectorIdentity, JsonSerializer.Serialize(identified, s_json), _cancellation);

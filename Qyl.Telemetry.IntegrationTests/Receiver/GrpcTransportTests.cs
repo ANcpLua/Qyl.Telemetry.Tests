@@ -14,10 +14,11 @@ using ProtoLog = OpenTelemetry.Proto.Logs.V1.LogRecord;
 namespace Qyl.Telemetry.IntegrationTests.Receiver;
 
 [TestClass]
-public sealed class GrpcTransportTests
+public sealed class GrpcTransportTests : IAsyncDisposable
 {
     private const string Gzip = "gzip";
     private const string EncodingRequestHeader = "grpc-internal-encoding-request";
+    private OtlpReceiver? _ownedReceiver;
 
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
@@ -206,13 +207,14 @@ public sealed class GrpcTransportTests
     [TestMethod]
     public async Task OtlpReceiver_Disposed_ClosesBothListenersToFreshConnectionsAndWakesAPendingWait()
     {
-        var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var receiver = _ownedReceiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         using (var live = OtlpGrpc.ExportAsync(channel, Signals.Traces, [],
                    new CallOptions(cancellationToken: TestContext.CancellationToken)))
             Assert.IsEmpty(await live.ResponseAsync);
         var waiting = receiver.AwaitAsync(snapshot => snapshot.Spans.Count > 0, OtlpReceiver.DefaultEvidenceTimeout, TestContext.CancellationToken);
         await receiver.DisposeAsync();
+        _ownedReceiver = null;
         await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => waiting);
         using var freshChannelToClosedListener = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
         using var closed = OtlpGrpc.ExportAsync(freshChannelToClosedListener, Signals.Traces, [],
@@ -221,6 +223,8 @@ public sealed class GrpcTransportTests
         Assert.AreEqual(StatusCode.Unavailable, failure.StatusCode, failure.Status.Detail);
         await Assert.ThrowsExactlyAsync<HttpRequestException>(() => TelemetryLifecycle.Http.GetAsync(receiver.Endpoint, TestContext.CancellationToken));
     }
+
+    public ValueTask DisposeAsync() => _ownedReceiver is { } receiver ? receiver.DisposeAsync() : ValueTask.CompletedTask;
 
     private Task<OtlpReceiver> StartReceiverAsync(int limit) => limit == OtlpReceiver.DefaultMaxPayloadBytes
         ? OtlpReceiver.StartAsync(TestContext.CancellationToken)

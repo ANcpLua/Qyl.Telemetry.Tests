@@ -5,10 +5,11 @@ using JetBrains.Annotations;
 namespace Qyl.Telemetry.Tests.Policies;
 
 /// <summary>
-///     Every captured registry attribute has its registered value type, every registered metric its unit, and no
+///     Every captured registry attribute has its unambiguous registered value type, every registered metric its unit, and no
 ///     deprecated attribute or metric appears unless <see cref="AllowDeprecated" /> is set. Covers the complete
 ///     captures of the test, including resources, scopes, events, links, logs and metric points. Application-defined
-///     names stay valid.
+///     names stay valid. Context-dependent types remain unevaluated and fail this policy even when
+///     <see cref="AllowDeprecated"/> is set; use explicit definition conformance to check those types.
 /// </summary>
 [PublicAPI]
 public sealed partial class ConformsToSemanticConventionsAttribute : TelemetryPolicyAttribute
@@ -21,7 +22,7 @@ public sealed partial class ConformsToSemanticConventionsAttribute : TelemetryPo
         {
             var report = RegistryConformance.Check(capture);
             if (report.RecordsChecked == 0) yield return "The capture contains no span, log or metric to check.";
-            foreach (var issue in report.Issues.Where(issue => issue.Level == RegistryIssueLevel.Violation || !AllowDeprecated))
+            foreach (var issue in report.Issues.Where(issue => issue.Level != RegistryIssueLevel.Improvement || !AllowDeprecated))
                 yield return $"{Locate(capture, issue.Location)} '{issue.Name}': {issue.Message}";
         }
     }

@@ -140,7 +140,7 @@ public sealed partial class OtlpReceiver : IAsyncDisposable
         receiver._application.UseWhen(
             static context => context.GetEndpoint()?.Metadata.GetMetadata<GrpcMethodMetadata>() is null,
             static httpBranch => httpBranch.UseRequestDecompression());
-        RequestDelegate receive = context => receiver.ReceiveAsync(context, (string)context.Request.RouteValues["signal"]!);
+        RequestDelegate receive = Receive;
         receiver._application.MapPost("/v1/{signal}", receive);
         receiver._application.MapGrpcService<OtlpGrpcService>();
         return await receiver._application.StartOwnedAsync(() =>
@@ -149,6 +149,8 @@ public sealed partial class OtlpReceiver : IAsyncDisposable
             receiver.GrpcEndpoint = new UriBuilder("http", IPAddress.Loopback.ToString(), grpc!.IPEndPoint!.Port).Uri;
             return receiver;
         }, cancellationToken).ConfigureAwait(false);
+
+        Task Receive(HttpContext context) => receiver.ReceiveAsync(context, (string)context.Request.RouteValues["signal"]!);
     }
 
     public TelemetrySnapshot Snapshot()

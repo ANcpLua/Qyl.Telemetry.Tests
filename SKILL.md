@@ -115,6 +115,8 @@ The suite skills are listed in `AGENTS.md`.
 
 Verified on 2026-10-23 against the installed `MSTest.Sdk`, `MSTest.TestAdapter` and `MSTest.TestFramework` 4.5.1 packages, the repository's project files, and the [4.5.1 source changelog](https://github.com/microsoft/testfx/blob/v4.5.1/docs/Changelog.md). API availability and configuration inspection are not evidence that a test has run under NativeAOT. Record actual execution separately.
 
+The imported MSTest API table covers the pinned source files listed in `.github/versions.yaml`, not every target-framework-specific public API. This scope also applies to the imported skills' "every public symbol" wording. Verify availability against the package asset selected for this repository's `net10.0` target and its pinned upstream source; an API missing from the table may still be available.
+
 - `MSTest.Sdk` supplies executable output and the native MTP runner for test applications. `global.json` selects native SDK test mode. Use `dotnet test --project <project>` or `dotnet test --solution <solution>`; do not add a VSTest bridge, another runner, or duplicate SDK packages.
 - For `PublishAot=true`, the SDK selects its NativeAOT runner targets and includes `MSTest.SourceGeneration` automatically. For managed execution, source generation requires `EnableMSTestSourceGeneration=true` if desired. The adapter defaults `MSTestSourceGenMode` to `ReflectionFree`; do not replace it with reflection-based discovery to hide unsupported tests.
 - `[TestClass]` belongs directly on concrete test classes. `MSTEST0069` detects inherited discovery assumptions; `MSTEST0085` flags abstract test classes. Keep every expected data row visible in the discovery and execution counts.
@@ -201,6 +203,6 @@ Every test in this repository, and every test an agent writes with this library 
 
 ## 6. The gate decides
 
-- The stack is MSTest.Sdk 4.5.1 on Microsoft.Testing.Platform 2.5.1, with generated metadata and invocation in Unit and the explicit managed exceptions above (https://devblogs.microsoft.com/dotnet/mstest-source-generation/): no reflection-only test tricks, `[DoNotParallelize]` on classes that change process-wide state, `[Timeout]` on tests that wait.
+- The stack is MSTest.Sdk 4.5.1 on Microsoft.Testing.Platform 2.5.1, with generated metadata and invocation in Unit and the explicit managed exceptions above (https://devblogs.microsoft.com/dotnet/mstest-source-generation/): no reflection-only test tricks, `[DoNotParallelize]` on classes that change process-wide state. The three suite configurations provide cooperative per-test deadlines through `mstest.timeout`; use `[Timeout]` for a test that needs a different budget. A wait must observe the runner's cancellation token as well as any operation-specific deadline.
 - Before a push: build the touched projects in Release, run the unit tests, run `./build.sh --target InspectCode` to zero findings. `./build.sh` (Fallout `Check`) is what CI runs. A red is fixed at its cause; no suppression, no skipped, deleted or loosened test, no special-cased input.
 - Configurable support types follow the options pattern for library authors (https://learn.microsoft.com/en-us/dotnet/core/extensions/options-library-authors): no static mutable configuration.

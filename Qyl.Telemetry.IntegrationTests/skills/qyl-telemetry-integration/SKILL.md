@@ -14,7 +14,7 @@ Binding rules: the [root skill](../../../SKILL.md) (sections "MSTest 4.5.1 and M
 - State changes use scopes: `EnvironmentScope` with `[ResourceLock(WellKnownResources.EnvironmentVariables)]`, `TelemetryPipeline.Ending(root)`, `await using` for receivers and relays. A test that proves disposal declares the variable without `using` and disposes it explicitly, once.
 - Waiting is `CollectorClient.WaitForTraceAsync` / `WaitForSpansAsync` / `WaitForSpanEventsAsync` with a deadline; no polling loop in a test. Deadlines read the fixture's `TimeProvider`.
 - Child runners go through `ChildProcess`. `Probes/InvocationContractTests` runs `Fixtures/TelemetryInvocation.Probe`; its `ProbeContract.cs` lists the probe case names and must follow every rename.
-- Classes that change process-wide state (environment variables, the Collector) are `[DoNotParallelize]`; tests that wait carry `[Timeout]`.
+- Classes that change process-wide state (environment variables, the Collector) are `[DoNotParallelize]`. Waits observe `TestContext.CancellationToken` and the suite's cooperative deadline; use `[Timeout]` when a test needs a different budget.
 - Run: `pwsh ./eng/test.ps1 -Suite Integration`; report the counts.
 
 - `Contracts/` contains the shared C#/TypeScript contract fixture cases and the real Collector consumer cases. Keep their assertions, data rows and fixture files in this integration project. The parent SDK versions come from root `global.json`.

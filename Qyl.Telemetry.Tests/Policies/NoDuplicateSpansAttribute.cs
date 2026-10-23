@@ -13,20 +13,23 @@ public sealed class NoDuplicateSpansAttribute : TelemetryPolicyAttribute
 {
     private protected override IEnumerable<string> Violations(TelemetryInvocation invocation)
     {
-        foreach (var trace in invocation.Traces)
+        var observations = invocation.Traces.SelectMany(trace => trace.Evidence.Spans)
+            .Distinct<SpanRecord>(ReferenceEqualityComparer.Instance);
+        foreach (var trace in observations.GroupBy(span => span.TraceId, StringComparer.Ordinal))
         {
-            var spans = trace.Evidence.Spans;
+            var spans = trace.ToArray();
             foreach (var (spanId, count) in spans.CountBy(span => span.SpanId, StringComparer.Ordinal)
                          .Where(pair => pair.Value > 1))
                 yield return $"{Describe(spans.First(span => span.SpanId == spanId))} was exported {count} times as span {spanId}.";
 
-            var remote = spans.DistinctBy(span => span.SpanId)
-                .Where(span => span.Kind is SpanKind.Server or SpanKind.Client or SpanKind.Producer or SpanKind.Consumer)
+            var remote = spans.Where(span => span.Kind is SpanKind.Server or SpanKind.Client or SpanKind.Producer or SpanKind.Consumer)
                 .ToArray();
-            var byId = remote.ToDictionary(span => span.SpanId, StringComparer.Ordinal);
+            var byId = remote.ToLookup(span => span.SpanId, StringComparer.Ordinal);
             foreach (var span in remote)
-                if (span.ParentSpanId is { } parentId && byId.TryGetValue(parentId, out var parent) && SameOperation(parent, span))
-                    yield return $"{Describe(span)} repeats its parent {Describe(parent)}: the operation is instrumented twice.";
+                if (span.ParentSpanId is { } parentId)
+                    foreach (var parent in byId[parentId])
+                        if (SameOperation(parent, span))
+                            yield return $"{Describe(span)} repeats its parent {Describe(parent)}: the operation is instrumented twice.";
 
             foreach (var siblings in remote.GroupBy(span => (span.ParentSpanId, span.Kind, span.Name, span.Service)))
             {

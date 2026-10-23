@@ -160,7 +160,23 @@ public sealed class EngineDefectTests(TestContext context)
 
         var stale = input.DeepClone().AsObject();
         stale["cursor"] = page.GetProperty("next_cursor").GetString();
-        var (status, error) = await Session.AskErrorAsync(path, AnalysisTools.GetTrace, stale, context.CancellationToken);
+        int? status;
+        string error;
+        if (path == AnalysisPath.Http)
+        {
+            var rejected = await Assert.ThrowsExactlyAsync<HttpRequestException>(() =>
+                Session.Client.AnalyzeAsync<JsonElement>(AnalysisTools.GetTrace, stale, context.CancellationToken));
+            status = (int?)rejected.StatusCode;
+            error = rejected.Message;
+        }
+        else
+        {
+            var rejected = await Session.CallToolAsync(AnalysisTools.GetTrace, stale, context.CancellationToken);
+            Assert.IsTrue(rejected.IsError ?? false,
+                $"{AnalysisTools.GetTrace} succeeded over MCP but was expected to fail: {JsonSerializer.Serialize(rejected.StructuredContent)}");
+            status = null;
+            error = JsonSerializer.Serialize(rejected.StructuredContent) + JsonSerializer.Serialize(rejected.Content);
+        }
         Assert.AreEqual(expectedStatus, status, error);
         Assert.Contains(expectedError, error);
         Assert.Contains("cursor.stale", error, "The rejection names the stale cursor.");

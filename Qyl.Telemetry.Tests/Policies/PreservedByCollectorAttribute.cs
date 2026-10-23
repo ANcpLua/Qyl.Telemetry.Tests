@@ -11,7 +11,8 @@ namespace Qyl.Telemetry.Tests.Policies;
 ///     timestamps, scope, events, and each span and resource attribute that <see cref="RegistryPolicy.IsPersisted" />
 ///     retains, with its typed value. It keeps no denied attribute and adds none, except a copy of the span's own
 ///     resource attribute. Exception text is compared exactly, so a scenario that expects sanitization asserts the
-///     stored text itself.
+///     stored text itself. Every stored candidate for an identity must agree with every captured observation on
+///     these preserved fields; identical retransmissions may share one stored copy.
 /// </summary>
 /// <remarks>Requires a <see cref="Collector.TelemetryPipeline" /> root; the pipeline reads the trace back before stopping its Collector.</remarks>
 [PublicAPI]
@@ -28,17 +29,19 @@ public sealed class PreservedByCollectorAttribute : TelemetryPolicyAttribute
                 continue;
             }
 
-            var storedById = stored.DistinctBy(span => (span.TraceId, span.SpanId))
-                .ToDictionary(span => (span.TraceId, span.SpanId));
-            foreach (var span in trace.Evidence.Spans.DistinctBy(span => span.SpanId))
+            var storedById = stored.Distinct<StoredSpan>(ReferenceEqualityComparer.Instance)
+                .ToLookup(span => (span.TraceId, span.SpanId));
+            foreach (var span in trace.Evidence.Spans.Distinct<SpanRecord>(ReferenceEqualityComparer.Instance))
             {
-                if (!storedById.TryGetValue((span.TraceId, span.SpanId), out var kept))
+                var identity = (span.TraceId, span.SpanId);
+                if (!storedById.Contains(identity))
                 {
                     yield return $"{Describe(span)} span {span.SpanId} was captured but not stored.";
                     continue;
                 }
 
-                foreach (var difference in Differences(span, kept)) yield return $"{Describe(span)} {difference}";
+                foreach (var kept in storedById[identity])
+                    foreach (var difference in Differences(span, kept)) yield return $"{Describe(span)} {difference}";
             }
         }
     }

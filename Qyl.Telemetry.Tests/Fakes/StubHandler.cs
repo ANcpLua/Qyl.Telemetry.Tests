@@ -1,4 +1,4 @@
-namespace Qyl.Telemetry.UnitTests;
+namespace Qyl.Telemetry.Tests.Fakes;
 
 /// <summary>An HTTP handler that answers each request with the response <paramref name="respond" /> builds for it.</summary>
 /// <param name="respond">Builds the response for one request.</param>

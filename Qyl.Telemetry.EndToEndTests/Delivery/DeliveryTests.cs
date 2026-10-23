@@ -93,9 +93,9 @@ public sealed class DeliveryTests(TestContext context)
     [DataRow(RequiredStringInput.Boolean)]
     [DataRow(RequiredStringInput.Null)]
     [Timeout(60_000, CooperativeCancellation = true)]
-    public async Task PackagedTypedView_WrongWireType_RejectsTheView(RequiredStringInput input)
+    public async Task PackagedTypedView_WrongWireType_RejectsTheView(RequiredStringInput wireType)
     {
-        var run = await RunSemanticProbeAsync(input);
+        var run = await RunSemanticProbeAsync(wireType);
         using var report = run.Report;
         Assert.AreEqual(0, run.ExitCode, run.Error);
         Assert.IsFalse(report.RootElement.GetProperty("dynamicCodeSupported").GetBoolean());

@@ -4,6 +4,7 @@ The four primary projects are `Qyl.Telemetry.Tests` (shared support), `Qyl.Telem
 
 Keep exactly three `testconfig.json` files, beside the UnitTests, IntegrationTests and EndToEndTests `.csproj` files; pin `$schema` to the MSTest version in `global.json`.
 Configure terminal output through `commandLineOptions`: UnitTests uses `failed` results, `Failed` stdout/stderr and `off` progress/ANSI; IntegrationTests/EndToEndTests use `all`, `All` and `auto`; set `mstest.output.captureTrace` to `Result` for UnitTests and `Live` for IntegrationTests/EndToEndTests.
+The same configurations set cooperative per-test deadlines through `mstest.timeout`: 30 seconds for Unit, 120 seconds for Integration and 300 seconds for EndToEnd. Keep explicit `[Timeout]` overrides where a test needs a different budget.
 
 ## General test defaults
 

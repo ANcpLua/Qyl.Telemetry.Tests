@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 using Qyl.Telemetry.Tests.Collector;
 
 namespace Qyl.Telemetry.EndToEndTests.Analysis;
@@ -64,32 +65,16 @@ internal sealed class AnalysisSession : IAsyncDisposable
     internal async Task<T> AskAsync<T>(AnalysisPath path, string tool, JsonObject input, CancellationToken cancellationToken)
     {
         if (path == AnalysisPath.Http) return await Client.AnalyzeAsync<T>(tool, input, cancellationToken);
-        var result = await _mcp.CallToolAsync(McpProcess.ToolCall(tool, input), cancellationToken);
-        Assert.IsFalse(result.IsError ?? false, $"{tool}: {JsonSerializer.Serialize(result.Content)}");
-        Assert.IsNotNull(result.StructuredContent, $"{tool} returned no structured content.");
-        return result.StructuredContent.Value.Deserialize<T>(JsonSerializerOptions.Web)
+        var result = await CallToolAsync(tool, input, cancellationToken);
+        var content = Assert.That.HasSuccessfulStructuredContent(tool, result.IsError, result.StructuredContent,
+            JsonSerializer.Serialize(result.Content));
+        return content.Deserialize<T>(JsonSerializerOptions.Web)
             ?? throw new InvalidDataException($"{tool} returned empty structured content.");
     }
 
-    /// <summary>Asks one analysis question that must fail and returns the HTTP status (null on MCP) with the error as text.</summary>
-    internal async Task<(int? Status, string Error)> AskErrorAsync(AnalysisPath path, string tool, JsonObject input, CancellationToken cancellationToken)
-    {
-        if (path == AnalysisPath.Http)
-        {
-            try
-            {
-                await Client.AnalyzeAsync<JsonElement>(tool, input, cancellationToken);
-            }
-            catch (HttpRequestException rejected)
-            {
-                return ((int?)rejected.StatusCode, rejected.Message);
-            }
-            Assert.Fail($"{tool} succeeded over HTTP but was expected to fail.");
-        }
-        var result = await _mcp.CallToolAsync(McpProcess.ToolCall(tool, input), cancellationToken);
-        Assert.IsTrue(result.IsError ?? false, $"{tool} succeeded over MCP but was expected to fail: {JsonSerializer.Serialize(result.StructuredContent)}");
-        return (null, JsonSerializer.Serialize(result.StructuredContent) + JsonSerializer.Serialize(result.Content));
-    }
+    /// <summary>Calls the MCP tool and returns its complete protocol response for inspection.</summary>
+    internal ValueTask<CallToolResult> CallToolAsync(string tool, JsonObject input, CancellationToken cancellationToken) =>
+        _mcp.CallToolAsync(McpProcess.ToolCall(tool, input), cancellationToken);
 
     /// <summary>Restarts the Collector on its data directory and reconnects the MCP server to it.</summary>
     internal async Task RestartAsync(CancellationToken cancellationToken)

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Qyl.Telemetry.SemanticConventions;
+using Qyl.Telemetry.SemanticConventions.Incubating.Spans;
 using Qyl.Telemetry.SemanticConventions.Spans;
 
 namespace Qyl.Telemetry.UnitTests.Receiver;
@@ -8,6 +9,34 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 [TestCategory("Fast")]
 public class ConformanceTests
 {
+    [TestMethod]
+    public void Should_AcceptAUuidThreadId_When_TheGeneratedCodexDefinitionRequiresString()
+    {
+        Assert.IsTrue(CodexReport("0199a213-81c0-7800-8aa1-bbab2a035a53").IsConformant);
+    }
+
+    [TestMethod]
+    [DataRow(7L)]
+    [DataRow(true)]
+    public void Should_RejectANonStringThreadId_When_TheGeneratedCodexDefinitionRequiresString(object threadId)
+    {
+        Assert.AreEqual(new ConformanceIssue("2222222222222222", "thread.id", "Expected string."),
+            Assert.ContainsSingle(CodexReport(threadId).Issues));
+    }
+
+    [TestMethod]
+    public void Should_AcceptAnIntegerThreadId_When_TheExplicitDefinitionRequiresTheCoreType()
+    {
+        Assert.IsTrue(CoreThreadReport(7L).IsConformant);
+    }
+
+    [TestMethod]
+    public void Should_RejectAUuidThreadId_When_TheExplicitDefinitionRequiresTheCoreType()
+    {
+        Assert.AreEqual(new ConformanceIssue("2222222222222222", "thread.id", "Expected int."),
+            Assert.ContainsSingle(CoreThreadReport("0199a213-81c0-7800-8aa1-bbab2a035a53").Issues));
+    }
+
     [TestMethod]
     public void Should_RejectAnIntegerHttpMethod_When_TheRegisteredEnumIsString()
     {
@@ -335,6 +364,29 @@ public class ConformanceTests
 
     private static ConformanceReport Check(SpanRecord span, SpanDefinition<Server> definition) =>
         new TraceEvidence(span.TraceId, TestSpan.Only(span)).Conformance(definition, _ => true);
+
+    private static ConformanceReport CodexReport(object threadId)
+    {
+        var span = ThreadSpan(threadId);
+        return new TraceEvidence(span.TraceId, TestSpan.Only(span)).Conformance(
+            OpenaiCodexIncubatingSpanDefinitions.OpenaiCodexCodexExecInternal, _ => true);
+    }
+
+    private static ConformanceReport CoreThreadReport(object threadId)
+    {
+        var span = ThreadSpan(threadId);
+        var definition = new SpanDefinition<Internal>("test.core_thread", "test.core_thread", "Core thread attribute",
+            Stability.Stable, Deprecation.None,
+            [new AttributeRef("thread.id", "int", RequirementLevel.Required, false, null, AttributePhase.Start, true)], []);
+        return new TraceEvidence(span.TraceId, TestSpan.Only(span)).Conformance(definition, _ => true);
+    }
+
+    private static SpanRecord ThreadSpan(object threadId) =>
+        new("11111111111111111111111111111111", "2222222222222222", "codex.exec")
+        {
+            Kind = SpanKind.Internal,
+            Attributes = new Dictionary<string, object?> { ["thread.id"] = threadId }
+        };
 
     private static ConformanceReport EmptySelectionReport() =>
         new TraceEvidence("trace", TestSpan.Only()).Conformance(Definition("string"), _ => true);

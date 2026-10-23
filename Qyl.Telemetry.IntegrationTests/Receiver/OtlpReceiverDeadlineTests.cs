@@ -1,15 +1,15 @@
 using Microsoft.Extensions.Time.Testing;
 
-namespace Qyl.Telemetry.UnitTests.Receiver;
+namespace Qyl.Telemetry.IntegrationTests.Receiver;
 
 /// <summary>Drives the OTLP receiver's evidence deadline on a fake clock.</summary>
 /// <param name="testContext">The runner context supplies cancellation.</param>
 [TestClass]
-[TestCategory("Fast")]
-public class OtlpReceiverDeadlineTests(TestContext testContext)
+public sealed class OtlpReceiverDeadlineTests(TestContext testContext)
 {
     [TestMethod]
-    public async Task Should_ThrowTimeoutException_When_OtlpReceiverAwait_EvidenceMissingAtTheDeadline()
+    [Timeout(30_000, CooperativeCancellation = true)]
+    public async Task AwaitAsync_EvidenceMissingAtDeadline_ThrowsTimeoutException()
     {
         var clock = new FakeTimeProvider();
         await using var receiver = await OtlpReceiver.StartAsync(OtlpReceiver.DefaultMaxPayloadBytes, clock, testContext.CancellationToken);
@@ -19,7 +19,8 @@ public class OtlpReceiverDeadlineTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task Should_KeepWaiting_When_OtlpReceiverAwait_EvidenceMissingJustBeforeTheDeadline()
+    [Timeout(30_000, CooperativeCancellation = true)]
+    public async Task AwaitAsync_EvidenceMissingJustBeforeDeadline_KeepsWaiting()
     {
         var clock = new FakeTimeProvider();
         await using var receiver = await OtlpReceiver.StartAsync(OtlpReceiver.DefaultMaxPayloadBytes, clock, testContext.CancellationToken);

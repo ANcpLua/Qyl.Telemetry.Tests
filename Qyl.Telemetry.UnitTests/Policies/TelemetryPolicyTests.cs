@@ -62,6 +62,59 @@ public class TelemetryPolicyTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_ReportTheMissingParent_When_AnotherObservationOfTheSameIdentityIsConnected(bool reverse)
+    {
+        var connected = Span(Server, Root);
+        var disconnected = Span(Server, Missing);
+        Assert.AreSequenceEqual(["[ConnectedTrace] 'GET /orders' (Server, orders, Microsoft.AspNetCore) names parent "
+            + "00000000000000ff, which is neither a captured span nor the test root."],
+            Violations(new ConnectedTraceAttribute(), reverse ? [disconnected, connected] : [connected, disconnected]));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_ReportTheSelfCycle_When_AnotherObservationOfTheSameIdentityIsConnected(bool reverse)
+    {
+        var connected = Span(Server, Root);
+        var cyclic = Span(Server, Server);
+        Assert.AreSequenceEqual([$"[ConnectedTrace] 'GET /orders' (Server, orders, Microsoft.AspNetCore) has cyclic parentage in trace {TestSpan.TraceId}."],
+            Violations(new ConnectedTraceAttribute(), reverse ? [cyclic, connected] : [connected, cyclic]));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_ReportTheCycleAndItsDescendants_When_AnAlternateParentObservationClosesTheCycle(bool reverse)
+    {
+        var connected = Span(Server, Root);
+        var alternate = Span(Server, Client, name: "alternate-parent");
+        var peer = Span(Client, Server, name: "cycle-peer");
+        var child = Span("0000000000000004", Client, name: "cycle-child");
+        SpanRecord[] spans = reverse ? [child, peer, alternate, connected] : [connected, alternate, peer, child];
+        Assert.AreSequenceEqual(new[] { alternate, peer, child }
+                .Select(span => $"[ConnectedTrace] '{span.Name}' (Server, orders, Microsoft.AspNetCore) has cyclic parentage in trace {TestSpan.TraceId}."),
+            Violations(new ConnectedTraceAttribute(), spans), SequenceOrder.InAnyOrder);
+    }
+
+    [TestMethod]
+    public void Should_AcceptEveryParentObservation_When_AlternateParentsAllReachTheTestRoot()
+    {
+        Assert.IsEmpty(Violations(new ConnectedTraceAttribute(), Span(Server, Root), Span(Server, Client), Span(Client, Root)));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_AcceptConnectedRetransmissions_When_ObservationsShareAnIdentity(bool sharedReference)
+    {
+        var connected = Span(Server, Root);
+        Assert.IsEmpty(Violations(new ConnectedTraceAttribute(), connected, sharedReference ? connected : Span(Server, Root)));
+    }
+
+    [TestMethod]
     public void Should_ShowEveryCyclicSpan_When_RenderingTheEvidence()
     {
         using var invocation = TelemetryInvocation.Begin([new ConnectedTraceAttribute()]);
@@ -70,6 +123,63 @@ public class TelemetryPolicyTests
         Assert.Contains($"span {Server}", outline);
         Assert.Contains($"span {Client}", outline);
         Assert.Contains("unrooted component (cyclic parentage)", outline);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_CountEveryObservation_When_RenderingRepeatedSpanIdentities(bool reverse)
+    {
+        var first = Span(Server, Root);
+        var second = Span(Server, Root, name: "second-observation");
+        var report = Render(reverse ? [second, first] : [first, second]);
+        Assert.Contains($"trace {TestSpan.TraceId}, test root {Root}, 2 span(s)", report);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_RenderEveryPayload_When_DistinctObservationsShareTheSameIdentity(bool reverse)
+    {
+        var first = Span(Server, Root, attributes: new Dictionary<string, object?> { ["first.attribute"] = "first-payload" });
+        var second = Span(Server, Root, name: "second-observation",
+            attributes: new Dictionary<string, object?> { ["second.attribute"] = "second-payload" });
+        var report = Render(reverse ? [second, first] : [first, second]);
+        Assert.Contains("GET /orders  Server", report);
+        Assert.Contains("second-observation  Server", report);
+        Assert.Contains("first.attribute = \"first-payload\"", report);
+        Assert.Contains("second.attribute = \"second-payload\"", report);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_RenderEachOccurrenceOnce_When_ConflictingObservationsFormACycle(bool reverse)
+    {
+        var connected = Span(Server, Root);
+        var cyclic = Span(Server, Client, name: "cyclic-observation",
+            attributes: new Dictionary<string, object?> { ["cyclic.attribute"] = "cycle-payload" });
+        var peer = Span(Client, Server, name: "cycle-peer");
+        var report = Render(reverse ? [peer, cyclic, connected] : [connected, cyclic, peer]);
+        Assert.HasCount(3, report.Split(Environment.NewLine).Where(line => line.Contains("  span ", StringComparison.Ordinal)));
+        Assert.Contains("cyclic-observation  Server", report);
+        Assert.Contains("cyclic.attribute = \"cycle-payload\"", report);
+    }
+
+    [TestMethod]
+    public void Should_RenderStructuredMetadata_When_AnObservationHasScopeAndEventPayloads()
+    {
+        var captured = Span(Server, Root, statusDescription: "observation-description", events: [EventWithValue(7)],
+            scopeMetadata: new InstrumentationScopeRecord
+            {
+                Name = "Microsoft.AspNetCore", Version = "2.0", SchemaUrl = "https://example.test/schema/2",
+                Attributes = new Dictionary<string, object?> { ["qyl.scope.value"] = new object?[] { "scope-payload", 8L } }
+            });
+        var report = Render(captured);
+        Assert.Contains("status Unset: \"observation-description\"", report);
+        Assert.Contains("scope version \"2.0\", schema \"https://example.test/schema/2\"", report);
+        Assert.Contains("scope qyl.scope.value = [\"scope-payload\", 8]", report);
+        Assert.Contains("event repeated at 1 {qyl.event.value: [\"expected\", 7]}", report);
     }
 
     [TestMethod]
@@ -106,6 +216,60 @@ public class TelemetryPolicyTests
         Assert.AreSequenceEqual(
             ["[NoDuplicateSpans] 'GET /orders' (Server, orders, Microsoft.AspNetCore) was exported 2 times as span 0000000000000002."],
             Violations(new NoDuplicateSpansAttribute(), Span(Server, Root), Span(Server, Root)));
+    }
+
+    [TestMethod]
+    public void Should_CountBothExports_When_IdenticalObservationsArePublishedInSeparateCaptures()
+    {
+        Assert.AreSequenceEqual(
+            ["[NoDuplicateSpans] 'GET /orders' (Server, orders, Microsoft.AspNetCore) was exported 2 times as span 0000000000000002."],
+            Violations(new NoDuplicateSpansAttribute(), Published(Span(Server, Root)), Published(Span(Server, Root))));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_CountBothExports_When_ConflictingObservationsArePublishedInSeparateCaptures(bool reverse)
+    {
+        var original = Span(Server, Root);
+        var changed = Span(Server, Root, name: "changed.operation");
+        var first = reverse ? changed : original;
+        var second = reverse ? original : changed;
+        Assert.AreSequenceEqual([$"[NoDuplicateSpans] '{first.Name}' (Server, orders, Microsoft.AspNetCore) was exported 2 times as span {Server}."],
+            Violations(new NoDuplicateSpansAttribute(), Published(first), Published(second)));
+    }
+
+    [TestMethod]
+    public void Should_CountOneExport_When_OverlappingCapturesReuseTheSameObservation()
+    {
+        var server = Span(Server, Root);
+        var client = Span(Client, Server, SpanKind.Client, "POST");
+        Assert.IsEmpty(Violations(new NoDuplicateSpansAttribute(), Published(server), Published(server, client)));
+    }
+
+    [TestMethod]
+    public void Should_KeepTraceIdentitiesSeparate_When_DifferentTracesReuseTheSameSpanId()
+    {
+        var other = Span(Server, Root, traceId: TestSpan.UnrelatedTraceId);
+        Assert.IsEmpty(Violations(new NoDuplicateSpansAttribute(), Published(Span(Server, Root)), PublishedFor(other)));
+    }
+
+    [TestMethod]
+    public void Should_ReportTheWrappedOperation_When_ParentAndChildArePublishedInSeparateCaptures()
+    {
+        Assert.AreSequenceEqual(["[NoDuplicateSpans] 'GET /orders' (Server, orders, Contrib.AspNetCore) repeats its parent "
+            + "'GET /orders' (Server, orders, Microsoft.AspNetCore): the operation is instrumented twice."],
+            Violations(new NoDuplicateSpansAttribute(), Published(Span(Server, Root)),
+                Published(Span(Client, Server, scope: "Contrib.AspNetCore"))));
+    }
+
+    [TestMethod]
+    public void Should_ReportConcurrentInstrumentation_When_ScopesArePublishedInSeparateCaptures()
+    {
+        Assert.AreSequenceEqual(["[NoDuplicateSpans] 'GET /orders' (Server, orders, Microsoft.AspNetCore) and 'GET /orders' (Server, orders, "
+            + "Contrib.AspNetCore) describe the same operation concurrently: the operation is instrumented twice."],
+            Violations(new NoDuplicateSpansAttribute(), Published(Span(Server, Root)),
+                Published(Span(Client, Root, scope: "Contrib.AspNetCore"))));
     }
 
     [TestMethod]
@@ -239,6 +403,20 @@ public class TelemetryPolicyTests
     {
         var server = Span(Server, Root, attributes: new Dictionary<string, object?> { ["orders.custom"] = 7L });
         Assert.IsEmpty(Violations(new ConformsToSemanticConventionsAttribute(), server));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_RequireExplicitDefinitionConformance_When_ConformsToSemanticConventions_ContextDependentType(bool allowDeprecated)
+    {
+        var span = Span(Server, Root, kind: SpanKind.Internal, name: "codex.exec", scope: "OpenAI.Codex",
+            attributes: new Dictionary<string, object?> { ["thread.id"] = "0199a213-81c0-7800-8aa1-bbab2a035a53" });
+        Assert.AreSequenceEqual(
+        [
+            "[ConformsToSemanticConventions] spans[0] 'codex.exec' (Internal, orders, OpenAI.Codex) "
+            + "'thread.id': The registered value type depends on the selected signal definition; run explicit definition conformance."
+        ], Violations(new ConformsToSemanticConventionsAttribute { AllowDeprecated = allowDeprecated }, span));
     }
 
     [TestMethod]
@@ -435,6 +613,102 @@ public class TelemetryPolicyTests
         var stored = StoredWithMetadata(captured, traceId: TestSpan.UnrelatedTraceId);
         Assert.AreSequenceEqual([$"[PreservedByCollector] 'GET /orders' (Server, orders, Microsoft.AspNetCore) span {Server} was captured but not stored."],
             Violations(new PreservedByCollectorAttribute(), Published(captured) with { Stored = [stored] }));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_ReportTheChangedCaptureName_When_AnotherObservationOfTheSameIdentityMatchesStorage(bool reverse)
+    {
+        var original = Span(Server, Root);
+        var changed = Span(Server, Root, name: "changed.operation");
+        var published = reverse ? Published(changed, original) : Published(original, changed);
+        Assert.AreSequenceEqual(["[PreservedByCollector] 'changed.operation' (Server, orders, Microsoft.AspNetCore) was stored as 'GET /orders'."],
+            Violations(new PreservedByCollectorAttribute(), published with { Stored = [Stored(original, original.Name)] }));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_ReportTheChangedStoredName_When_AnotherStoredCandidateOfTheSameIdentityMatchesCapture(bool reverse)
+    {
+        var captured = Span(Server, Root);
+        var original = Stored(captured, captured.Name);
+        var changed = Stored(captured, "changed.operation");
+        Assert.AreSequenceEqual(["[PreservedByCollector] 'GET /orders' (Server, orders, Microsoft.AspNetCore) was stored as 'changed.operation'."],
+            Violations(new PreservedByCollectorAttribute(), Published(captured) with { Stored = reverse ? [changed, original] : [original, changed] }));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_ReportTheChangedCapturedEventPayload_When_AnotherObservationOfTheSameIdentityMatchesStorage(bool reverse)
+    {
+        var original = Span(Server, Root, events: [EventWithValue(7)]);
+        var changed = Span(Server, Root, events: [EventWithValue(8)]);
+        var published = reverse ? Published(changed, original) : Published(original, changed);
+        Assert.AreSequenceEqual(["[PreservedByCollector] 'GET /orders' (Server, orders, Microsoft.AspNetCore) event 'repeated' "
+            + "changed 'qyl.event.value' from [\"expected\", 8] to [\"expected\", 7]."],
+            Violations(new PreservedByCollectorAttribute(), published with
+            {
+                Stored = [StoredWithMetadata(original, events: [StoredEventWithValue(7)])]
+            }));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_ReportTheChangedStoredEventPayload_When_AnotherStoredCandidateOfTheSameIdentityMatchesCapture(bool reverse)
+    {
+        var captured = Span(Server, Root, events: [EventWithValue(7)]);
+        var original = StoredWithMetadata(captured, events: [StoredEventWithValue(7)]);
+        var changed = StoredWithMetadata(captured, events: [StoredEventWithValue(8)]);
+        Assert.AreSequenceEqual(["[PreservedByCollector] 'GET /orders' (Server, orders, Microsoft.AspNetCore) event 'repeated' "
+            + "changed 'qyl.event.value' from [\"expected\", 7] to [\"expected\", 8]."],
+            Violations(new PreservedByCollectorAttribute(), Published(captured) with { Stored = reverse ? [changed, original] : [original, changed] }));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Should_AcceptIdenticalRetransmissions_When_MultipleObservationsShareAnIdentity(bool sharedReference)
+    {
+        var captured = Span(Server, Root, events: [EventWithValue(7)]);
+        var repeated = sharedReference ? captured : Span(Server, Root, events: [EventWithValue(7)]);
+        var stored = StoredWithMetadata(captured, events: [StoredEventWithValue(7)]);
+        Assert.IsEmpty(Violations(new PreservedByCollectorAttribute(), Published(captured, repeated) with
+        {
+            Stored = [stored, sharedReference ? stored : StoredWithMetadata(repeated, events: [StoredEventWithValue(7)])]
+        }));
+    }
+
+    [TestMethod]
+    public void Should_AcceptOneStoredCopy_When_IdenticalCapturesAreRetransmitted()
+    {
+        var first = Span(Server, Root, events: [EventWithValue(7)]);
+        var second = Span(Server, Root, events: [EventWithValue(7)]);
+        Assert.IsEmpty(Violations(new PreservedByCollectorAttribute(), Published(first, second) with
+        {
+            Stored = [StoredWithMetadata(first, events: [StoredEventWithValue(7)])]
+        }));
+    }
+
+    [TestMethod]
+    public void Should_AcceptSharedObservations_When_MultiplePublishedViewsContainTheSameCaptureAndStorage()
+    {
+        var captured = Span(Server, Root);
+        var trace = Published(captured) with { Stored = [Stored(captured, captured.Name)] };
+        Assert.IsEmpty(Violations(new PreservedByCollectorAttribute(), trace, trace));
+    }
+
+    [TestMethod]
+    public void Should_MatchEachFullIdentity_When_DifferentTracesReuseTheSameSpanId()
+    {
+        var first = Span(Server, Root);
+        var second = Span(Server, Root, name: "other.operation", traceId: TestSpan.UnrelatedTraceId);
+        var stored = new[] { Stored(first, first.Name), Stored(second, second.Name) };
+        Assert.IsEmpty(Violations(new PreservedByCollectorAttribute(), Published(first) with { Stored = stored },
+            PublishedFor(second) with { Stored = stored }));
     }
 
     [TestMethod]
@@ -658,6 +932,13 @@ public class TelemetryPolicyTests
     private static IReadOnlyList<string> Violations(TelemetryPolicyAttribute policy, params SpanRecord[] spans) =>
         Violations(policy, Published(spans));
 
+    private static string Render(params SpanRecord[] spans)
+    {
+        using var invocation = TelemetryInvocation.Begin([]);
+        TelemetryInvocation.Publish(Published(spans));
+        return TelemetryReport.Render(invocation, []);
+    }
+
     private static IReadOnlyList<string> Violations(TelemetryPolicyAttribute policy, params PublishedTrace[] traces)
     {
         using var invocation = TelemetryInvocation.Begin([policy]);
@@ -674,6 +955,16 @@ public class TelemetryPolicyTests
     private static SpanEventRecord Event() => new("repeated", 1, new Dictionary<string, object?>());
 
     private static SpanEvent StoredEvent() => new() { Name = "repeated", TimeUnixNano = 1, Attributes = [] };
+
+    private static SpanEventRecord EventWithValue(long value) =>
+        new("repeated", 1, new Dictionary<string, object?> { ["qyl.event.value"] = new object?[] { "expected", value } });
+
+    private static SpanEvent StoredEventWithValue(long value) => new()
+    {
+        Name = "repeated", TimeUnixNano = 1,
+        Attributes = [Attribute("qyl.event.value", new AttributeValue.ArrayValue(
+            [new AttributeValue.StringValue("expected"), new AttributeValue.ObjectValue(new AttributeIntValue { Value = value })]))]
+    };
 
     private static SpanRecord ScopeSpan(string? version = null, string? schema = null,
         IReadOnlyDictionary<string, object?>? attributes = null, string? description = null) =>

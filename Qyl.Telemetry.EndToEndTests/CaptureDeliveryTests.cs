@@ -40,24 +40,29 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
             CaptureEnvironment);
     }
 
-    protected async Task<TraceEvidence> SendRequestAsync(string route = "capture", HttpStatusCode expectedStatus = HttpStatusCode.OK)
+    protected async Task<(ApplicationRoundTrip RoundTrip, HttpStatusCode StatusCode, bool InformationLoggingEnabled,
+        IReadOnlyDictionary<string, bool> AddedHeaders)> SendRequestAsync(string route = "capture")
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, route);
-        Assert.IsTrue(request.Headers.TryAddWithoutValidation(ProbeSignals.RequestHeader, ProbeSignals.RequestId));
-        Assert.IsTrue(request.Headers.TryAddWithoutValidation(RequestIdHeader, s_requestValues));
-        Assert.IsTrue(request.Headers.TryAddWithoutValidation(UnderscoreHeader, UnderscoreValues));
-        Assert.IsTrue(request.Headers.TryAddWithoutValidation(AuthorizationHeader, AuthorizationValues));
+        var addedHeaders = new Dictionary<string, bool>
+        {
+            [ProbeSignals.RequestHeader] = request.Headers.TryAddWithoutValidation(ProbeSignals.RequestHeader, ProbeSignals.RequestId),
+            [RequestIdHeader] = request.Headers.TryAddWithoutValidation(RequestIdHeader, s_requestValues),
+            [UnderscoreHeader] = request.Headers.TryAddWithoutValidation(UnderscoreHeader, UnderscoreValues),
+            [AuthorizationHeader] = request.Headers.TryAddWithoutValidation(AuthorizationHeader, AuthorizationValues)
+        };
+        var statusCode = default(HttpStatusCode);
+        var informationLoggingEnabled = false;
         var roundTrip = await Application.RoundTripAsync(request, async response =>
         {
-            Assert.AreEqual(expectedStatus, response.StatusCode);
+            statusCode = response.StatusCode;
             if (route == "capture")
             {
                 using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.CancellationToken));
-                Assert.IsTrue(body.RootElement.GetProperty("informationLoggingEnabled").GetBoolean());
+                informationLoggingEnabled = body.RootElement.GetProperty("informationLoggingEnabled").GetBoolean();
             }
         }, context);
-        _ = Assert.That.HasServerSpanUnderTheTestClient(roundTrip, "GET /" + route);
-        return roundTrip.Evidence;
+        return (roundTrip, statusCode, informationLoggingEnabled, addedHeaders);
     }
 
     public async ValueTask DisposeAsync()
@@ -85,7 +90,13 @@ public sealed class SelectedHeaderDeliveryTests(TestContext context) : CaptureDe
     [CapturesExactly(RequestIdAttribute, UnderscoreAttribute, AuthorizationAttribute, ResponseIdAttribute)]
     public async Task HeaderCapture_SelectedArrays_KeepNamesValuesAndOrderThroughStorage()
     {
-        var evidence = await SendRequestAsync();
+        var response = await SendRequestAsync();
+        foreach (var (header, added) in response.AddedHeaders)
+            Assert.IsTrue(added, $"Could not add request header '{header}'.");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.IsTrue(response.InformationLoggingEnabled);
+        _ = Assert.That.HasServerSpanUnderTheTestClient(response.RoundTrip, "GET /capture");
+        var evidence = response.RoundTrip.Evidence;
         var server = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName));
         Assert.AreEqual(SpanKind.Server, server.Kind);
         Assert.AreSequenceEqual(CapturedRequestValues, server.GetStrings(RequestIdAttribute)!);
@@ -103,5 +114,13 @@ public sealed class UnconfiguredHeaderDeliveryTests(TestContext context) : Captu
 {
     [TestMethod]
     [CapturesExactly]
-    public async Task HeaderCapture_Unconfigured_EmitsNoRequestOrResponseHeaderAttributes() => _ = await SendRequestAsync();
+    public async Task HeaderCapture_Unconfigured_EmitsNoRequestOrResponseHeaderAttributes()
+    {
+        var response = await SendRequestAsync();
+        foreach (var (header, added) in response.AddedHeaders)
+            Assert.IsTrue(added, $"Could not add request header '{header}'.");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.IsTrue(response.InformationLoggingEnabled);
+        _ = Assert.That.HasServerSpanUnderTheTestClient(response.RoundTrip, "GET /capture");
+    }
 }

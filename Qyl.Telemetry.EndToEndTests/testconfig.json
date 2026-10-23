@@ -8,6 +8,10 @@
     "ansi": "auto"
   },
   "mstest": {
+    "timeout": {
+      "test": 300000,
+      "useCooperativeCancellation": true
+    },
     "output": {
       "captureTrace": "Live"
     }

@@ -13,12 +13,12 @@ public sealed class ProbeCases(TestContext context)
     [ProbeMethod]
     [DataRow(ProbeContract.FirstRow)]
     [DataRow(ProbeContract.SecondRow)]
-    public void ProbeRows_EachDataRow_KeepsItsTraceAndOriginalExecutor(string value)
+    public void ProbeRows_EachDataRow_KeepsItsTraceAndOriginalExecutor(string rowLabel)
     {
         var activity = Activity.Current;
         Assert.IsNotNull(activity);
         Assert.AreEqual(TracePerTestAttribute.ActivityName, activity.OperationName);
-        context.WriteLine($"{ProbeContract.RowMarker}|{value}|{activity.TraceId.ToHexString()}");
+        context.WriteLine($"{ProbeContract.RowMarker}|{rowLabel}|{activity.TraceId.ToHexString()}");
     }
 
     [TestMethod]

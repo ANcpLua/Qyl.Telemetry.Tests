@@ -30,16 +30,39 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task Triage_SeededIncidents_RanksReleaseFailureFirstAndKeepsRareSilentAndSessionFindings(AnalysisPath path)
+    public async Task Triage_SeededIncidents_RanksReleaseFailureFirst(AnalysisPath path)
     {
-        var triage = await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, Key.Window(("matchers", new JsonArray(AnswerKey.Matcher("service.name", "in",
-            new JsonArray("checkout", "orders-db", "payments", "billing", "sessions"))))), context.CancellationToken);
+        var triage = await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, SeededTriageInput(), context.CancellationToken);
         var checkout = Assert.ContainsSingle(await CheckoutFailuresAsync(path));
         var first = triage.Failures[0];
         Assert.AreEqual(checkout.FailureId, first.FailureId);
         Assert.AreEqual(AnswerKey.Release, first.CoincidingRelease?.Version);
+    }
+
+    [TestMethod]
+    [DataRow(AnalysisPath.Http)]
+    [DataRow(AnalysisPath.Mcp)]
+    public async Task Triage_SeededRareFailure_IncludesPaymentsOccurrences(AnalysisPath path)
+    {
+        var triage = await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, SeededTriageInput(), context.CancellationToken);
         Assert.Contains(failure => failure is { Count: 2, Service: "payments" }, triage.Failures);
+    }
+
+    [TestMethod]
+    [DataRow(AnalysisPath.Http)]
+    [DataRow(AnalysisPath.Mcp)]
+    public async Task Triage_SeededSilentService_IncludesBilling(AnalysisPath path)
+    {
+        var triage = await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, SeededTriageInput(), context.CancellationToken);
         Assert.Contains(service => service.Service == "billing", triage.SilentServices);
+    }
+
+    [TestMethod]
+    [DataRow(AnalysisPath.Http)]
+    [DataRow(AnalysisPath.Mcp)]
+    public async Task Triage_SeededSessions_ReportsOnlyFailingSessionWithoutRegression(AnalysisPath path)
+    {
+        var triage = await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, SeededTriageInput(), context.CancellationToken);
         var session = Assert.ContainsSingle(triage.Failures.Where(failure => failure.Service == "sessions"));
         Assert.AreEqual(3L, session.Count, "Only sess_bad contributes failures.");
         Assert.Contains(session.ExampleTraceId!, TraceIds("sess_bad-"));
@@ -114,16 +137,33 @@ public sealed class AnswerKeyTests(TestContext context)
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
-    public async Task VerifyFix_InsufficientEvidence_NeverVerifies(AnalysisPath path)
+    public async Task VerifyFix_NoRequestsAfterChange_RemainsPending(AnalysisPath path)
     {
         var checkout = Assert.ContainsSingle(await CheckoutFailuresAsync(path));
         var since = AnswerKey.Iso(Key.Now - Minute);
         var waiting = await Session.AskAsync<VerifyFixOutput>(path, AnalysisTools.VerifyFix, Key.Window(("failure_id", checkout.FailureId), ("since", since)), context.CancellationToken);
         Assert.AreEqual("pending", waiting.Verdict);
         Assert.AreEqual(0L, waiting.After.Requests);
+    }
+
+    [TestMethod]
+    [DataRow(AnalysisPath.Http)]
+    [DataRow(AnalysisPath.Mcp)]
+    public async Task VerifyFix_NoRequestsAndZeroThresholds_IsInconclusive(AnalysisPath path)
+    {
+        var checkout = Assert.ContainsSingle(await CheckoutFailuresAsync(path));
+        var since = AnswerKey.Iso(Key.Now - Minute);
         var unobserved = await Session.AskAsync<VerifyFixOutput>(path, AnalysisTools.VerifyFix, Key.Window(("failure_id", checkout.FailureId), ("since", since),
             ("min_requests", 0), ("min_minutes", 0)), context.CancellationToken);
         Assert.AreEqual("inconclusive", unobserved.Verdict, "Zero requests after the change cannot pass, even without thresholds.");
+    }
+
+    [TestMethod]
+    [DataRow(AnalysisPath.Http)]
+    [DataRow(AnalysisPath.Mcp)]
+    public async Task VerifyFix_RecurringFailureAndZeroThresholds_FailsWithItsTrace(AnalysisPath path)
+    {
+        var checkout = Assert.ContainsSingle(await CheckoutFailuresAsync(path));
         var recurring = await Session.AskAsync<VerifyFixOutput>(path, AnalysisTools.VerifyFix, Key.Window(("failure_id", checkout.FailureId),
             ("since", AnswerKey.Iso(Key.T - Minute)), ("min_requests", 0), ("min_minutes", 0)), context.CancellationToken);
         Assert.AreEqual("failed", recurring.Verdict);
@@ -160,6 +200,9 @@ public sealed class AnswerKeyTests(TestContext context)
     private async Task<IEnumerable<TriageFailure>> CheckoutFailuresAsync(AnalysisPath path) =>
         (await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, Key.Window(("service_name", "checkout"), ("status", "all")), context.CancellationToken))
             .Failures.Where(failure => failure.Operation == "checkout");
+
+    private static JsonObject SeededTriageInput() => Key.Window(("matchers", new JsonArray(AnswerKey.Matcher("service.name", "in",
+        new JsonArray("checkout", "orders-db", "payments", "billing", "sessions")))));
 
     private static HashSet<string> TraceIds(string prefix) => Key.Incidents.Keys.Where(pair => pair.Key.StartsWith(prefix, StringComparison.Ordinal))
         .Select(pair => pair.Value.TraceId).ToHashSet(StringComparer.Ordinal);

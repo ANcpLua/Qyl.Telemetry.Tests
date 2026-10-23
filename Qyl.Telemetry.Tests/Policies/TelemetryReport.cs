@@ -78,39 +78,60 @@ internal static class TelemetryReport
 
     private static List<string> Tree(PublishedTrace trace, bool details)
     {
-        var spans = trace.Evidence.Spans.DistinctBy(span => span.SpanId).ToArray();
+        var spans = trace.Evidence.Spans;
         var ids = spans.Select(span => span.SpanId).ToHashSet(StringComparer.Ordinal);
-        var children = spans.ToLookup(span => span.ParentSpanId ?? "", StringComparer.Ordinal);
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        var lines = new List<string> { $"trace {trace.Evidence.TraceId}, test root {trace.RootSpanId}, {spans.Length} span(s)" };
-        foreach (var root in spans.Where(span => string.IsNullOrEmpty(span.ParentSpanId) || !ids.Contains(span.ParentSpanId))
-                     .OrderBy(span => span.StartTimeUnixNano))
-            Walk(root, 1);
-        foreach (var unrooted in spans.Where(span => !visited.Contains(span.SpanId)).OrderBy(span => span.StartTimeUnixNano))
+        var occurrences = spans.Index().ToArray();
+        var counts = spans.CountBy(span => span.SpanId, StringComparer.Ordinal)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var children = occurrences.ToLookup(item => item.Item.ParentSpanId ?? "", StringComparer.Ordinal);
+        var visited = new HashSet<int>();
+        var expanded = new HashSet<string>(StringComparer.Ordinal);
+        var lines = new List<string> { $"trace {trace.Evidence.TraceId}, test root {trace.RootSpanId}, {spans.Count} span(s)" };
+        foreach (var root in occurrences.Where(item => string.IsNullOrEmpty(item.Item.ParentSpanId) || !ids.Contains(item.Item.ParentSpanId))
+                     .OrderBy(item => item.Item.StartTimeUnixNano))
+            Walk(root.Index, 1);
+        foreach (var unrooted in occurrences.OrderBy(item => item.Item.StartTimeUnixNano))
         {
-            if (visited.Contains(unrooted.SpanId)) continue;
+            if (visited.Contains(unrooted.Index)) continue;
             lines.Add("  unrooted component (cyclic parentage):");
-            Walk(unrooted, 2);
+            Walk(unrooted.Index, 2);
         }
         return lines;
 
-        void Walk(SpanRecord span, int depth)
+        void Walk(int index, int depth)
         {
-            if (!visited.Add(span.SpanId)) return;
-            var indent = new string(' ', depth * 2);
-            var parent = string.IsNullOrEmpty(span.ParentSpanId) ? ""
-                : span.ParentSpanId == trace.RootSpanId ? "  (under the test root)"
-                : ids.Contains(span.ParentSpanId) ? "" : $"  (parent {span.ParentSpanId} was not captured)";
-            lines.Add($"{indent}{span.Name}  {span.Kind}  {span.Service ?? "no service"}  {span.Scope?.Name ?? "no scope"}  "
-                + $"span {span.SpanId}{(span.Status == ActivityStatusCode.Error ? "  ERROR " + span.StatusDescription : "")}{parent}");
-            if (details)
+            var pending = new Stack<(int Index, int Depth)>();
+            pending.Push((index, depth));
+            while (pending.TryPop(out var next))
             {
-                lines.AddRange(span.Attributes.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                    .Select(pair => $"{indent}  {pair.Key} = {Format(pair.Value)}"));
-                lines.AddRange(span.Events.Select(spanEvent => $"{indent}  event {spanEvent.Name} {Format(spanEvent.Attributes)}"));
-            }
+                if (!visited.Add(next.Index)) continue;
+                var span = spans[next.Index];
+                var indent = new string(' ', next.Depth * 2);
+                var parent = string.IsNullOrEmpty(span.ParentSpanId) ? ""
+                    : span.ParentSpanId == trace.RootSpanId ? "  (under the test root)"
+                    : ids.Contains(span.ParentSpanId) ? "" : $"  (parent {span.ParentSpanId} was not captured)";
+                var occurrence = counts[span.SpanId] > 1 ? $"  observation {next.Index + 1}" : "";
+                lines.Add($"{indent}{span.Name}  {span.Kind}  {span.Service ?? "no service"}  {span.Scope?.Name ?? "no scope"}  "
+                    + $"span {span.SpanId}{occurrence}{(span.Status == ActivityStatusCode.Error ? "  ERROR " + span.StatusDescription : "")}{parent}");
+                if (details)
+                {
+                    lines.Add($"{indent}  parent {span.ParentSpanId ?? "-"}, time {span.StartTimeUnixNano} to {span.EndTimeUnixNano}, "
+                        + $"status {span.Status}: {Format(span.StatusDescription)}");
+                    lines.Add($"{indent}  scope version {Format(span.Scope?.Version)}, schema {Format(span.Scope?.SchemaUrl)}");
+                    lines.AddRange(span.Attributes.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                        .Select(pair => $"{indent}  {pair.Key} = {Format(pair.Value)}"));
+                    lines.AddRange(span.Resource.Attributes.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                        .Select(pair => $"{indent}  resource {pair.Key} = {Format(pair.Value)}"));
+                    if (span.Scope is { } scope)
+                        lines.AddRange(scope.Attributes.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                            .Select(pair => $"{indent}  scope {pair.Key} = {Format(pair.Value)}"));
+                    lines.AddRange(span.Events.Select(spanEvent => $"{indent}  event {spanEvent.Name} at {spanEvent.TimeUnixNano} {Format(spanEvent.Attributes)}"));
+                }
 
-            foreach (var child in children[span.SpanId].OrderBy(child => child.StartTimeUnixNano)) Walk(child, depth + 1);
+                if (!expanded.Add(span.SpanId)) continue;
+                foreach (var child in children[span.SpanId].OrderByDescending(item => item.Item.StartTimeUnixNano).ThenByDescending(item => item.Index))
+                    pending.Push((child.Index, next.Depth + 1));
+            }
         }
     }
 }

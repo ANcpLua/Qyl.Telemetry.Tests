@@ -253,10 +253,65 @@ public class RegistryConformanceTests
     }
 
     [TestMethod]
-    [DynamicData(nameof(ValueCases))]
-    public void Should_PreserveOtlpTypes_When_RegistryAudit_ValueKinds(RegistryAttributeValueKind kind, object? value, bool expected)
+    public void Should_NotReportATypeViolation_When_RegistryAudit_ContextDependentCodexThreadId()
     {
-        Assert.AreEqual(expected, RegistryConformance.Matches(kind, value));
+        Assert.IsEmpty(ContextDependentReport("0199a213-81c0-7800-8aa1-bbab2a035a53").Issues
+            .Where(issue => issue.Level == RegistryIssueLevel.Violation));
+    }
+
+    [TestMethod]
+    public void Should_ReportAnUnevaluatedType_When_RegistryAudit_ContextDependentCodexThreadId()
+    {
+        Assert.AreEqual(new RegistryIssue("spans[0]", "thread.id", RegistryIssueLevel.Unevaluated,
+                "The registered value type depends on the selected signal definition; run explicit definition conformance."),
+            Assert.ContainsSingle(ContextDependentReport("0199a213-81c0-7800-8aa1-bbab2a035a53").Issues));
+    }
+
+    [TestMethod]
+    [DataRow("0199a213-81c0-7800-8aa1-bbab2a035a53")]
+    [DataRow(7L)]
+    [DataRow(true)]
+    public void Should_NotClaimConformance_When_RegistryAudit_ContextDependentTypeHasNoSelectedDefinition(object threadId)
+    {
+        Assert.IsFalse(ContextDependentReport(threadId).IsConformant);
+    }
+
+    [TestMethod]
+    public void Should_CountTheRegisteredAttribute_When_RegistryAudit_ContextDependentCodexThreadId()
+    {
+        Assert.AreEqual(1, ContextDependentReport("0199a213-81c0-7800-8aa1-bbab2a035a53").AttributesChecked);
+    }
+
+    [TestMethod]
+    public void Should_NotClassifyTheAttributeAsCustom_When_RegistryAudit_ContextDependentCodexThreadId()
+    {
+        Assert.IsEmpty(ContextDependentReport("0199a213-81c0-7800-8aa1-bbab2a035a53").CustomAttributes);
+    }
+
+    [TestMethod]
+    public void Should_PreserveTheCoreIntegerKind_When_RegistryAttributeHasAContextualStringDefinition()
+    {
+        Assert.IsTrue(RegistryCatalog.TryGetAttribute("thread.id", out var attribute));
+        Assert.IsNotNull(attribute);
+        Assert.AreEqual(RegistryAttributeValueKind.Integer, attribute.ValueKind);
+    }
+
+    [TestMethod]
+    public void Should_RequireRegeneration_When_TypeContextWasGeneratedForAnotherRegistry()
+    {
+        var error = Assert.ThrowsExactly<InvalidOperationException>(() =>
+            RegistryConformance.VerifyRegistrySnapshot("different-snapshot"));
+        Assert.AreEqual(
+            $"Registry type-context metadata was generated for registry '{RegistryTypeContext.RegistrySha256}', "
+            + "but the loaded registry is 'different-snapshot'. "
+            + "Regenerate it with python3 eng/generate-registry-type-context.py.", error.Message);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(ValueCases))]
+    public void Should_PreserveOtlpTypes_When_RegistryAudit_ValueKinds(RegistryAttributeValueKind kind, object? attributeValue, bool expected)
+    {
+        Assert.AreEqual(expected, RegistryConformance.Matches(kind, attributeValue));
     }
 
     public static IEnumerable<object?[]> ValueCases()
@@ -358,6 +413,16 @@ public class RegistryConformanceTests
                 ("http.request.headers.content_type", "custom"),
                 ("pprof.scope.sample_type_order", new object?[] { 1L }),
                 ("feature_flag.result.value", new Dictionary<string, object?>()))
+        };
+        return RegistryConformance.Check(TestSpan.Only(span));
+    }
+
+    private static RegistryReport ContextDependentReport(object threadId)
+    {
+        var span = new SpanRecord("11111111111111111111111111111111", "2222222222222222", "codex.exec")
+        {
+            Kind = SpanKind.Internal,
+            Attributes = Attributes(("thread.id", threadId))
         };
         return RegistryConformance.Check(TestSpan.Only(span));
     }
