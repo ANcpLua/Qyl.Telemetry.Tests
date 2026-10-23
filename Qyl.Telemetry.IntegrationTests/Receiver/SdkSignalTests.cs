@@ -16,7 +16,7 @@ namespace Qyl.Telemetry.IntegrationTests.Receiver;
 public sealed class SdkSignalTests
 {
     private const string SchemaUrl = "https://opentelemetry.io/schemas/1.44.0";
-    private static readonly Action<ILogger, int, Exception?> OrderCreated =
+    private static readonly Action<ILogger, int, Exception?> s_orderCreated =
         LoggerMessage.Define<int>(LogLevel.Information, new EventId(19, "OrderCreated"), "Created {OrderId}");
 
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
@@ -32,7 +32,7 @@ public sealed class SdkSignalTests
                 var resource = ResourceBuilder.CreateEmpty().AddAttributes(new Dictionary<string, object>
                         { [ServiceAttributes.Name] = "sdk-service", [test.Partition.ResourceAttribute] = test.Partition.Value },
                     SchemaUrl);
-                var receiver = transport == OtlpTransport.Grpc ? test.GrpcEndpoint : test.Endpoint;
+                var receiver = ReceiverEndpoint(transport, test.Endpoint, test.GrpcEndpoint);
                 using var source = new ActivitySource(sourceName, "2.0.1");
                 using var traces = Sdk.CreateTracerProviderBuilder().AddSource(sourceName).SetResourceBuilder(resource)
                     .AddOtlpCapture(receiver, transport).Build();
@@ -47,7 +47,7 @@ public sealed class SdkSignalTests
                 }));
                 using var activity = source.CreateActivity("sdk.operation", ActivityKind.Server)!.Start();
                 activity.SetStatus(ActivityStatusCode.Ok).SetTag(HttpAttributes.RequestMethod, "POST");
-                OrderCreated(logs.CreateLogger(sourceName), 41, null);
+                s_orderCreated(logs.CreateLogger(sourceName), 41, null);
                 meter.CreateCounter<long>("orders.created", "{order}", "Created orders").Add(7);
                 Assert.IsTrue(metrics.ForceFlush());
                 activity.Stop();
@@ -84,4 +84,6 @@ public sealed class SdkSignalTests
         Assert.AreEqual(7L, Assert.ContainsSingle(sum.Points).Value);
     }
 
+    private static Uri ReceiverEndpoint(OtlpTransport transport, Uri http, Uri grpc) =>
+        transport == OtlpTransport.Grpc ? grpc : http;
 }

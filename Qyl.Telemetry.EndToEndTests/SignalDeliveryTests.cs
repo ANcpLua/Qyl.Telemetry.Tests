@@ -66,38 +66,28 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
         Assert.IsFalse(stored.Truncated);
         var persisted = Assert.ContainsSingle(stored.Series).Buckets.Where(bucket => bucket.Value is not null).ToArray();
         Assert.IsNotEmpty(persisted);
-        foreach (var bucket in persisted) Assert.AreEqual(1d, bucket.Value, "The stored cumulative counter must retain its measured value.");
+        Assert.AreSequenceEqual(Enumerable.Repeat<double?>(1d, persisted.Length), persisted.Select(bucket => bucket.Value),
+            "The stored cumulative counter must retain its measured value.");
     }
 
     [TestMethod]
     [NoErrorTelemetry]
     [ExportsCleanly]
-    [DataRow(NativeMetric.ServerDuration)]
-    [DataRow(NativeMetric.CpuTime)]
-    [DataRow(NativeMetric.WorkingSet)]
-    public async Task NativeMetrics_Stored_KeepTypeUnitScopeAndProducer(NativeMetric metric)
+    [DataRow("http.server.request.duration", "s", "Microsoft.AspNetCore.Hosting", typeof(HistogramData))]
+    [DataRow("dotnet.process.cpu.time", "s", "System.Runtime", typeof(SumData))]
+    [DataRow("dotnet.process.memory.working_set", "By", "System.Runtime", typeof(SumData))]
+    public async Task NativeMetrics_Stored_KeepTypeUnitScopeAndProducer(string name, string unit, string scope, Type kind)
     {
-        var expected = metric switch
-        {
-            NativeMetric.ServerDuration => (Name: "http.server.request.duration", Unit: "s", Scope: "Microsoft.AspNetCore.Hosting", Kind: typeof(HistogramData)),
-            NativeMetric.CpuTime => (Name: "dotnet.process.cpu.time", Unit: "s", Scope: "System.Runtime", Kind: typeof(SumData)),
-            NativeMetric.WorkingSet => (Name: "dotnet.process.memory.working_set", Unit: "By", Scope: "System.Runtime", Kind: typeof(SumData)),
-            _ => throw new ArgumentOutOfRangeException(nameof(metric))
-        };
         var evidence = await SendRequestAsync();
         var instance = Assert.ContainsSingle(evidence.Spans.Where(span => span.Service == InstrumentedApplicationFixture.ServiceName)).Resource.Attributes[ServiceInstanceId];
         var capture = await Application.Telemetry.AwaitAsync(snapshot => snapshot.Metrics.Any(item =>
-            item.Name == expected.Name && Equals(item.Resource.Attributes[ServiceInstanceId], instance)), Context.CancellationToken);
-        var observed = capture.Metrics.Where(item => item.Name == expected.Name
+            item.Name == name && Equals(item.Resource.Attributes[ServiceInstanceId], instance)), Context.CancellationToken);
+        var observed = capture.Metrics.Where(item => item.Name == name
             && Equals(item.Resource.Attributes[ServiceInstanceId], instance)).ToArray();
         Assert.IsNotEmpty(observed);
-        foreach (var item in observed)
-        {
-            Assert.AreEqual(expected.Unit, item.Unit);
-            Assert.AreEqual(expected.Scope, item.Scope?.Name);
-            Assert.IsInstanceOfType(item.Data, expected.Kind);
-            Assert.AreEqual("dotnet", item.Resource.Attributes["telemetry.sdk.language"]);
-        }
+        Assert.AreSequenceEqual(Enumerable.Repeat<(string, string?, Type, object?)>((unit, scope, kind, "dotnet"), observed.Length),
+            observed.Select(item => (item.Unit, item.Scope?.Name, item.Data.GetType(),
+                item.Resource.Attributes["telemetry.sdk.language"])));
     }
 
     [TestMethod]
@@ -118,5 +108,4 @@ public sealed class SignalDeliveryTests(TestContext context) : CaptureDeliveryFi
             $"Observed events: {string.Join("; ", server.Events.Select(item => item.Name + ":" + string.Join(", ", item.Attributes.Select(pair => pair.Key + "=" + pair.Value))))}; error.type={server.GetString("error.type")}");
     }
 
-    public enum NativeMetric { ServerDuration, CpuTime, WorkingSet }
 }

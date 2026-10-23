@@ -85,7 +85,8 @@ internal sealed class OtlpIncidents
             var request = new ExportTraceServiceRequest();
             request.ResourceSpans.Add(_spans);
             var response = ExportTraceServiceResponse.Parser.ParseFrom(await ExportAsync(client, "v1/traces", request, cancellationToken));
-            Assert.AreEqual(0L, response.PartialSuccess?.RejectedSpans ?? 0, response.PartialSuccess?.ErrorMessage);
+            if ((response.PartialSuccess?.RejectedSpans ?? 0) != 0)
+                throw new InvalidDataException($"The incident export rejected spans: {response.PartialSuccess?.ErrorMessage}");
         }
 
         if (_metrics.Count > 0)
@@ -93,7 +94,8 @@ internal sealed class OtlpIncidents
             var request = new ExportMetricsServiceRequest();
             request.ResourceMetrics.Add(_metrics);
             var response = ExportMetricsServiceResponse.Parser.ParseFrom(await ExportAsync(client, "v1/metrics", request, cancellationToken));
-            Assert.AreEqual(0L, response.PartialSuccess?.RejectedDataPoints ?? 0, response.PartialSuccess?.ErrorMessage);
+            if ((response.PartialSuccess?.RejectedDataPoints ?? 0) != 0)
+                throw new InvalidDataException($"The incident export rejected metric points: {response.PartialSuccess?.ErrorMessage}");
         }
 
         _spans.Clear();
@@ -104,8 +106,9 @@ internal sealed class OtlpIncidents
     {
         using var response = await client.ExportAsync(route, request.ToByteArray(), OtlpReceiver.ProtobufMediaType, null, cancellationToken);
         var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-        Assert.IsTrue(response.IsSuccessStatusCode, $"{route} returned {(int)response.StatusCode}: {Encoding.UTF8.GetString(body)}");
-        return body;
+        return response.IsSuccessStatusCode
+            ? body
+            : throw new HttpRequestException($"{route} returned {(int)response.StatusCode}: {Encoding.UTF8.GetString(body)}", null, response.StatusCode);
     }
 
     private static Resource Resource(string service, IReadOnlyDictionary<string, object>? attributes)

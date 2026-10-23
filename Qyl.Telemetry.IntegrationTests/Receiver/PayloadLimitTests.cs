@@ -30,33 +30,31 @@ public sealed class PayloadLimitTests
     public async Task HttpReceiver_DefaultOrConfiguredLimit_IsEnforcedWithAndWithoutContentLength(
         int limit, bool gzip, bool chunked)
     {
-        await using var receiver = limit == OtlpReceiver.DefaultMaxPayloadBytes
-            ? await OtlpReceiver.StartAsync(TestContext.CancellationToken)
-            : await OtlpReceiver.StartAsync(limit, TestContext.CancellationToken);
-        foreach (var size in new[] { limit - 1, limit, limit + 1 })
-        {
-            var payload = UnknownFieldPayload(size);
-            using var content = OtlpHttp.Content(gzip ? OtlpHttp.Compress(payload) : payload, gzip ? "gzip" : null, chunked);
-            if (chunked) Assert.IsNull(content.Headers.ContentLength);
-            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(receiver.Endpoint, "v1/traces"));
-            request.Content = content;
-            var awaitDeclaredSizeVerdictBeforeUpload = !chunked;
-            request.Headers.ExpectContinue = awaitDeclaredSizeVerdictBeforeUpload;
-            using var response = await TelemetryLifecycle.Http.SendAsync(request, TestContext.CancellationToken);
-            Assert.AreEqual(size > limit ? HttpStatusCode.RequestEntityTooLarge : HttpStatusCode.OK, response.StatusCode, $"Payload size: {size}; gzip: {gzip}; chunked: {chunked}.");
-            if (size <= limit)
-            {
-                Assert.IsEmpty(await response.Content.ReadAsByteArrayAsync(TestContext.CancellationToken));
-                Assert.AreSequenceEqual(payload, receiver.Snapshot().Requests[^1].Payload.ToArray());
-            }
-            else
-            {
-                var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
-                Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
-                Assert.Contains($"{limit}-byte", error.Message);
-                Assert.AreEqual(error.Message, receiver.Snapshot().Receipts[^1].Error);
-            }
-        }
+        await using var receiver = await StartReceiverAsync(limit);
+        var belowLimit = UnknownFieldPayload(limit - 1);
+        using var belowRequest = Request(receiver.Endpoint, belowLimit, gzip, chunked);
+        Assert.AreEqual(!chunked, belowRequest.Content!.Headers.ContentLength.HasValue);
+        using var belowResponse = await TelemetryLifecycle.Http.SendAsync(belowRequest, TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.OK, belowResponse.StatusCode);
+        Assert.IsEmpty(await belowResponse.Content.ReadAsByteArrayAsync(TestContext.CancellationToken));
+        Assert.AreSequenceEqual(belowLimit, receiver.Snapshot().Requests[^1].Payload.ToArray());
+
+        var atLimit = UnknownFieldPayload(limit);
+        using var atRequest = Request(receiver.Endpoint, atLimit, gzip, chunked);
+        Assert.AreEqual(!chunked, atRequest.Content!.Headers.ContentLength.HasValue);
+        using var atResponse = await TelemetryLifecycle.Http.SendAsync(atRequest, TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.OK, atResponse.StatusCode);
+        Assert.IsEmpty(await atResponse.Content.ReadAsByteArrayAsync(TestContext.CancellationToken));
+        Assert.AreSequenceEqual(atLimit, receiver.Snapshot().Requests[^1].Payload.ToArray());
+
+        using var aboveRequest = Request(receiver.Endpoint, UnknownFieldPayload(limit + 1), gzip, chunked);
+        Assert.AreEqual(!chunked, aboveRequest.Content!.Headers.ContentLength.HasValue);
+        using var aboveResponse = await TelemetryLifecycle.Http.SendAsync(aboveRequest, TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.RequestEntityTooLarge, aboveResponse.StatusCode);
+        var error = await Assert.That.HasOtlpErrorAsync(aboveResponse, TestContext.CancellationToken);
+        Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
+        Assert.Contains($"{limit}-byte", error.Message);
+        Assert.AreEqual(error.Message, receiver.Snapshot().Receipts[^1].Error);
         var snapshot = receiver.Snapshot();
         Assert.HasCount(2, snapshot.Requests);
         Assert.HasCount(3, snapshot.Receipts);
@@ -68,21 +66,22 @@ public sealed class PayloadLimitTests
     public async Task HttpReceiver_ChunkedIdentityRequest_IsHeldToTheKestrelWireBudget()
     {
         await using var receiver = await OtlpReceiver.StartAsync(1024, TestContext.CancellationToken);
-        const int acceptedSizeLeavingRoomForKestrelChunkFraming = 992;
-        const int rejectedSizeAboveTheWireBudgetByItself = 1025;
-        foreach (var size in new[] { acceptedSizeLeavingRoomForKestrelChunkFraming, rejectedSizeAboveTheWireBudgetByItself })
-        {
-            using var content = OtlpHttp.Content(UnknownFieldPayload(size), chunked: true);
-            Assert.IsNull(content.Headers.ContentLength);
-            using var response = await TelemetryLifecycle.Http.PostAsync(new Uri(receiver.Endpoint, "v1/metrics"),
-                content, TestContext.CancellationToken);
-            Assert.AreEqual(size == acceptedSizeLeavingRoomForKestrelChunkFraming ? HttpStatusCode.OK : HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
-            if (size == acceptedSizeLeavingRoomForKestrelChunkFraming) continue;
-            var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
-            Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
-            Assert.Contains("1024-byte", error.Message);
-            Assert.AreEqual(error.Message, receiver.Snapshot().Receipts[^1].Error);
-        }
+        const int AcceptedSizeLeavingRoomForKestrelChunkFraming = 992;
+        const int RejectedSizeAboveTheWireBudgetByItself = 1025;
+        using var acceptedContent = OtlpHttp.Content(UnknownFieldPayload(AcceptedSizeLeavingRoomForKestrelChunkFraming), chunked: true);
+        Assert.IsNull(acceptedContent.Headers.ContentLength);
+        using var accepted = await TelemetryLifecycle.Http.PostAsync(new Uri(receiver.Endpoint, "v1/" + Signals.Metrics),
+            acceptedContent, TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.OK, accepted.StatusCode);
+        using var rejectedContent = OtlpHttp.Content(UnknownFieldPayload(RejectedSizeAboveTheWireBudgetByItself), chunked: true);
+        Assert.IsNull(rejectedContent.Headers.ContentLength);
+        using var rejected = await TelemetryLifecycle.Http.PostAsync(new Uri(receiver.Endpoint, "v1/" + Signals.Metrics),
+            rejectedContent, TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.RequestEntityTooLarge, rejected.StatusCode);
+        var error = await Assert.That.HasOtlpErrorAsync(rejected, TestContext.CancellationToken);
+        Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
+        Assert.Contains("1024-byte", error.Message);
+        Assert.AreEqual(error.Message, receiver.Snapshot().Receipts[^1].Error);
         Assert.HasCount(1, receiver.Snapshot().Requests);
         Assert.HasCount(2, receiver.Snapshot().Receipts);
     }
@@ -94,8 +93,8 @@ public sealed class PayloadLimitTests
         var gzip = OtlpHttp.Compress([0xfa, 0x07, 0x00]);
         var body = new byte[gzip.Length + 1026];
         gzip.AsSpan(0, 10).CopyTo(body);
-        const byte gzipFileNameFlagEmittingNoDecodedBytes = 0x08;
-        body[3] |= gzipFileNameFlagEmittingNoDecodedBytes;
+        const byte GzipFileNameFlagEmittingNoDecodedBytes = 0x08;
+        body[3] |= GzipFileNameFlagEmittingNoDecodedBytes;
         body.AsSpan(10, 1025).Fill((byte)'x');
         gzip.AsSpan(10).CopyTo(body.AsSpan(1036));
         using var content = OtlpHttp.Content(body, "gzip", chunked: true);
@@ -103,7 +102,7 @@ public sealed class PayloadLimitTests
         using var response = await TelemetryLifecycle.Http.PostAsync(new Uri(receiver.Endpoint, "v1/logs"),
             content, TestContext.CancellationToken);
         Assert.AreEqual(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
-        var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
+        var error = await Assert.That.HasOtlpErrorAsync(response, TestContext.CancellationToken);
         Assert.AreEqual((int)Google.Rpc.Code.ResourceExhausted, error.Code);
         Assert.Contains("1024-byte", error.Message);
         Assert.IsEmpty(receiver.Snapshot().Requests);
@@ -131,6 +130,17 @@ public sealed class PayloadLimitTests
         Assert.IsNotNull(error);
         Assert.Contains("128-byte", error);
     }
+
+    private Task<OtlpReceiver> StartReceiverAsync(int limit) => limit == OtlpReceiver.DefaultMaxPayloadBytes
+        ? OtlpReceiver.StartAsync(TestContext.CancellationToken)
+        : OtlpReceiver.StartAsync(limit, TestContext.CancellationToken);
+
+    private static HttpRequestMessage Request(Uri endpoint, byte[] payload, bool gzip, bool chunked) =>
+        new(HttpMethod.Post, new Uri(endpoint, "v1/" + Signals.Traces))
+        {
+            Content = OtlpHttp.Content(gzip ? OtlpHttp.Compress(payload) : payload, gzip ? "gzip" : null, chunked),
+            Headers = { ExpectContinue = !chunked }
+        };
 
     private static byte[] UnknownFieldPayload(int size)
     {

@@ -1,8 +1,7 @@
 using System.Net;
 using System.Text;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Time.Testing;
-using Qyl.Api.Contracts.OTel.Traces;
 using Qyl.Telemetry.Tests.Collector;
 
 namespace Qyl.Telemetry.UnitTests.Collector;
@@ -10,17 +9,18 @@ namespace Qyl.Telemetry.UnitTests.Collector;
 /// <summary>Drives the Collector evidence waits on a fake clock: polling pace, deadline and caller cancellation.</summary>
 /// <param name="testContext">The runner context supplies cancellation.</param>
 [TestClass]
-public sealed class CollectorClientWaitTests(TestContext testContext)
+[TestCategory("Fast")]
+public class CollectorClientWaitTests(TestContext testContext)
 {
     private const string TraceId = "trace";
     private const string EventName = "completed";
-    private const string StoredTrace = """{"spans":[]}""";
+    private const string StoredTrace = """{"trace_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","span_count":0,"duration_ns":"0","start_time":"2026-10-23T00:00:00Z","end_time":"2026-10-23T00:00:00Z","services":[],"has_error":false,"spans":[]}""";
 
     [TestMethod]
-    public async Task WaitForTrace_TraceMissingUntilTheDeadline_ThrowsTimeoutException()
+    public async Task Should_ThrowTimeoutException_When_WaitForTrace_TraceMissingUntilTheDeadline()
     {
         var clock = new FakeTimeProvider();
-        using var collector = new FakeCollector(_ => null);
+        using var collector = new FakeCollector([null]);
         var waiting = collector.Client(clock).WaitForTraceAsync(TraceId, _ => true, testContext.CancellationToken);
         await collector.FirstRead.WaitAsync(testContext.CancellationToken);
         clock.Advance(CollectorClient.WaitDeadline);
@@ -28,10 +28,10 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task WaitForTrace_TraceMissingJustBeforeTheDeadline_KeepsWaiting()
+    public async Task Should_KeepWaiting_When_WaitForTrace_TraceMissingJustBeforeTheDeadline()
     {
         var clock = new FakeTimeProvider();
-        using var collector = new FakeCollector(_ => null);
+        using var collector = new FakeCollector([null]);
         var waiting = collector.Client(clock).WaitForTraceAsync(TraceId, _ => true, testContext.CancellationToken);
         await collector.FirstRead.WaitAsync(testContext.CancellationToken);
         clock.Advance(CollectorClient.WaitDeadline - TimeSpan.FromTicks(1));
@@ -39,10 +39,10 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task WaitForTrace_TraceStoredAfterOnePollingInterval_ReturnsTheStoredTrace()
+    public async Task Should_ReturnTheStoredTrace_When_WaitForTrace_TraceStoredAfterOnePollingInterval()
     {
         var clock = new FakeTimeProvider();
-        using var collector = new FakeCollector(read => read == 1 ? null : StoredTrace);
+        using var collector = new FakeCollector([null, StoredTrace]);
         var waiting = collector.Client(clock).WaitForTraceAsync(TraceId, _ => true, testContext.CancellationToken);
         await collector.FirstRead.WaitAsync(testContext.CancellationToken);
         clock.Advance(CollectorClient.PollingInterval);
@@ -51,10 +51,10 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task WaitForTrace_PollingIntervalNotElapsed_ReadsOnce()
+    public async Task Should_ReadOnce_When_WaitForTrace_PollingIntervalNotElapsed()
     {
         var clock = new FakeTimeProvider();
-        using var collector = new FakeCollector(_ => null);
+        using var collector = new FakeCollector([null]);
         _ = collector.Client(clock).WaitForTraceAsync(TraceId, _ => true, testContext.CancellationToken);
         await collector.FirstRead.WaitAsync(testContext.CancellationToken);
         clock.Advance(CollectorClient.PollingInterval - TimeSpan.FromTicks(1));
@@ -62,10 +62,10 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task WaitForTrace_ConditionUnmetAfterOnePollingInterval_ReadsAgain()
+    public async Task Should_ReadAgain_When_WaitForTrace_ConditionUnmetAfterOnePollingInterval()
     {
         var clock = new FakeTimeProvider();
-        using var collector = new FakeCollector(_ => StoredTrace);
+        using var collector = new FakeCollector([StoredTrace]);
         _ = collector.Client(clock).WaitForTraceAsync(TraceId, _ => false, testContext.CancellationToken);
         await collector.FirstRead.WaitAsync(testContext.CancellationToken);
         clock.Advance(CollectorClient.PollingInterval);
@@ -74,11 +74,11 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task WaitForTrace_CallerCancelsBeforeTheDeadline_ThrowsOperationCanceledException()
+    public async Task Should_ThrowOperationCanceledException_When_WaitForTrace_CallerCancelsBeforeTheDeadline()
     {
         var clock = new FakeTimeProvider();
         using var caller = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
-        using var collector = new FakeCollector(_ => null);
+        using var collector = new FakeCollector([null]);
         var waiting = collector.Client(clock).WaitForTraceAsync(TraceId, _ => true, caller.Token);
         await collector.FirstRead.WaitAsync(testContext.CancellationToken);
         await caller.CancelAsync();
@@ -86,10 +86,10 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task WaitForSpanEvents_EventStoredAfterOnePollingInterval_ReturnsTheStoredEvent()
+    public async Task Should_ReturnTheStoredEvent_When_WaitForSpanEvents_EventStoredAfterOnePollingInterval()
     {
         var clock = new FakeTimeProvider();
-        using var collector = new FakeCollector(read => read == 1 ? StoredTrace : TraceWithEvent);
+        using var collector = new FakeCollector([StoredTrace, TraceWithEvent]);
         var waiting = collector.Client(clock).WaitForSpanEventsAsync(TraceId, events => events.Count > 0,
             testContext.CancellationToken);
         await collector.FirstRead.WaitAsync(testContext.CancellationToken);
@@ -99,10 +99,10 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
     }
 
     [TestMethod]
-    public async Task WaitForSpanEvents_EventMissingUntilTheDeadline_ThrowsTimeoutException()
+    public async Task Should_ThrowTimeoutException_When_WaitForSpanEvents_EventMissingUntilTheDeadline()
     {
         var clock = new FakeTimeProvider();
-        using var collector = new FakeCollector(_ => StoredTrace);
+        using var collector = new FakeCollector([StoredTrace]);
         var waiting = collector.Client(clock).WaitForSpanEventsAsync(TraceId, events => events.Count > 0,
             testContext.CancellationToken);
         await collector.FirstRead.WaitAsync(testContext.CancellationToken);
@@ -110,12 +110,18 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
         _ = await Assert.ThrowsExactlyAsync<TimeoutException>(() => waiting);
     }
 
-    private static string TraceWithEvent => JsonSerializer.Serialize(new
+    private static string TraceWithEvent
     {
-        spans = new[] { new { events = new[] { new SpanEvent { Name = EventName, TimeUnixNano = 0 } } } }
-    });
+        get
+        {
+            var trace = JsonNode.Parse(StoredTrace)!.AsObject();
+            trace["span_count"] = 1;
+            trace["spans"] = JsonNode.Parse("""[{"span_id":"1111111111111111","trace_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","name":"operation","kind":1,"start_time_unix_nano":"0","end_time_unix_nano":"0","status":{"code":0},"resource":{"service_name":"test"},"events":[{"name":"completed","time_unix_nano":"0"}]}]""");
+            return trace.ToJsonString();
+        }
+    }
 
-    private sealed class FakeCollector(Func<int, string?> respond) : IDisposable
+    private sealed class FakeCollector(IReadOnlyList<string?> responses) : IDisposable
     {
         private readonly TaskCompletionSource _firstRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _secondRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -141,7 +147,7 @@ public sealed class CollectorClientWaitTests(TestContext testContext)
         private HttpResponseMessage Respond()
         {
             var read = Interlocked.Increment(ref _reads);
-            var body = respond(read);
+            var body = responses[Math.Min(read - 1, responses.Count - 1)];
             switch (read)
             {
                 case 1:

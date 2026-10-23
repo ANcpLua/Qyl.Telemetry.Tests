@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using JetBrains.Annotations;
+using Qyl.Telemetry.SemanticConventions;
 using Qyl.Telemetry.SemanticConventions.Attributes.Exception;
 
 namespace Qyl.Telemetry.Tests.Policies;
@@ -17,7 +18,7 @@ public sealed class NoErrorTelemetryAttribute : TelemetryPolicyAttribute
 
     private protected override IEnumerable<string> Violations(TelemetryInvocation invocation)
     {
-        foreach (var span in invocation.Traces.SelectMany(trace => trace.Evidence.Spans).DistinctBy(span => span.SpanId))
+        foreach (var span in invocation.Traces.SelectMany(trace => trace.Evidence.Spans).Distinct<SpanRecord>(ReferenceEqualityComparer.Instance))
         {
             if (span.Status == ActivityStatusCode.Error)
                 yield return $"{Describe(span)} ended with error status"

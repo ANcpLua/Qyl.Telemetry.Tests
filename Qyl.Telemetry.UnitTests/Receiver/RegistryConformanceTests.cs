@@ -3,94 +3,113 @@ using Qyl.Telemetry.SemanticConventions;
 namespace Qyl.Telemetry.UnitTests.Receiver;
 
 [TestClass]
-public sealed class RegistryConformanceTests
+[TestCategory("Fast")]
+public class RegistryConformanceTests
 {
     [TestMethod]
-    public void RegistryAudit_NullCapture_ThrowsArgumentNullException()
+    public void Should_IdentifyThePinnedRegistry_When_ReportingConformance()
+    {
+        Assert.AreEqual("https://qyl.at/schemas/15.0.5", EmptyReport().RegistrySchemaUrl.AbsoluteUri);
+    }
+
+    [TestMethod]
+    public void Should_IdentifyTheUpstreamSchema_When_ReportingConformance()
+    {
+        Assert.AreEqual("https://opentelemetry.io/schemas/1.44.0", EmptyReport().UpstreamSchemaUrl.AbsoluteUri);
+    }
+
+    [TestMethod]
+    public void Should_IdentifyTheResolvedRegistrySnapshot_When_ReportingConformance()
+    {
+        Assert.AreEqual("2798e34f623307847e2a00b9384e780aad5543eebf09f500f188519f1a2baa7b", EmptyReport().RegistrySha256);
+    }
+
+    [TestMethod]
+    public void Should_ThrowArgumentNullException_When_RegistryAudit_NullCapture()
     {
         _ = Assert.ThrowsExactly<ArgumentNullException>(() => RegistryConformance.Check(null!));
     }
 
     [TestMethod]
-    public void RegistryAudit_EmptyCapture_IsNotConformant()
+    public void Should_BeNotConformant_When_RegistryAudit_EmptyCapture()
     {
         Assert.IsFalse(EmptyReport().IsConformant);
     }
 
     [TestMethod]
-    public void RegistryAudit_EmptyCapture_ChecksNoRecord()
+    public void Should_CheckNoRecord_When_RegistryAudit_EmptyCapture()
     {
         Assert.AreEqual(0, EmptyReport().RecordsChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_EmptyCapture_ChecksNoAttribute()
+    public void Should_CheckNoAttribute_When_RegistryAudit_EmptyCapture()
     {
         Assert.AreEqual(0, EmptyReport().AttributesChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_EmptyCapture_ChecksNoMetric()
+    public void Should_CheckNoMetric_When_RegistryAudit_EmptyCapture()
     {
         Assert.AreEqual(0, EmptyReport().MetricsChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_EmptyCapture_ReportsNoIssue()
+    public void Should_ReportNoIssue_When_RegistryAudit_EmptyCapture()
     {
         Assert.IsEmpty(EmptyReport().Issues);
     }
 
     [TestMethod]
-    public void RegistryAudit_CustomNamesAndOpenEnumValues_AreConformant()
+    public void Should_BeConformant_When_RegistryAudit_CustomNamesAndOpenEnumValues()
     {
         Assert.IsTrue(CustomReport().IsConformant);
     }
 
     [TestMethod]
-    public void RegistryAudit_CustomSpanAndMetric_AreBothCheckedAsRecords()
+    public void Should_BeBothCheckedAsRecords_When_RegistryAudit_CustomSpanAndMetric()
     {
         Assert.AreEqual(2, CustomReport().RecordsChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_OpenEnumValue_IsTheOnlyCheckedAttribute()
+    public void Should_BeTheOnlyCheckedAttribute_When_RegistryAudit_OpenEnumValue()
     {
         Assert.AreEqual(1, CustomReport().AttributesChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_CustomMetric_IsNotCheckedAgainstTheRegistry()
+    public void Should_BeNotCheckedAgainstTheRegistry_When_RegistryAudit_CustomMetric()
     {
         Assert.AreEqual(0, CustomReport().MetricsChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_CustomAttribute_IsListedAsCustom()
+    public void Should_BeListedAsCustom_When_RegistryAudit_CustomAttribute()
     {
         Assert.AreSequenceEqual(["custom.payload"], CustomReport().CustomAttributes);
     }
 
     [TestMethod]
-    public void RegistryAudit_CustomMetric_IsListedAsCustom()
+    public void Should_BeListedAsCustom_When_RegistryAudit_CustomMetric()
     {
         Assert.AreSequenceEqual(["custom.metric"], CustomReport().CustomMetrics);
     }
 
     [TestMethod]
-    public void RegistryAudit_InvalidAttributesOnEveryRecordPart_AreNotConformant()
+    public void Should_BeNotConformant_When_RegistryAudit_InvalidAttributesOnEveryRecordPart()
     {
         Assert.IsFalse(RegistryConformance.Check(EveryRecordPartCapture()).IsConformant);
     }
 
     [TestMethod]
-    public void RegistryAudit_LogBodyMap_IsNotCountedAsAnAttributeCollection()
+    public void Should_BeNotCountedAsAnAttributeCollection_When_RegistryAudit_LogBodyMap()
     {
         Assert.AreEqual(8, RegistryConformance.Check(EveryRecordPartCapture()).AttributesChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_SpanLogResourceScopeEventAndLinkAttributes_AreLocated()
+    public void Should_BeLocated_When_RegistryAudit_SpanLogResourceScopeEventAndLinkAttributes()
     {
         Assert.AreSequenceEqual(
         [
@@ -100,14 +119,14 @@ public sealed class RegistryConformanceTests
     }
 
     [TestMethod]
-    public void RegistryAudit_StringStatusCodeOnEveryRecordPart_IsAnIntegerTypeViolation()
+    public void Should_BeAnIntegerTypeViolation_When_RegistryAudit_StringStatusCodeOnEveryRecordPart()
     {
         Assert.IsTrue(RegistryConformance.Check(EveryRecordPartCapture()).Issues.All(i => i is
             { Name: "http.response.status_code", Message: "Expected Integer.", Level: RegistryIssueLevel.Violation }));
     }
 
     [TestMethod]
-    public void RegistryAudit_LogBodyMap_IsLeftUnchanged()
+    public void Should_BeLeftUnchanged_When_RegistryAudit_LogBodyMap()
     {
         var capture = EveryRecordPartCapture();
         var body = capture.Logs[0].Body;
@@ -116,7 +135,7 @@ public sealed class RegistryConformanceTests
     }
 
     [TestMethod]
-    public void RegistryAudit_LogWithoutTimestamp_KeepsZeroTime()
+    public void Should_KeepZeroTime_When_RegistryAudit_LogWithoutTimestamp()
     {
         var capture = EveryRecordPartCapture();
         _ = RegistryConformance.Check(capture);
@@ -124,19 +143,19 @@ public sealed class RegistryConformanceTests
     }
 
     [TestMethod]
-    public void RegistryAudit_InvalidPointAttributes_AreNotConformant()
+    public void Should_BeNotConformant_When_RegistryAudit_InvalidPointAttributes()
     {
         Assert.IsFalse(RegistryConformance.Check(EveryPointShapeCapture()).IsConformant);
     }
 
     [TestMethod]
-    public void RegistryAudit_EveryPointShapeAndFilteredExemplar_AreCheckedAsAttributes()
+    public void Should_BeCheckedAsAttributes_When_RegistryAudit_EveryPointShapeAndFilteredExemplar()
     {
         Assert.AreEqual(9, RegistryConformance.Check(EveryPointShapeCapture()).AttributesChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_EveryPointShapeAndFilteredExemplarAttributes_AreLocated()
+    public void Should_BeLocated_When_RegistryAudit_EveryPointShapeAndFilteredExemplarAttributes()
     {
         Assert.AreSequenceEqual(
             [
@@ -149,93 +168,93 @@ public sealed class RegistryConformanceTests
     }
 
     [TestMethod]
-    public void RegistryAudit_RegisteredMetrics_AreEachChecked()
+    public void Should_BeEachChecked_When_RegistryAudit_RegisteredMetrics()
     {
         Assert.AreEqual(3, UnitsReport().MetricsChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_DeprecatedSpanAttribute_IsChecked()
+    public void Should_BeChecked_When_RegistryAudit_DeprecatedSpanAttribute()
     {
         Assert.AreEqual(1, UnitsReport().AttributesChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_DeprecationsAndUnitMismatch_AreReportedWithoutInferringAnSdkInstrument()
+    public void Should_BeReportedWithoutInferringAnSdkInstrument_When_RegistryAudit_DeprecationsAndUnitMismatch()
     {
         Assert.AreSequenceEqual(["db.system", "http.server.request.duration", "container.memory.paging.faults"],
             UnitsReport().Issues.Select(i => i.Name));
     }
 
     [TestMethod]
-    public void RegistryAudit_UnitMismatch_NamesExpectedAndObservedUnit()
+    public void Should_NameExpectedAndObservedUnit_When_RegistryAudit_UnitMismatch()
     {
         Assert.AreEqual("Expected unit 's', observed 'ms'.", UnitsReport().Issues[1].Message);
     }
 
     [TestMethod]
-    public void RegistryAudit_UnitMismatch_IsLocatedOnItsMetric()
+    public void Should_BeLocatedOnItsMetric_When_RegistryAudit_UnitMismatch()
     {
         Assert.AreEqual("metrics[1]", UnitsReport().Issues[1].Location);
     }
 
     [TestMethod]
-    public void RegistryAudit_UnitMismatch_IsNotConformant()
+    public void Should_BeNotConformant_When_RegistryAudit_UnitMismatch()
     {
         Assert.IsFalse(UnitsReport().IsConformant);
     }
 
     [TestMethod]
-    public void RegistryAudit_Deprecation_IsNotAProtocolFailure()
+    public void Should_BeNotAProtocolFailure_When_RegistryAudit_Deprecation()
     {
         Assert.IsTrue(DeprecationReport().IsConformant);
     }
 
     [TestMethod]
-    public void RegistryAudit_Deprecation_IsAnImprovement()
+    public void Should_BeAnImprovement_When_RegistryAudit_Deprecation()
     {
         Assert.AreEqual(RegistryIssueLevel.Improvement, Assert.ContainsSingle(DeprecationReport().Issues).Level);
     }
 
     [TestMethod]
-    public void RegistryAudit_Deprecation_NamesTheAttribute()
+    public void Should_NameTheAttribute_When_RegistryAudit_Deprecation()
     {
         Assert.AreEqual("db.system", Assert.ContainsSingle(DeprecationReport().Issues).Name);
     }
 
     [TestMethod]
-    public void RegistryAudit_Deprecation_IsLocatedOnItsSpan()
+    public void Should_BeLocatedOnItsSpan_When_RegistryAudit_Deprecation()
     {
         Assert.AreEqual("spans[0]", Assert.ContainsSingle(DeprecationReport().Issues).Location);
     }
 
     [TestMethod]
-    public void RegistryAudit_Deprecation_SaysTheRegistryDeprecatesIt()
+    public void Should_SayTheRegistryDeprecatesIt_When_RegistryAudit_Deprecation()
     {
         Assert.AreEqual("The pinned registry marks this attribute deprecated.", Assert.ContainsSingle(DeprecationReport().Issues).Message);
     }
 
     [TestMethod]
-    public void RegistryAudit_TemplateAttributesWithDeclaredArrayKind_AreConformant()
+    public void Should_BeConformant_When_RegistryAudit_TemplateAttributesWithDeclaredArrayKind()
     {
         Assert.IsTrue(TemplateReport().IsConformant);
     }
 
     [TestMethod]
-    public void RegistryAudit_TemplateAttributes_AreCheckedButCustomNeighborIsNot()
+    public void Should_BeCheckedButCustomNeighborIsNot_When_RegistryAudit_TemplateAttributes()
     {
         Assert.AreEqual(3, TemplateReport().AttributesChecked);
     }
 
     [TestMethod]
-    public void RegistryAudit_TemplateLookalikeNeighbor_IsListedAsCustom()
+    public void Should_BeListedAsCustom_When_RegistryAudit_TemplateLookalikeNeighbor()
     {
         Assert.AreSequenceEqual(["http.request.headers.content_type"], TemplateReport().CustomAttributes);
     }
 
     [TestMethod]
     [DynamicData(nameof(ValueCases))]
-    public void RegistryAudit_ValueKinds_PreserveOtlpTypes(RegistryAttributeValueKind kind, object? value, bool expected)
+    public void Should_PreserveOtlpTypes_When_RegistryAudit_ValueKinds(RegistryAttributeValueKind kind, object? value, bool expected)
     {
         Assert.AreEqual(expected, RegistryConformance.Matches(kind, value));
     }

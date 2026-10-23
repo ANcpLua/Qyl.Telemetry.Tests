@@ -14,10 +14,11 @@ public sealed class ProfilingFieldTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow(Signals.Traces)]
-    [DataRow(Signals.Logs)]
-    [DataRow(Signals.Metrics)]
-    public async Task Receiver_ProfilingStringTableValueOnSignal_IsEmptyWithAWarningNotLeakedToTheNextExport(string signal)
+    [DataRow(Signals.Traces, 1, 0, 0)]
+    [DataRow(Signals.Logs, 0, 1, 0)]
+    [DataRow(Signals.Metrics, 0, 0, 1)]
+    public async Task Receiver_ProfilingStringTableValueOnSignal_IsEmptyWithAWarningNotLeakedToTheNextExport(
+        string signal, int expectedSpanCount, int expectedLogCount, int expectedMetricCount)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var resource = new Resource
@@ -53,12 +54,12 @@ public sealed class ProfilingFieldTests
         Assert.Contains("StringValueStrindex 7", receipt.Warnings[0]);
         Assert.Contains("StringValueStrindex 8", receipt.Warnings[1]);
         Assert.AreSequenceEqual(bytes, Assert.ContainsSingle(snapshot.Requests).Payload.ToArray());
-        var observed = signal switch
-        {
-            Signals.Traces => Assert.ContainsSingle(snapshot.Spans).Resource,
-            Signals.Logs => Assert.ContainsSingle(snapshot.Logs).Resource,
-            _ => Assert.ContainsSingle(snapshot.Metrics).Resource
-        };
+        Assert.HasCount(expectedSpanCount, snapshot.Spans);
+        Assert.HasCount(expectedLogCount, snapshot.Logs);
+        Assert.HasCount(expectedMetricCount, snapshot.Metrics);
+        var observed = Assert.ContainsSingle(snapshot.Spans.Select(span => span.Resource)
+            .Concat(snapshot.Logs.Select(log => log.Resource))
+            .Concat(snapshot.Metrics.Select(metric => metric.Resource)));
         Assert.AreEqual(string.Empty, observed.Attributes["profile.value"]);
         Assert.AreEqual(42L, observed.Attributes["unaffected"]);
         var map = Assert.IsInstanceOfType<IReadOnlyDictionary<string, object?>>(observed.Attributes["nested"]);

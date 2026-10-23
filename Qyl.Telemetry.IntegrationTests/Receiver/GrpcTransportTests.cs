@@ -16,27 +16,28 @@ namespace Qyl.Telemetry.IntegrationTests.Receiver;
 [TestClass]
 public sealed class GrpcTransportTests
 {
+    private const string Gzip = "gzip";
+    private const string EncodingRequestHeader = "grpc-internal-encoding-request";
+
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow(Signals.Traces, false)]
-    [DataRow(Signals.Logs, false)]
-    [DataRow(Signals.Metrics, false)]
-    [DataRow(Signals.Traces, true)]
-    [DataRow(Signals.Logs, true)]
-    [DataRow(Signals.Metrics, true)]
-    public async Task GrpcReceiver_UnknownFieldsNoncanonicalVarintsAndGzip_KeepTheOriginalMessage(string signal, bool gzip)
+    [DataRow(Signals.Traces, null)]
+    [DataRow(Signals.Logs, null)]
+    [DataRow(Signals.Metrics, null)]
+    [DataRow(Signals.Traces, Gzip)]
+    [DataRow(Signals.Logs, Gzip)]
+    [DataRow(Signals.Metrics, Gzip)]
+    public async Task GrpcReceiver_UnknownFieldsNoncanonicalVarintsAndGzip_KeepTheOriginalMessage(string signal, string? encoding)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         using var wire = new WireHeaders();
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint, new GrpcChannelOptions { HttpHandler = wire });
         byte[] unknownFieldsDescendingWithNonMinimalVarint1 = [0xf8, 0x07, 0x81, 0x00, 0xf0, 0x07, 0x02];
-        var headers = new Metadata();
-        if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
         using var call = OtlpGrpc.ExportAsync(channel, signal, unknownFieldsDescendingWithNonMinimalVarint1,
-            new CallOptions(headers, cancellationToken: TestContext.CancellationToken));
+            new CallOptions(CompressionHeaders(encoding), cancellationToken: TestContext.CancellationToken));
         Assert.IsEmpty(await call.ResponseAsync);
-        Assert.AreEqual(gzip ? "gzip" : null, wire.Encoding);
+        Assert.AreEqual(encoding, wire.Encoding);
         var snapshot = receiver.Snapshot();
         Assert.IsEmpty(snapshot.Spans);
         Assert.IsEmpty(snapshot.Logs);
@@ -128,20 +129,16 @@ public sealed class GrpcTransportTests
     }
 
     [TestMethod]
-    [DataRow(1024, false)]
-    [DataRow(1024, true)]
-    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, false)]
-    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, true)]
-    public async Task GrpcReceiver_DecompressedMessageOverLimit_IsRejectedBeforeDecoding(int limit, bool gzip)
+    [DataRow(1024, null)]
+    [DataRow(1024, Gzip)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, null)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, Gzip)]
+    public async Task GrpcReceiver_DecompressedMessageOverLimit_IsRejectedBeforeDecoding(int limit, string? encoding)
     {
-        await using var receiver = limit == OtlpReceiver.DefaultMaxPayloadBytes
-            ? await OtlpReceiver.StartAsync(TestContext.CancellationToken)
-            : await OtlpReceiver.StartAsync(limit, TestContext.CancellationToken);
+        await using var receiver = await StartReceiverAsync(limit);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        var headers = new Metadata();
-        if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
         using var call = OtlpGrpc.ExportAsync(channel, Signals.Traces, new byte[limit + 1],
-            new CallOptions(headers, cancellationToken: TestContext.CancellationToken));
+            new CallOptions(CompressionHeaders(encoding), cancellationToken: TestContext.CancellationToken));
         var failure = await Assert.ThrowsExactlyAsync<RpcException>(() => call.ResponseAsync);
         Assert.AreEqual(StatusCode.ResourceExhausted, failure.StatusCode, failure.Status.Detail);
         Assert.Contains($"{limit}-byte", failure.Status.Detail);
@@ -150,27 +147,17 @@ public sealed class GrpcTransportTests
     }
 
     [TestMethod]
-    [DataRow(1024, false)]
-    [DataRow(1024, true)]
-    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, false)]
-    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, true)]
-    public async Task GrpcReceiver_MessageExactlyAtDecompressedLimit_IsAccepted(int limit, bool gzip)
+    [DataRow(1024, null)]
+    [DataRow(1024, Gzip)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, null)]
+    [DataRow(OtlpReceiver.DefaultMaxPayloadBytes, Gzip)]
+    public async Task GrpcReceiver_MessageExactlyAtDecompressedLimit_IsAccepted(int limit, string? encoding)
     {
-        await using var receiver = limit == OtlpReceiver.DefaultMaxPayloadBytes
-            ? await OtlpReceiver.StartAsync(TestContext.CancellationToken)
-            : await OtlpReceiver.StartAsync(limit, TestContext.CancellationToken);
+        await using var receiver = await StartReceiverAsync(limit);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
-        var bytes = new byte[limit];
-        byte[] unknownLengthDelimitedField127Tag = [0xfa, 0x07];
-        const int fourByteLengthVarint = 4;
-        unknownLengthDelimitedField127Tag.CopyTo(bytes, 0);
-        var length = bytes.Length - unknownLengthDelimitedField127Tag.Length - fourByteLengthVarint;
-        for (var i = 0; i < fourByteLengthVarint; i++)
-            bytes[unknownLengthDelimitedField127Tag.Length + i] = (byte)((length >> (7 * i)) | (i < fourByteLengthVarint - 1 ? 0x80 : 0));
-        var headers = new Metadata();
-        if (gzip) headers.Add("grpc-internal-encoding-request", "gzip");
+        var bytes = UnknownFieldPayload(limit);
         using var call = OtlpGrpc.ExportAsync(channel, Signals.Traces, bytes,
-            new CallOptions(headers, cancellationToken: TestContext.CancellationToken));
+            new CallOptions(CompressionHeaders(encoding), cancellationToken: TestContext.CancellationToken));
         Assert.IsEmpty(await call.ResponseAsync);
         Assert.AreSequenceEqual(bytes, Assert.ContainsSingle(receiver.Snapshot().Requests).Payload.ToArray());
         Assert.IsNull(Assert.ContainsSingle(receiver.Snapshot().Receipts).Error);
@@ -190,10 +177,10 @@ public sealed class GrpcTransportTests
         request.Content = content;
         request.Headers.TE.Add(new TransferCodingWithQualityHeaderValue("trailers"));
         var sending = TelemetryLifecycle.Http.SendAsync(request, cancellation.Token);
-        var first = await Task.WhenAny(content.Started.Task, sending);
-        var wasSuspended = first == content.Started.Task && !sending.IsCompleted;
+        var first = await Task.WhenAny(content._started.Task, sending);
+        var wasSuspended = first == content._started.Task && !sending.IsCompleted;
         await cancellation.CancelAsync();
-        content.Resume.TrySetResult();
+        content._resume.TrySetResult();
         await Assert.ThrowsAsync<OperationCanceledException>(() => sending);
         Assert.IsTrue(wasSuspended);
         using var channel = GrpcChannel.ForAddress(receiver.GrpcEndpoint);
@@ -235,6 +222,29 @@ public sealed class GrpcTransportTests
         await Assert.ThrowsExactlyAsync<HttpRequestException>(() => TelemetryLifecycle.Http.GetAsync(receiver.Endpoint, TestContext.CancellationToken));
     }
 
+    private Task<OtlpReceiver> StartReceiverAsync(int limit) => limit == OtlpReceiver.DefaultMaxPayloadBytes
+        ? OtlpReceiver.StartAsync(TestContext.CancellationToken)
+        : OtlpReceiver.StartAsync(limit, TestContext.CancellationToken);
+
+    private static Metadata CompressionHeaders(string? encoding)
+    {
+        var headers = new Metadata();
+        if (encoding is not null) headers.Add(EncodingRequestHeader, encoding);
+        return headers;
+    }
+
+    private static byte[] UnknownFieldPayload(int size)
+    {
+        var bytes = new byte[size];
+        byte[] unknownLengthDelimitedField127Tag = [0xfa, 0x07];
+        const int FourByteLengthVarint = 4;
+        unknownLengthDelimitedField127Tag.CopyTo(bytes, 0);
+        var length = bytes.Length - unknownLengthDelimitedField127Tag.Length - FourByteLengthVarint;
+        for (var i = 0; i < FourByteLengthVarint; i++)
+            bytes[unknownLengthDelimitedField127Tag.Length + i] = (byte)((length >> (7 * i)) | (i < FourByteLengthVarint - 1 ? 0x80 : 0));
+        return bytes;
+    }
+
     private static IMessage Request(string signal, bool invalid, bool warning)
     {
         var resource = new Resource { Attributes = { OtlpEvidence.Pair("custom.value", warning
@@ -273,8 +283,8 @@ public sealed class GrpcTransportTests
 
     private sealed class PausedGrpcContent : HttpContent
     {
-        internal readonly TaskCompletionSource Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        internal readonly TaskCompletionSource Resume = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal readonly TaskCompletionSource _resume = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly CancellationToken _operationCancellation;
         internal PausedGrpcContent(CancellationToken operationCancellation)
         {
@@ -291,8 +301,8 @@ public sealed class GrpcTransportTests
             // A unary frame declaring two bytes, paused after the first payload byte.
             await stream.WriteAsync(new byte[] { 0, 0, 0, 0, 2, 0x80 }, cancellationToken);
             await stream.FlushAsync(cancellationToken);
-            Started.TrySetResult();
-            await Resume.Task.WaitAsync(cancellationToken);
+            _started.TrySetResult();
+            await _resume.Task.WaitAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             await stream.WriteAsync(new byte[] { 0 }, cancellationToken);
         }

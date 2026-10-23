@@ -1,37 +1,131 @@
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
+using System.Text;
 
 namespace Qyl.Telemetry.Tests;
 
-/// <summary>Runs a child process to its exit with redirected output; cancellation kills and joins the process tree.</summary>
+/// <summary>Runs a command with bounded execution, redirected output and ownership of its descendants.</summary>
 internal static class ChildProcess
 {
     public static async Task<(int ExitCode, string Output, string Error)> RunAsync(ProcessStartInfo start, string description,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, ChildProcessOptions? options = null)
     {
+        ArgumentNullException.ThrowIfNull(start);
+        options ??= new ChildProcessOptions();
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.ShutdownTimeout, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.ExecutionTimeout, TimeSpan.Zero);
+        cancellationToken.ThrowIfCancellationRequested();
         start.RedirectStandardOutput = true;
         start.RedirectStandardError = true;
         start.UseShellExecute = false;
-        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {description}.");
-        // Drain redirected output after cancellation has killed and joined the child.
-        var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        var error = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        await using (new Reaper(process, output, error))
+        using var execution = new CancellationTokenSource(options.ExecutionTimeout, options.TimeProvider);
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, execution.Token);
+        OwnedProcess process;
+        try { process = await OwnedProcess.StartAsync(start, lifetime.Token, options.TimeProvider).ConfigureAwait(false); }
+        catch (OperationCanceledException failure) when (execution.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            throw new TimeoutException($"{description} exceeded its execution deadline of {options.ExecutionTimeout} during startup.", failure);
         }
-        return (process.ExitCode, await output.ConfigureAwait(false), await error.ConfigureAwait(false));
+        using var shutdown = new CancellationTokenSource(Timeout.InfiniteTimeSpan, options.TimeProvider);
+        var output = new OutputCapture(process.StandardOutput, options.StandardOutputReceived, shutdown.Token);
+        var error = new OutputCapture(process.StandardError, null, shutdown.Token);
+        Exception? executionFailure = null;
+        try
+        {
+            await process.WaitForExitAsync(lifetime.Token).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            executionFailure = exception;
+        }
+
+        var cleanupFailures = new List<Exception>();
+        shutdown.CancelAfter(options.ShutdownTimeout);
+        try
+        {
+            await process.KillAsync(shutdown.Token).ConfigureAwait(false);
+            await Task.WhenAll(output.Completion, error.Completion).WaitAsync(shutdown.Token).ConfigureAwait(false);
+            if (!output.Ended || !error.Ended)
+                cleanupFailures.Add(new TimeoutException($"{description} did not close its output streams."
+                    + Diagnostics(process, output, error)));
+        }
+        catch (OperationCanceledException exception) when (shutdown.IsCancellationRequested)
+        {
+            cleanupFailures.Add(new TimeoutException($"{description} did not finish shutdown and output capture within {options.ShutdownTimeout}."
+                + Diagnostics(process, output, error), exception));
+        }
+        catch (Exception exception)
+        {
+            cleanupFailures.Add(exception);
+        }
+
+        try { await process.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception exception)
+        {
+            if (!cleanupFailures.Contains(exception)) cleanupFailures.Add(exception);
+        }
+
+        if (executionFailure is OperationCanceledException cancellation)
+            executionFailure = execution.IsCancellationRequested && !cancellationToken.IsCancellationRequested
+                ? new TimeoutException($"{description} exceeded its execution deadline of {options.ExecutionTimeout}."
+                    + Diagnostics(process, output, error), cancellation)
+                : new OperationCanceledException($"{description} was cancelled and reaped."
+                    + Diagnostics(process, output, error), cancellation, cancellationToken)
+                {
+                    Data = { ["ProcessId"] = process.Id, ["ExitCode"] = process.ExitCode }
+                };
+
+        if (executionFailure is not null) cleanupFailures.Insert(0, executionFailure);
+        switch (cleanupFailures.Count)
+        {
+            case 1:
+                ExceptionDispatchInfo.Capture(cleanupFailures[0]).Throw();
+                break;
+            case > 1:
+                throw new AggregateException($"{description} execution and cleanup failed.", cleanupFailures);
+        }
+        return (process.ExitCode, output.Text, error.Text);
     }
 
-    private sealed class Reaper(Process process, Task<string> output, Task<string> error) : IAsyncDisposable
+    private static string Diagnostics(OwnedProcess process, OutputCapture output, OutputCapture error) =>
+        $" Process: {process.Id}; exit code: {(process.HasExited ? process.ExitCode.ToString() : "still running")}"
+        + $"\nstdout:\n{Tail(output.Text)}\nstderr:\n{Tail(error.Text)}";
+
+    private static string Tail(string text) => string.Join('\n', text.Split('\n').TakeLast(30));
+
+    internal sealed class OutputCapture
     {
-        public async ValueTask DisposeAsync()
+        private readonly StringBuilder _text = new();
+
+        internal OutputCapture(StreamReader reader, Action<string>? received, CancellationToken cancellationToken) =>
+            Completion = ReadAsync(reader, received, cancellationToken);
+
+        internal Task Completion { get; }
+        internal bool Ended { get; private set; }
+        internal string Text { get { lock (_text) return _text.ToString(); } }
+
+        private async Task ReadAsync(StreamReader reader, Action<string>? received, CancellationToken cancellationToken)
         {
-            if (!process.HasExited)
+            var buffer = new char[2048];
+            try
             {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+                while (await reader.ReadAsync(buffer, cancellationToken).ConfigureAwait(false) is var count && count > 0)
+                {
+                    var chunk = new string(buffer, 0, count);
+                    lock (_text) _text.Append(chunk);
+                    received?.Invoke(chunk);
+                }
+                Ended = true;
             }
-            await Task.WhenAll(output, error).ConfigureAwait(false);
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         }
     }
+}
+
+internal sealed class ChildProcessOptions
+{
+    public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+    public TimeSpan ExecutionTimeout { get; init; } = TimeSpan.FromMinutes(5);
+    public TimeSpan ShutdownTimeout { get; init; } = TimeSpan.FromSeconds(10);
+    public Action<string>? StandardOutputReceived { get; init; }
 }

@@ -17,7 +17,7 @@ namespace Qyl.Telemetry.Tests.Collector;
 /// <summary>Captures every OTLP export and relays the Collector's actual response to the producer.</summary>
 internal sealed class OtlpRelay : IAsyncDisposable
 {
-    private static readonly HttpClient Transport = new() { Timeout = TimeSpan.FromSeconds(15) };
+    private static readonly HttpClient s_transport = new() { Timeout = TimeSpan.FromSeconds(15) };
     private readonly WebApplication _app;
     private readonly ConcurrentQueue<OtlpDelivery> _deliveries;
     private int _disposed;
@@ -70,7 +70,7 @@ internal sealed class OtlpRelay : IAsyncDisposable
                 byte[] collectorReply;
                 try
                 {
-                    using var captured = await Transport.PostAsync(new Uri(capture.Endpoint, $"v1/{signal}"), body, deadline.Token).ConfigureAwait(false);
+                    using var captured = await s_transport.PostAsync(new Uri(capture.Endpoint, $"v1/{signal}"), body, deadline.Token).ConfigureAwait(false);
                     captureStatus = (int)captured.StatusCode;
                     captureReply = await captured.Content.ReadAsByteArrayAsync(deadline.Token).ConfigureAwait(false);
                     using var forwarded = await collector.ExportAsync($"v1/{signal}", payload, request.ContentType, encoding, deadline.Token).ConfigureAwait(false);

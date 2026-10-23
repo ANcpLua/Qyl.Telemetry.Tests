@@ -1,22 +1,10 @@
 <Project>
-  <PropertyGroup Label="Qyl packages">
-    <QylPlatformVersion>17.0.14</QylPlatformVersion>
-    <QylTelemetryVersion>28.2.4</QylTelemetryVersion>
-    <QylSemanticConventionsVersion>15.0.5</QylSemanticConventionsVersion>
-    <QylApiContractsVersion>17.0.14</QylApiContractsVersion>
-  </PropertyGroup>
-  <PropertyGroup Label="Runtime and telemetry dependencies">
-    <DotNetRuntimeVersion>10.0.13</DotNetRuntimeVersion>
-    <DotNetExtensionsVersion>10.11.0</DotNetExtensionsVersion>
-    <OpenTelemetryVersion>1.20.0</OpenTelemetryVersion>
+  <!-- Shared product and runtime pins have one owner in the parent qyl checkout. -->
+  <Import Project="$(MSBuildThisFileDirectory)../Version.props" />
+  <PropertyGroup Label="Test-only dependencies">
     <ModelContextProtocolVersion>2.2.0</ModelContextProtocolVersion>
-    <GrpcVersion>2.84.0</GrpcVersion>
-    <GoogleProtobufVersion>3.36.2</GoogleProtobufVersion>
     <GoogleApiCommonProtosVersion>2.17.0</GoogleApiCommonProtosVersion>
-  </PropertyGroup>
-  <PropertyGroup Label="Tooling">
     <JetBrainsAnnotationsVersion>2026.2.0</JetBrainsAnnotationsVersion>
-    <FalloutVersion>10.4.0</FalloutVersion>
     <DotCovVersion>4.7.0</DotCovVersion>
   </PropertyGroup>
 </Project>

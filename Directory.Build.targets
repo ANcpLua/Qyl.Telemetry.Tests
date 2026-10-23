@@ -1,11 +1,52 @@
 <Project>
-  <ItemGroup Condition="'$(UsesQylCollector)' == 'true'">
-    <PackageDownload Include="qyl.$(NETCoreSdkRuntimeIdentifier)" Version="[$(QylPlatformVersion)]" />
-    <Content Include="$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))qyl.$(NETCoreSdkRuntimeIdentifier)/$(QylPlatformVersion)/tools/net10.0/$(NETCoreSdkRuntimeIdentifier)/collector/**/*"
-             Link="qyl/collector/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
+  <ItemDefinitionGroup>
+    <ProjectReference>
+      <AdditionalProperties>ShouldUnsetParentConfigurationAndPlatform=false</AdditionalProperties>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <PropertyGroup>
+    <_LocalCollectorProject>$(MSBuildThisFileDirectory)../services/qyl.collector/qyl.collector.csproj</_LocalCollectorProject>
+    <_LocalDependencyBuildProperties>Configuration=$(Configuration);ShouldUnsetParentConfigurationAndPlatform=false;BuildProjectReferences=true;BuildingInsideVisualStudio=false</_LocalDependencyBuildProperties>
+  </PropertyGroup>
+  <!-- Build the dependency graph even when the IDE only schedules the selected project. -->
+  <Target Name="BuildLocalProjectReferences"
+          BeforeTargets="ResolveProjectReferences"
+          DependsOnTargets="PrepareProjectReferences"
+          Condition="'$(DesignTimeBuild)' != 'true' and ('$(BuildingInsideVisualStudio)' == 'true' or '$(BuildProjectReferences)' == 'false')">
+    <ItemGroup>
+      <_LocalDependencyReference Include="@(_MSBuildProjectReferenceExistent->'%(FullPath)')"
+                                 Condition="'%(_MSBuildProjectReferenceExistent.BuildReference)' == 'true'" />
+    </ItemGroup>
+    <MSBuild Projects="@(_LocalDependencyReference)"
+             Targets="%(_LocalDependencyReference.Targets)"
+             Properties="%(_LocalDependencyReference.SetConfiguration);%(_LocalDependencyReference.SetPlatform);%(_LocalDependencyReference.SetTargetFramework);$(_LocalDependencyBuildProperties)"
+             RemoveProperties="BuildingSolutionFile;CurrentSolutionConfigurationContents;%(_LocalDependencyReference.GlobalPropertiesToRemove);$(_GlobalPropertiesToRemoveFromProjectReferences);$(_JetBrainsProjectReferenceGlobalPropertiesToRemove)"
+             BuildInParallel="false"
+             Condition="'@(_LocalDependencyReference)' != ''" />
+  </Target>
+  <Target Name="StageLocalQylCollector" AfterTargets="Build" Condition="'$(UsesQylCollector)' == 'true'">
+    <Error Condition="!Exists('$(_LocalCollectorProject)')" Text="The test solution requires the parent qyl Collector source checkout." />
+    <MSBuild Projects="$(_LocalCollectorProject)" Targets="Build"
+             Properties="$(_LocalDependencyBuildProperties)"
+             RemoveProperties="BuildingSolutionFile;CurrentSolutionConfigurationContents;$(_GlobalPropertiesToRemoveFromProjectReferences);$(_JetBrainsProjectReferenceGlobalPropertiesToRemove)"
+             BuildInParallel="false" />
+    <MSBuild Projects="$(_LocalCollectorProject)" Targets="GetTargetPath"
+             Properties="$(_LocalDependencyBuildProperties)"
+             RemoveProperties="BuildingSolutionFile;CurrentSolutionConfigurationContents;$(_GlobalPropertiesToRemoveFromProjectReferences);$(_JetBrainsProjectReferenceGlobalPropertiesToRemove)">
+      <Output TaskParameter="TargetOutputs" ItemName="_LocalCollectorAssembly" />
+    </MSBuild>
+    <ItemGroup>
+      <_LocalCollectorFiles Include="%(_LocalCollectorAssembly.RootDir)%(_LocalCollectorAssembly.Directory)**/*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(TargetDir)qyl/collector" />
+    <Copy SourceFiles="@(_LocalCollectorFiles)"
+          DestinationFiles="@(_LocalCollectorFiles->'$(TargetDir)qyl/collector/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
   <Target Name="CopyTestFixturePayloads" AfterTargets="Build" Condition="'@(TestFixtureProject)' != ''">
-    <MSBuild Projects="@(TestFixtureProject)" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+    <MSBuild Projects="@(TestFixtureProject->'%(FullPath)')" Targets="GetTargetPath"
+             Properties="$(_LocalDependencyBuildProperties)"
+             RemoveProperties="BuildingSolutionFile;CurrentSolutionConfigurationContents;$(_GlobalPropertiesToRemoveFromProjectReferences);$(_JetBrainsProjectReferenceGlobalPropertiesToRemove)">
       <Output TaskParameter="TargetOutputs" ItemName="_TestFixtureTarget" />
     </MSBuild>
     <ItemGroup>

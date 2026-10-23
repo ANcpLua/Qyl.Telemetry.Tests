@@ -1,0 +1,45 @@
+name: Sync MSTest API reference
+
+on:
+  push:
+    branches: [main]
+    # Neue testfx-Versionen kommen über versions.yaml; Release-Tags ändern sich nicht.
+    paths:
+      - .github/versions.yaml
+      - .github/generate_table.py
+      - .github/api_table.md.j2
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: api-status-docs
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install jinja2 pyyaml
+
+      - run: python .github/generate_table.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit changes
+        run: |
+          git add .agents/references/mstest-publicapi.md
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs(skills): sync MSTest public API reference [skip ci]"
+          git push

@@ -3,7 +3,7 @@ namespace Qyl.Telemetry.IntegrationTests;
 [TestClass]
 public static class TelemetryLifecycle
 {
-    internal static readonly HttpClient Http = new();
+    internal static HttpClient Http { get; } = new();
 
     [AssemblyCleanup]
     public static void CloseAssembly() => Http.Dispose();

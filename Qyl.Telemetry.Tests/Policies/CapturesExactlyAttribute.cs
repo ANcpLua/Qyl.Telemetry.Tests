@@ -1,4 +1,5 @@
 using JetBrains.Annotations;
+using Qyl.Telemetry.SemanticConventions;
 using static Qyl.Telemetry.Tests.Capture.CapturedActivityAssertions;
 
 namespace Qyl.Telemetry.Tests.Policies;
@@ -18,7 +19,7 @@ public sealed class CapturesExactlyAttribute(params string[] fields) : Telemetry
     {
         foreach (var field in Fields.Where(field => !IsCapturedField(field)))
             yield return $"'{field}' is not an HTTP header or RPC metadata attribute.";
-        var captured = invocation.Traces.SelectMany(trace => trace.Evidence.Spans).DistinctBy(span => span.SpanId)
+        var captured = invocation.Traces.SelectMany(trace => trace.Evidence.Spans).Distinct<SpanRecord>(ReferenceEqualityComparer.Instance)
             .SelectMany(span => span.Attributes.Keys.Where(IsCapturedField).Select(key => (Key: key, Span: span)))
             .ToArray();
         foreach (var field in Fields.Where(field => IsCapturedField(field) && captured.All(item => item.Key != field)))

@@ -1,19 +1,28 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Client;
-using Qyl.Telemetry.EndToEndTests.Delivery;
 using Qyl.Telemetry.Tests.Collector;
 
 namespace Qyl.Telemetry.EndToEndTests.Analysis;
 
-/// <summary>Where an analysis question is asked: the Collector's HTTP route or the published MCP tool.</summary>
+/// <summary>Where an analysis question is asked: the Collector's HTTP route or the matching source MCP tool.</summary>
 public enum AnalysisPath
 {
     Http,
     Mcp
 }
 
-/// <summary>Owns one packaged Collector and the pinned npm MCP server reading from it.</summary>
+internal static class AnalysisTools
+{
+    internal const string Triage = "triage";
+    internal const string FailureContext = "get_failure_context";
+    internal const string VerifyFix = "verify_fix";
+    internal const string CompareGroups = "compare_groups";
+    internal const string QueryMetric = "query_metric";
+    internal const string GetTrace = "get_trace";
+}
+
+/// <summary>Owns the locally staged Collector and the MCP server from the same source checkout.</summary>
 internal sealed class AnalysisSession : IAsyncDisposable
 {
     private readonly string _mcpEntryPoint;
@@ -34,7 +43,10 @@ internal sealed class AnalysisSession : IAsyncDisposable
 
     internal static async Task<AnalysisSession> StartAsync(TestContext context)
     {
-        var entryPoint = await new DeliveryArtifacts(context).InstallMcpAsync();
+        var entryPoint = (await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "local-mcp-entrypoint.txt"),
+            context.CancellationToken)).Trim();
+        if (!File.Exists(entryPoint))
+            throw new FileNotFoundException("The analysis suite requires the parent qyl MCP source checkout.", entryPoint);
         var collector = await CollectorFixture.StartAsync(CollectorFixture.DefaultAssembly,
             timeProvider: TimeProvider.System, cancellationToken: context.CancellationToken);
         try
@@ -52,7 +64,7 @@ internal sealed class AnalysisSession : IAsyncDisposable
     internal async Task<T> AskAsync<T>(AnalysisPath path, string tool, JsonObject input, CancellationToken cancellationToken)
     {
         if (path == AnalysisPath.Http) return await Client.AnalyzeAsync<T>(tool, input, cancellationToken);
-        var result = await _mcp.CallToolAsync(PublishedMcp.ToolCall(tool, input), cancellationToken);
+        var result = await _mcp.CallToolAsync(McpProcess.ToolCall(tool, input), cancellationToken);
         Assert.IsFalse(result.IsError ?? false, $"{tool}: {JsonSerializer.Serialize(result.Content)}");
         Assert.IsNotNull(result.StructuredContent, $"{tool} returned no structured content.");
         return result.StructuredContent.Value.Deserialize<T>(JsonSerializerOptions.Web)
@@ -74,7 +86,7 @@ internal sealed class AnalysisSession : IAsyncDisposable
             }
             Assert.Fail($"{tool} succeeded over HTTP but was expected to fail.");
         }
-        var result = await _mcp.CallToolAsync(PublishedMcp.ToolCall(tool, input), cancellationToken);
+        var result = await _mcp.CallToolAsync(McpProcess.ToolCall(tool, input), cancellationToken);
         Assert.IsTrue(result.IsError ?? false, $"{tool} succeeded over MCP but was expected to fail: {JsonSerializer.Serialize(result.StructuredContent)}");
         return (null, JsonSerializer.Serialize(result.StructuredContent) + JsonSerializer.Serialize(result.Content));
     }
@@ -94,5 +106,5 @@ internal sealed class AnalysisSession : IAsyncDisposable
     }
 
     private static Task<McpClient> ConnectAsync(string entryPoint, CollectorFixture collector, CancellationToken cancellationToken) =>
-        PublishedMcp.ConnectAsync(entryPoint, collector.Address, null, cancellationToken);
+        McpProcess.ConnectAsync("bun", entryPoint, collector.Address, null, cancellationToken);
 }

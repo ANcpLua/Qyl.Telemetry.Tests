@@ -32,7 +32,7 @@ public sealed class ReceiverTests
         var original = Assert.ContainsSingle(receiver.Snapshot().Requests);
         Assert.AreEqual(signal, original.Signal);
         Assert.AreSequenceEqual(new byte[] { 0x80 }, original.Payload.ToArray());
-        var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
+        var error = await Assert.That.HasOtlpErrorAsync(response, TestContext.CancellationToken);
         Assert.AreEqual((int)Google.Rpc.Code.InvalidArgument, error.Code);
         Assert.AreEqual(receipt.Error, error.Message);
     }

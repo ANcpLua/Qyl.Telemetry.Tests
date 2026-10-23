@@ -14,64 +14,59 @@ public sealed class InvocationContractTests(TestContext context)
     [Timeout(60_000, CooperativeCancellation = true)]
     public async Task TraceScope_ExecutorRowsFailuresAndInconclusiveResults_SurviveUnchanged()
     {
-        var results = await RunReportedAsync("ClassName=Qyl.Telemetry.IntegrationTests.Probes.ProbeCases");
+        var (exitCode, error, results) = await RunReportedAsync("ClassName=Qyl.Telemetry.IntegrationTests.Probes.ProbeCases");
+        Assert.AreEqual(2, exitCode, error);
         Assert.HasCount(5, results);
         Assert.HasCount(5, results.Select(item => (string?)item.Attribute("testId")).Distinct());
         var passed = results.Where(item => (string?)item.Attribute("outcome") == "Passed").ToArray();
         Assert.HasCount(2, passed);
-        foreach (var value in new[] { ProbeContract.FirstRow, ProbeContract.SecondRow })
-        {
-            var row = Assert.ContainsSingle(passed.Where(item => item.Value.Contains($"{ProbeContract.RowMarker}|{value}|", StringComparison.Ordinal)));
-            Assert.AreEqual(1, row.Value.Split(ProbeContract.ExecutorMarker).Length - 1);
-        }
+        Assert.AreSequenceEqual([ProbeContract.FirstRow, ProbeContract.SecondRow],
+            passed.Select(item => item.Value.Split(ProbeContract.RowMarker + "|")[1].Split('|')[0]), SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual([1, 1], passed.Select(item => item.Value.Split(ProbeContract.ExecutorMarker).Length - 1));
 
         var rowIdentities = passed.Select(item => item.Value.Split(ProbeContract.RowMarker + "|")[1]
             .Split('|')[1].Split('\r', '\n')[0]).ToArray();
         Assert.HasCount(2, rowIdentities.Distinct(StringComparer.Ordinal));
-        foreach (var identity in rowIdentities) Assert.AreEqual(32, identity.Length);
-        RequireResult(ProbeContract.AssertionMethod, "Failed", ProbeContract.AssertionMessage);
-        RequireResult(ProbeContract.ExceptionMethod, "Failed", ProbeContract.ExceptionMessage);
-        RequireResult(ProbeContract.InconclusiveMethod, "NotExecuted", ProbeContract.InconclusiveMessage);
-        return;
-
-        void RequireResult(string method, string outcome, string message)
-        {
-            var item = Assert.ContainsSingle(results.Where(item => ((string?)item.Attribute("testName"))!
-                .Contains(method, StringComparison.Ordinal)));
-            Assert.AreEqual(outcome, (string?)item.Attribute("outcome"));
-            Assert.Contains(message, item.Value);
-        }
+        Assert.AreSequenceEqual([32, 32], rowIdentities.Select(identity => identity.Length));
+        var assertion = Assert.ContainsSingle(ResultsFor(results, ProbeContract.AssertionMethod));
+        Assert.AreEqual("Failed", (string?)assertion.Attribute("outcome"));
+        Assert.Contains(ProbeContract.AssertionMessage, assertion.Value);
+        var exception = Assert.ContainsSingle(ResultsFor(results, ProbeContract.ExceptionMethod));
+        Assert.AreEqual("Failed", (string?)exception.Attribute("outcome"));
+        Assert.Contains(ProbeContract.ExceptionMessage, exception.Value);
+        var inconclusive = Assert.ContainsSingle(ResultsFor(results, ProbeContract.InconclusiveMethod));
+        Assert.AreEqual("NotExecuted", (string?)inconclusive.Attribute("outcome"));
+        Assert.Contains(ProbeContract.InconclusiveMessage, inconclusive.Value);
     }
 
     [TestMethod]
     [Timeout(60_000, CooperativeCancellation = true)]
     public async Task TraceScopePolicies_ViolationsOrMissingEvidence_FailWhileOriginalOutcomesStay()
     {
-        var results = await RunReportedAsync("FullyQualifiedName~PolicyCases");
+        var (exitCode, error, results) = await RunReportedAsync("FullyQualifiedName~PolicyCases");
+        Assert.AreEqual(2, exitCode, error);
         Assert.HasCount(6, results);
-        Assert.HasCount(2, Of(PolicyContract.SatisfiedMethod).Where(item => (string?)item.Attribute("outcome") == "Passed"));
-        var wrapped = RequireFailure(PolicyContract.WrappedMethod, "Telemetry policy violated (1):",
-            $"[NoDuplicateSpans] '{PolicyContract.Operation}' (Server, policy-probe, policy-", "repeats its parent");
-        var evidence = Assert.ContainsSingle(wrapped.Descendants(Trx + "ResultFile"));
+        Assert.HasCount(2, ResultsFor(results, PolicyContract.SatisfiedMethod).Where(item => (string?)item.Attribute("outcome") == "Passed"));
+        var wrapped = Assert.ContainsSingle(ResultsFor(results, PolicyContract.WrappedMethod));
+        Assert.AreEqual("Failed", (string?)wrapped.Attribute("outcome"));
+        Assert.Contains("Telemetry policy violated (1):", wrapped.Value);
+        Assert.Contains($"[NoDuplicateSpans] '{PolicyContract.Operation}' (Server, policy-probe, policy-", wrapped.Value);
+        Assert.Contains("repeats its parent", wrapped.Value);
+        var evidence = Assert.ContainsSingle(wrapped.Descendants(s_trx + "ResultFile"));
         Assert.EndsWith("telemetry-evidence.txt", (string?)evidence.Attribute("path"));
-        _ = RequireFailure(PolicyContract.MissingMethod, "Telemetry policy violated (2):",
-            "[ConnectedTrace] No trace was published.", "[ExportsCleanly] No trace was published.");
-        var original = RequireFailure(PolicyContract.OriginalMethod, PolicyContract.OriginalMessage);
+        var missing = Assert.ContainsSingle(ResultsFor(results, PolicyContract.MissingMethod));
+        Assert.AreEqual("Failed", (string?)missing.Attribute("outcome"));
+        Assert.Contains("Telemetry policy violated (2):", missing.Value);
+        Assert.Contains("[ConnectedTrace] No trace was published.", missing.Value);
+        Assert.Contains("[ExportsCleanly] No trace was published.", missing.Value);
+        var original = Assert.ContainsSingle(ResultsFor(results, PolicyContract.OriginalMethod));
+        Assert.AreEqual("Failed", (string?)original.Attribute("outcome"));
+        Assert.Contains(PolicyContract.OriginalMessage, original.Value);
         Assert.DoesNotContain("Telemetry policy violated", original.Value);
-        _ = RequireFailure(PolicyContract.UnverifiedMethod, "Qyl.Telemetry.IntegrationTests.Probes.UnverifiedPolicyCases "
-            + "declares [ConnectedTrace], but only a [TracePerTest] class verifies telemetry policies.");
-        return;
-
-        IEnumerable<XElement> Of(string method) => results.Where(item =>
-            ((string?)item.Attribute("testName"))!.Contains(method, StringComparison.Ordinal));
-
-        XElement RequireFailure(string method, params string[] messages)
-        {
-            var item = Assert.ContainsSingle(Of(method));
-            Assert.AreEqual("Failed", (string?)item.Attribute("outcome"));
-            foreach (var message in messages) Assert.Contains(message, item.Value);
-            return item;
-        }
+        var unverified = Assert.ContainsSingle(ResultsFor(results, PolicyContract.UnverifiedMethod));
+        Assert.AreEqual("Failed", (string?)unverified.Attribute("outcome"));
+        Assert.Contains("Qyl.Telemetry.IntegrationTests.Probes.UnverifiedPolicyCases "
+            + "declares [ConnectedTrace], but only a [TracePerTest] class verifies telemetry policies.", unverified.Value);
     }
 
     [TestMethod]
@@ -84,37 +79,39 @@ public sealed class InvocationContractTests(TestContext context)
         var rows = discovery.RootElement.GetProperty("tests").EnumerateArray().Where(item =>
             item.GetProperty("type").GetProperty("methodName").GetString() == ProbeContract.RowMethod).ToArray();
         Assert.HasCount(2, rows);
-        var source = await File.ReadAllLinesAsync(Path.Combine(FixtureDirectory, ProbeContract.CasesFileName), context.CancellationToken);
-        var expectedLine = Array.FindIndex(source, line => line.Trim() == "[ProbeMethod]") + 1;
+        var expectedLine = await ProbeMethodLineAsync();
         Assert.IsGreaterThan(0, expectedLine);
-        foreach (var row in rows)
-        {
-            var location = row.GetProperty("location");
-            Assert.AreEqual(ProbeContract.CasesSourcePath, location.GetProperty("file").GetString());
-            Assert.AreEqual(expectedLine, location.GetProperty("lineStart").GetInt32());
-            Assert.AreEqual(expectedLine, location.GetProperty("lineEnd").GetInt32());
-        }
+        Assert.AreSequenceEqual(Enumerable.Repeat(((string?)ProbeContract.CasesSourcePath, expectedLine, expectedLine), 2),
+            rows.Select(row => row.GetProperty("location")).Select(location =>
+                (location.GetProperty("file").GetString(), location.GetProperty("lineStart").GetInt32(),
+                    location.GetProperty("lineEnd").GetInt32())));
     }
 
-    private static readonly XNamespace Trx = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
+    private static readonly XNamespace s_trx = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
 
-    private async Task<XElement[]> RunReportedAsync(string filter)
+    private static IEnumerable<XElement> ResultsFor(IEnumerable<XElement> results, string method) =>
+        results.Where(item => ((string?)item.Attribute("testName"))!.Contains(method, StringComparison.Ordinal));
+
+    private async Task<int> ProbeMethodLineAsync()
     {
-        var directory = context.TestTempDirectory;
-        Assert.IsNotNull(directory);
+        var source = await File.ReadAllLinesAsync(Path.Combine(FixtureDirectory, ProbeContract.CasesFileName), context.CancellationToken);
+        return Array.FindIndex(source, line => line.Trim() == "[ProbeMethod]") + 1;
+    }
+
+    private async Task<(int ExitCode, string Error, XElement[] Results)> RunReportedAsync(string filter)
+    {
+        var directory = context.TestTempDirectory ?? throw new InvalidOperationException("The runner did not provide a test directory.");
         var result = await RunAsync("--report-trx", "--results-directory", directory, "--filter", filter);
-        Assert.AreEqual(2, result.ExitCode, result.Error);
-        var path = Assert.ContainsSingle(Directory.GetFiles(directory, "*.trx"));
+        var path = Directory.GetFiles(directory, "*.trx").Single();
         context.AddResultFile(path);
-        return [.. XDocument.Load(path).Descendants(Trx + "UnitTestResult")];
+        return (result.ExitCode, result.Error, [.. XDocument.Load(path).Descendants(s_trx + "UnitTestResult")]);
     }
 
     private async Task<(int ExitCode, string Output, string Error)> RunAsync(params string[] arguments)
     {
-        Assert.IsTrue(File.Exists(ProbeAssembly), $"MSBuild did not deploy {ProbeAssembly}.");
         var start = new ProcessStartInfo("dotnet");
         start.ArgumentList.Add(ProbeAssembly);
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        return await ChildProcess.RunAsync(start, "the native probe", context.CancellationToken);
+        return await ChildProcess.RunAsync(start, "the managed MTP invocation probe", context.CancellationToken);
     }
 }

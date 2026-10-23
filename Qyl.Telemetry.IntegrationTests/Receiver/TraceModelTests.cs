@@ -86,11 +86,10 @@ public sealed class TraceModelTests
         payments.ScopeSpans[0].Spans.Add(nextServer);
         request.ResourceSpans.Add(payments);
         var bytes = request.ToByteArray();
-        for (var attempt = 0; attempt < 2; attempt++)
-        {
-            using var response = await OtlpHttp.PostAsync(receiver.Endpoint, bytes, TestContext.CancellationToken);
-            response.EnsureSuccessStatusCode();
-        }
+        using var first = await OtlpHttp.PostAsync(receiver.Endpoint, bytes, TestContext.CancellationToken);
+        first.EnsureSuccessStatusCode();
+        using var repeated = await OtlpHttp.PostAsync(receiver.Endpoint, bytes, TestContext.CancellationToken);
+        repeated.EnsureSuccessStatusCode();
         var capture = receiver.Snapshot();
         var trace = new TraceEvidence(TraceId, capture);
         Assert.HasCount(8, capture.Spans);

@@ -58,7 +58,6 @@ public sealed class MetricWireTests
         Assert.AreEqual("4.2", observed.Scope?.Version);
         Assert.AreEqual("scope-schema", observed.Scope?.SchemaUrl);
         Assert.AreEqual("original", observed.Metadata["metadata"]);
-        CheckShape(shape, observed.Data);
         using var archive = JsonSerializer.SerializeToDocument(receiver.Snapshot());
         var archivedDistribution = archive.RootElement.GetProperty("Metrics")[0].GetProperty("Data");
         Assert.AreEqual(shape, archivedDistribution.GetProperty("kind").GetString());
@@ -101,82 +100,117 @@ public sealed class MetricWireTests
         Assert.IsEmpty(mismatch.Metrics);
     }
 
-    private static void CheckShape(string shape, MetricData observed)
+    [TestMethod]
+    public async Task OtlpReceiverMetrics_Gauge_KeepsTheNumberPointAndExemplar()
     {
-        switch (shape)
-        {
-            case MetricShapes.Gauge:
-                CheckNumber(Assert.ContainsSingle(Assert.IsInstanceOfType<GaugeData>(observed).Points)); break;
-            case MetricShapes.Sum:
-                var sum = Assert.IsInstanceOfType<SumData>(observed);
-                Assert.AreEqual(1, sum.AggregationTemporality);
-                Assert.IsFalse(sum.IsMonotonic);
-                CheckNumber(Assert.ContainsSingle(sum.Points));
-                break;
-            case MetricShapes.Histogram:
-                var histogram = Assert.IsInstanceOfType<HistogramData>(observed);
-                Assert.AreEqual(2, histogram.AggregationTemporality);
-                var h = Assert.ContainsSingle(histogram.Points);
-                Assert.AreEqual(3UL, h.Count);
-                Assert.AreEqual(6.5, h.Sum);
-                Assert.AreEqual(1d, h.Min);
-                Assert.AreEqual(4d, h.Max);
-                Assert.AreSequenceEqual(new ulong[] { 1, 2 }, h.BucketCounts);
-                Assert.AreSequenceEqual([2d], h.ExplicitBounds);
-                Assert.AreEqual(101UL, h.StartTimeUnixNano);
-                Assert.AreEqual(109UL, h.TimeUnixNano);
-                Assert.AreEqual(3u, h.Flags);
-                CheckExemplar(h.Exemplars);
-                break;
-            case MetricShapes.Exponential:
-                var exponential = Assert.IsInstanceOfType<ExponentialHistogramData>(observed);
-                Assert.AreEqual(1, exponential.AggregationTemporality);
-                var e = Assert.ContainsSingle(exponential.Points);
-                Assert.AreEqual(3UL, e.Count);
-                Assert.AreEqual(2d, e.Sum);
-                Assert.AreEqual(-2d, e.Min);
-                Assert.AreEqual(4d, e.Max);
-                Assert.AreEqual(-1, e.Scale);
-                Assert.AreEqual(1UL, e.ZeroCount);
-                Assert.AreEqual(0.5, e.ZeroThreshold);
-                Assert.AreEqual(-2, e.Positive!.Offset);
-                Assert.AreEqual(3, e.Negative!.Offset);
-                Assert.AreSequenceEqual(new ulong[] { 1 }, e.Positive!.BucketCounts);
-                Assert.AreSequenceEqual(new ulong[] { 1 }, e.Negative!.BucketCounts);
-                Assert.AreEqual(101UL, e.StartTimeUnixNano);
-                Assert.AreEqual(109UL, e.TimeUnixNano);
-                Assert.AreEqual(5u, e.Flags);
-                CheckExemplar(e.Exemplars);
-                break;
-            case MetricShapes.Summary:
-                var summary = Assert.ContainsSingle(Assert.IsInstanceOfType<SummaryData>(observed).Points);
-                Assert.AreEqual(3UL, summary.Count);
-                Assert.AreEqual(6.5, summary.Sum);
-                Assert.AreEqual(101UL, summary.StartTimeUnixNano);
-                Assert.AreEqual(109UL, summary.TimeUnixNano);
-                Assert.AreEqual(7u, summary.Flags);
-                Assert.AreEqual(new QuantileValue(0.5, 2.5), Assert.ContainsSingle(summary.Quantiles));
-                break;
-        }
-    }
-
-    private static void CheckNumber(NumberPoint point)
-    {
+        var data = Assert.IsInstanceOfType<GaugeData>(await ReadDataAsync(MetricShapes.Gauge));
+        var point = Assert.ContainsSingle(data.Points);
         Assert.AreEqual(-9L, point.Value);
         Assert.AreEqual(101UL, point.StartTimeUnixNano);
         Assert.AreEqual(109UL, point.TimeUnixNano);
         Assert.AreEqual(0x80000001u, point.Flags);
         Assert.AreEqual("exact", point.Attributes["point"]);
-        CheckExemplar(point.Exemplars);
-    }
-
-    private static void CheckExemplar(IReadOnlyList<ExemplarRecord> exemplars)
-    {
-        var exemplar = Assert.ContainsSingle(exemplars);
+        var exemplar = Assert.ContainsSingle(point.Exemplars);
         Assert.AreEqual(TraceId, exemplar.TraceId);
         Assert.AreEqual(SpanId, exemplar.SpanId);
         Assert.AreEqual(103UL, exemplar.TimeUnixNano);
         Assert.AreEqual(2.5, exemplar.Value);
         Assert.IsTrue(Assert.IsInstanceOfType<bool>(exemplar.FilteredAttributes["exemplar"]));
+    }
+
+    [TestMethod]
+    public async Task OtlpReceiverMetrics_Sum_KeepsTemporalityMonotonicityAndTheNumberPoint()
+    {
+        var data = Assert.IsInstanceOfType<SumData>(await ReadDataAsync(MetricShapes.Sum));
+        Assert.AreEqual(1, data.AggregationTemporality);
+        Assert.IsFalse(data.IsMonotonic);
+        var point = Assert.ContainsSingle(data.Points);
+        Assert.AreEqual(-9L, point.Value);
+        Assert.AreEqual(101UL, point.StartTimeUnixNano);
+        Assert.AreEqual(109UL, point.TimeUnixNano);
+        Assert.AreEqual(0x80000001u, point.Flags);
+        Assert.AreEqual("exact", point.Attributes["point"]);
+        var exemplar = Assert.ContainsSingle(point.Exemplars);
+        Assert.AreEqual(TraceId, exemplar.TraceId);
+        Assert.AreEqual(SpanId, exemplar.SpanId);
+        Assert.AreEqual(103UL, exemplar.TimeUnixNano);
+        Assert.AreEqual(2.5, exemplar.Value);
+        Assert.IsTrue(Assert.IsInstanceOfType<bool>(exemplar.FilteredAttributes["exemplar"]));
+    }
+
+    [TestMethod]
+    public async Task OtlpReceiverMetrics_Histogram_KeepsBucketsBoundsAndTheExemplar()
+    {
+        var histogram = Assert.IsInstanceOfType<HistogramData>(await ReadDataAsync(MetricShapes.Histogram));
+        Assert.AreEqual(2, histogram.AggregationTemporality);
+        var point = Assert.ContainsSingle(histogram.Points);
+        Assert.AreEqual(3UL, point.Count);
+        Assert.AreEqual(6.5, point.Sum);
+        Assert.AreEqual(1d, point.Min);
+        Assert.AreEqual(4d, point.Max);
+        Assert.AreSequenceEqual(new ulong[] { 1, 2 }, point.BucketCounts);
+        Assert.AreSequenceEqual([2d], point.ExplicitBounds);
+        Assert.AreEqual(101UL, point.StartTimeUnixNano);
+        Assert.AreEqual(109UL, point.TimeUnixNano);
+        Assert.AreEqual(3u, point.Flags);
+        var exemplar = Assert.ContainsSingle(point.Exemplars);
+        Assert.AreEqual(TraceId, exemplar.TraceId);
+        Assert.AreEqual(SpanId, exemplar.SpanId);
+        Assert.AreEqual(103UL, exemplar.TimeUnixNano);
+        Assert.AreEqual(2.5, exemplar.Value);
+        Assert.IsTrue(Assert.IsInstanceOfType<bool>(exemplar.FilteredAttributes["exemplar"]));
+    }
+
+    [TestMethod]
+    public async Task OtlpReceiverMetrics_ExponentialHistogram_KeepsScaleBucketsAndTheExemplar()
+    {
+        var histogram = Assert.IsInstanceOfType<ExponentialHistogramData>(await ReadDataAsync(MetricShapes.Exponential));
+        Assert.AreEqual(1, histogram.AggregationTemporality);
+        var point = Assert.ContainsSingle(histogram.Points);
+        Assert.AreEqual(3UL, point.Count);
+        Assert.AreEqual(2d, point.Sum);
+        Assert.AreEqual(-2d, point.Min);
+        Assert.AreEqual(4d, point.Max);
+        Assert.AreEqual(-1, point.Scale);
+        Assert.AreEqual(1UL, point.ZeroCount);
+        Assert.AreEqual(0.5, point.ZeroThreshold);
+        Assert.IsNotNull(point.Positive);
+        Assert.IsNotNull(point.Negative);
+        Assert.AreEqual(-2, point.Positive.Offset);
+        Assert.AreEqual(3, point.Negative.Offset);
+        Assert.AreSequenceEqual(new ulong[] { 1 }, point.Positive.BucketCounts);
+        Assert.AreSequenceEqual(new ulong[] { 1 }, point.Negative.BucketCounts);
+        Assert.AreEqual(101UL, point.StartTimeUnixNano);
+        Assert.AreEqual(109UL, point.TimeUnixNano);
+        Assert.AreEqual(5u, point.Flags);
+        var exemplar = Assert.ContainsSingle(point.Exemplars);
+        Assert.AreEqual(TraceId, exemplar.TraceId);
+        Assert.AreEqual(SpanId, exemplar.SpanId);
+        Assert.AreEqual(103UL, exemplar.TimeUnixNano);
+        Assert.AreEqual(2.5, exemplar.Value);
+        Assert.IsTrue(Assert.IsInstanceOfType<bool>(exemplar.FilteredAttributes["exemplar"]));
+    }
+
+    [TestMethod]
+    public async Task OtlpReceiverMetrics_Summary_KeepsCountSumAndQuantiles()
+    {
+        var summary = Assert.IsInstanceOfType<SummaryData>(await ReadDataAsync(MetricShapes.Summary));
+        var point = Assert.ContainsSingle(summary.Points);
+        Assert.AreEqual(3UL, point.Count);
+        Assert.AreEqual(6.5, point.Sum);
+        Assert.AreEqual(101UL, point.StartTimeUnixNano);
+        Assert.AreEqual(109UL, point.TimeUnixNano);
+        Assert.AreEqual(7u, point.Flags);
+        Assert.AreEqual(new QuantileValue(0.5, 2.5), Assert.ContainsSingle(point.Quantiles));
+    }
+
+    private async Task<MetricData> ReadDataAsync(string shape)
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var request = Metrics(null, MetricFixture.Of(shape));
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
+            TestContext.CancellationToken, Signals.Metrics);
+        response.EnsureSuccessStatusCode();
+        return receiver.Snapshot().Metrics.Single().Data;
     }
 }

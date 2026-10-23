@@ -5,157 +5,199 @@ using Qyl.Telemetry.SemanticConventions.Spans;
 namespace Qyl.Telemetry.UnitTests.Receiver;
 
 [TestClass]
-public sealed class ConformanceTests
+[TestCategory("Fast")]
+public class ConformanceTests
 {
     [TestMethod]
-    public void Conformance_EmptySelection_IsNotConformant()
+    public void Should_RejectAnIntegerHttpMethod_When_TheRegisteredEnumIsString()
+    {
+        var issue = Assert.ContainsSingle(CompleteHttpServerReport(7L).Issues);
+        Assert.AreEqual("http.request.method", issue.Attribute);
+    }
+
+    [TestMethod]
+    public void Should_AcceptAnOpenStringHttpMethod_When_TheRegisteredEnumIsString()
+    {
+        Assert.IsTrue(CompleteHttpServerReport("CUSTOM").IsConformant);
+    }
+
+    [TestMethod]
+    public void Should_RejectAWrongHeaderType_When_TheTemplateExpansionIsPresent()
+    {
+        var issue = Assert.ContainsSingle(CompleteHttpServerReport("GET", "http.request.header.content_type", 42L).Issues);
+        Assert.AreEqual("http.request.header.content_type", issue.Attribute);
+    }
+
+    [TestMethod]
+    public void Should_AcceptAnEmptyStringArray_When_TheTemplateExpansionIsPresent()
+    {
+        Assert.IsTrue(CompleteHttpServerReport("GET", "http.request.header.content_type", Array.Empty<object?>()).IsConformant);
+    }
+
+    [TestMethod]
+    public void Should_IgnoreACustomNeighbor_When_OnlyTheDeclaredTemplateIsSelected()
+    {
+        Assert.IsTrue(CompleteHttpServerReport("GET", "http.request.headers.content_type", 42L).IsConformant);
+    }
+
+    [TestMethod]
+    [DataRow("field")]
+    [DataRow("field.")]
+    public void Should_ReportTheRequiredTemplateAbsent_When_NoNonemptyExpansionExists(string key)
+    {
+        var report = Check(Model(new Dictionary<string, object?> { [key] = "value" }), Definition("template"));
+        Assert.AreEqual("Required attribute is absent.", Assert.ContainsSingle(report.Issues).Message);
+    }
+
+    [TestMethod]
+    public void Should_BeNotConformant_When_Conformance_EmptySelection()
     {
         Assert.IsFalse(EmptySelectionReport().IsConformant);
     }
 
     [TestMethod]
-    public void Conformance_EmptySelection_ChecksNoSpan()
+    public void Should_CheckNoSpan_When_Conformance_EmptySelection()
     {
         Assert.AreEqual(0, EmptySelectionReport().SpansChecked);
     }
 
     [TestMethod]
-    public void Conformance_EmptySelection_ReportsThatNoSpanMatched()
+    public void Should_ReportThatNoSpanMatched_When_Conformance_EmptySelection()
     {
         Assert.AreEqual("No span matched the explicit conformance selection.",
             Assert.ContainsSingle(EmptySelectionReport().Issues).Message);
     }
 
     [TestMethod]
-    [DataRow("string", "string", true)]
-    [DataRow("string", "int", false)]
-    [DataRow("int", "int", true)]
-    [DataRow("double", "double", true)]
-    [DataRow("boolean", "boolean", true)]
-    [DataRow("string[]", "string[]", true)]
-    [DataRow("int[]", "int[]", true)]
-    [DataRow("double[]", "double[]", true)]
-    [DataRow("boolean[]", "boolean[]", true)]
-    [DataRow("enum", "string", true)]
-    [DataRow("enum", "int", true)]
-    [DataRow("string[]", "int[]", false)]
-    [DataRow("int[]", "string[]", false)]
-    [DataRow("double[]", "int[]", false)]
-    [DataRow("boolean[]", "string[]", false)]
-    [DataRow("string[]", "string", false)]
-    [DataRow("int[]", "string", false)]
-    [DataRow("double[]", "string", false)]
-    [DataRow("boolean[]", "string", false)]
-    [DataRow("int", "string", false)]
-    [DataRow("double", "string", false)]
-    [DataRow("boolean", "string", false)]
-    [DataRow("enum", "boolean", false)]
-    [DataRow("", "string", false)]
-    [DataRow("str", "string", false)]
-    [DataRow("u8", "string", false)]
-    [DataRow("object[]", "string", false)]
-    [DataRow("bytes", "string", false)]
-    [DataRow("object", "string", false)]
-    [DataRow("map", "string", false)]
-    [DataRow("array", "string", false)]
-    [DataRow("bool[]", "string", false)]
-    [DataRow("float[]", "string", false)]
-    [DataRow("integer[]", "string", false)]
-    [DataRow("bool", "string", false)]
-    [DataRow("float", "string", false)]
-    [DataRow("integer", "string", false)]
-    [DataRow("string?", "string", false)]
-    [DataRow("array<string>", "string", false)]
-    [DataRow("strinG", "string", false)]
-    [DataRow("inT", "string", false)]
-    [DataRow("doublE", "string", false)]
-    [DataRow("booleaN", "string", false)]
-    [DataRow("strinG[]", "string", false)]
-    [DataRow("inT[]", "string", false)]
-    [DataRow("doublE[]", "string", false)]
-    [DataRow("booleaN[]", "string", false)]
-    [DataRow("enuM", "string", false)]
-    [DataRow("anY", "string", false)]
-    [DataRow("templatE", "string", false)]
-    [DataRow("unknown", "string", false)]
-    [DataRow("any", "string", true)]
-    [DataRow("template", "string", true)]
-    public void Conformance_DefinitionScopedAttribute_IsCheckedAgainstItsDeclaredType(string type, string valueType,
-        bool expected)
+    [DataRow("string", "string", true, 0)]
+    [DataRow("string", "int", false, 1)]
+    [DataRow("int", "int", true, 0)]
+    [DataRow("double", "double", true, 0)]
+    [DataRow("boolean", "boolean", true, 0)]
+    [DataRow("string[]", "string[]", true, 0)]
+    [DataRow("int[]", "int[]", true, 0)]
+    [DataRow("double[]", "double[]", true, 0)]
+    [DataRow("boolean[]", "boolean[]", true, 0)]
+    [DataRow("enum", "string", true, 0)]
+    [DataRow("enum", "int", true, 0)]
+    [DataRow("string[]", "int[]", false, 1)]
+    [DataRow("int[]", "string[]", false, 1)]
+    [DataRow("double[]", "int[]", false, 1)]
+    [DataRow("boolean[]", "string[]", false, 1)]
+    [DataRow("string[]", "string", false, 1)]
+    [DataRow("int[]", "string", false, 1)]
+    [DataRow("double[]", "string", false, 1)]
+    [DataRow("boolean[]", "string", false, 1)]
+    [DataRow("int", "string", false, 1)]
+    [DataRow("double", "string", false, 1)]
+    [DataRow("boolean", "string", false, 1)]
+    [DataRow("enum", "boolean", false, 1)]
+    [DataRow("", "string", false, 1)]
+    [DataRow("str", "string", false, 1)]
+    [DataRow("u8", "string", false, 1)]
+    [DataRow("object[]", "string", false, 1)]
+    [DataRow("bytes", "string", false, 1)]
+    [DataRow("object", "string", false, 1)]
+    [DataRow("map", "string", false, 1)]
+    [DataRow("array", "string", false, 1)]
+    [DataRow("bool[]", "string", false, 1)]
+    [DataRow("float[]", "string", false, 1)]
+    [DataRow("integer[]", "string", false, 1)]
+    [DataRow("bool", "string", false, 1)]
+    [DataRow("float", "string", false, 1)]
+    [DataRow("integer", "string", false, 1)]
+    [DataRow("string?", "string", false, 1)]
+    [DataRow("array<string>", "string", false, 1)]
+    [DataRow("strinG", "string", false, 1)]
+    [DataRow("inT", "string", false, 1)]
+    [DataRow("doublE", "string", false, 1)]
+    [DataRow("booleaN", "string", false, 1)]
+    [DataRow("strinG[]", "string", false, 1)]
+    [DataRow("inT[]", "string", false, 1)]
+    [DataRow("doublE[]", "string", false, 1)]
+    [DataRow("booleaN[]", "string", false, 1)]
+    [DataRow("enuM", "string", false, 1)]
+    [DataRow("anY", "string", false, 1)]
+    [DataRow("templatE", "string", false, 1)]
+    [DataRow("unknown", "string", false, 1)]
+    [DataRow("any", "string", true, 0)]
+    [DataRow("template", "string", true, 0)]
+    public void Should_BeCheckedAgainstItsDeclaredType_When_Conformance_DefinitionScopedAttribute(string type, string valueType,
+        bool expected, int expectedIssueCount)
     {
-        var span = Model(new Dictionary<string, object?> { ["field"] = Literal(valueType) });
+        var span = Model(new Dictionary<string, object?> { [type == "template" ? "field.entry" : "field"] = Literal(valueType) });
         var report =
             new TraceEvidence(span.TraceId, TestSpan.Only(span)).Conformance(Definition(type),
                 _ => true);
         Assert.AreEqual(expected, report.IsConformant);
-        Assert.HasCount(expected ? 0 : 1, report.Issues);
+        Assert.HasCount(expectedIssueCount, report.Issues);
     }
 
     [TestMethod]
-    public void Conformance_DefinitionScopedReport_NamesTheDefinition()
+    public void Should_NameTheDefinition_When_Conformance_DefinitionScopedReport()
     {
         Assert.AreEqual("test.server", StringFieldReport().DefinitionId);
     }
 
     [TestMethod]
-    public void Conformance_DefinitionScopedReport_ChecksTheSelectedSpan()
+    public void Should_CheckTheSelectedSpan_When_Conformance_DefinitionScopedReport()
     {
         Assert.AreEqual(1, StringFieldReport().SpansChecked);
     }
 
     [TestMethod]
-    public void Conformance_UnconditionalDefinition_LeavesNoUnevaluatedCondition()
+    public void Should_LeaveNoUnevaluatedCondition_When_Conformance_UnconditionalDefinition()
     {
         Assert.IsEmpty(StringFieldReport().UnevaluatedConditions);
     }
 
     [TestMethod]
-    public void Conformance_MissingRequiredOrPresentDeprecated_IsNotConformant()
+    public void Should_BeNotConformant_When_Conformance_MissingRequiredOrPresentDeprecated()
     {
         Assert.IsFalse(MixedRequirementReport().IsConformant);
     }
 
     [TestMethod]
-    public void Conformance_MissingRequiredAndPresentDeprecated_AreReportedInDefinitionOrder()
+    public void Should_BeReportedInDefinitionOrder_When_Conformance_MissingRequiredAndPresentDeprecated()
     {
         Assert.AreSequenceEqual(["required", "deprecated"], MixedRequirementReport().Issues.Select(i => i.Attribute));
     }
 
     [TestMethod]
-    public void Conformance_MissingRequiredAttribute_IsReportedAsAbsent()
+    public void Should_BeReportedAsAbsent_When_Conformance_MissingRequiredAttribute()
     {
         Assert.AreEqual("Required attribute is absent.",
             Assert.ContainsSingle(MixedRequirementReport().Issues.Where(i => i.Attribute == "required")).Message);
     }
 
     [TestMethod]
-    public void Conformance_PresentDeprecatedAttribute_IsReportedAsDeprecated()
+    public void Should_BeReportedAsDeprecated_When_Conformance_PresentDeprecatedAttribute()
     {
         Assert.AreEqual("The selected definition marks this attribute deprecated.",
             Assert.ContainsSingle(MixedRequirementReport().Issues.Where(i => i.Attribute == "deprecated")).Message);
     }
 
     [TestMethod]
-    public void Conformance_AbsentConditionalAttribute_IsAnUnevaluatedCondition()
+    public void Should_BeAnUnevaluatedCondition_When_Conformance_AbsentConditionalAttribute()
     {
         Assert.AreEqual("2222222222222222:conditional: When the operation retries.",
             Assert.ContainsSingle(MixedRequirementReport().UnevaluatedConditions));
     }
 
     [TestMethod]
-    public void Conformance_WrongSpanKind_IsNotConformant()
+    public void Should_BeNotConformant_When_Conformance_WrongSpanKind()
     {
         Assert.IsFalse(ClientKindReport().IsConformant);
     }
 
     [TestMethod]
-    public void Conformance_WrongSpanKind_IsReportedOnSpanKind()
+    public void Should_BeReportedOnSpanKind_When_Conformance_WrongSpanKind()
     {
         Assert.AreEqual("span.kind", Assert.ContainsSingle(ClientKindReport().Issues).Attribute);
     }
 
     [TestMethod]
-    public void Conformance_WrongSpanKind_NamesExpectedAndObservedKind()
+    public void Should_NameExpectedAndObservedKind_When_Conformance_WrongSpanKind()
     {
         Assert.AreEqual("Expected server, observed Client.", Assert.ContainsSingle(ClientKindReport().Issues).Message);
     }
@@ -164,7 +206,7 @@ public sealed class ConformanceTests
     [DataRow(RequirementLevel.Unspecified)]
     [DataRow(RequirementLevel.Recommended)]
     [DataRow(RequirementLevel.OptIn)]
-    public void Conformance_AbsentNonRequiredAttribute_IsConformant(RequirementLevel level)
+    public void Should_BeConformant_When_Conformance_AbsentNonRequiredAttribute(RequirementLevel level)
     {
         Assert.IsTrue(OptionalFieldReport(level).IsConformant);
     }
@@ -173,7 +215,7 @@ public sealed class ConformanceTests
     [DataRow(RequirementLevel.Unspecified)]
     [DataRow(RequirementLevel.Recommended)]
     [DataRow(RequirementLevel.OptIn)]
-    public void Conformance_AbsentNonRequiredAttribute_ReportsNoIssue(RequirementLevel level)
+    public void Should_ReportNoIssue_When_Conformance_AbsentNonRequiredAttribute(RequirementLevel level)
     {
         Assert.IsEmpty(OptionalFieldReport(level).Issues);
     }
@@ -182,7 +224,7 @@ public sealed class ConformanceTests
     [DataRow(RequirementLevel.Unspecified)]
     [DataRow(RequirementLevel.Recommended)]
     [DataRow(RequirementLevel.OptIn)]
-    public void Conformance_AbsentNonRequiredAttribute_LeavesNoUnevaluatedCondition(RequirementLevel level)
+    public void Should_LeaveNoUnevaluatedCondition_When_Conformance_AbsentNonRequiredAttribute(RequirementLevel level)
     {
         Assert.IsEmpty(OptionalFieldReport(level).UnevaluatedConditions);
     }
@@ -191,7 +233,7 @@ public sealed class ConformanceTests
     [DataRow(RequirementLevel.Unspecified)]
     [DataRow(RequirementLevel.Recommended)]
     [DataRow(RequirementLevel.OptIn)]
-    public void Conformance_AbsentNonRequiredAttribute_StillChecksTheSpan(RequirementLevel level)
+    public void Should_StillCheckTheSpan_When_Conformance_AbsentNonRequiredAttribute(RequirementLevel level)
     {
         Assert.AreEqual(1, OptionalFieldReport(level).SpansChecked);
     }
@@ -200,7 +242,7 @@ public sealed class ConformanceTests
     [DataRow(RequirementLevel.Unspecified)]
     [DataRow(RequirementLevel.Recommended)]
     [DataRow(RequirementLevel.OptIn)]
-    public void Conformance_AbsentNonRequiredAttribute_NamesTheDefinition(RequirementLevel level)
+    public void Should_NameTheDefinition_When_Conformance_AbsentNonRequiredAttribute(RequirementLevel level)
     {
         Assert.AreEqual("optional.server", OptionalFieldReport(level).DefinitionId);
     }
@@ -208,7 +250,7 @@ public sealed class ConformanceTests
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void Conformance_UndefinedPublicRequirementLevel_IsRejectedAsTheDefinitionArgument(bool present)
+    public void Should_BeRejectedAsTheDefinitionArgument_When_Conformance_UndefinedPublicRequirementLevel(bool present)
     {
         var error = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => CheckUndefinedLevel(present));
         Assert.AreEqual("definition", error.ParamName);
@@ -217,7 +259,7 @@ public sealed class ConformanceTests
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void Conformance_UndefinedPublicRequirementLevel_IsRejectedWithItsValue(bool present)
+    public void Should_BeRejectedWithItsValue_When_Conformance_UndefinedPublicRequirementLevel(bool present)
     {
         var error = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => CheckUndefinedLevel(present));
         Assert.AreEqual((RequirementLevel)99, error.ActualValue);
@@ -226,38 +268,38 @@ public sealed class ConformanceTests
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void Conformance_UndefinedPublicRequirementLevel_IsRejectedNamingTheAttribute(bool present)
+    public void Should_BeRejectedNamingTheAttribute_When_Conformance_UndefinedPublicRequirementLevel(bool present)
     {
         var error = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => CheckUndefinedLevel(present));
         Assert.Contains("Attribute 'field' has an unsupported requirement level.", error.Message);
     }
 
     [TestMethod]
-    public void Conformance_PresentConditionalAttribute_LeavesNoUnresolvedRequirement()
+    public void Should_LeaveNoUnresolvedRequirement_When_Conformance_PresentConditionalAttribute()
     {
         Assert.IsEmpty(PresentConditionalReport().UnevaluatedConditions);
     }
 
     [TestMethod]
-    public void Conformance_PresentConditionalAttribute_IsConformant()
+    public void Should_BeConformant_When_Conformance_PresentConditionalAttribute()
     {
         Assert.IsTrue(PresentConditionalReport().IsConformant);
     }
 
     [TestMethod]
-    public void Conformance_PresentConditionalAttribute_ReportsNoIssue()
+    public void Should_ReportNoIssue_When_Conformance_PresentConditionalAttribute()
     {
         Assert.IsEmpty(PresentConditionalReport().Issues);
     }
 
     [TestMethod]
-    public void Conformance_PresentConditionalAttribute_ChecksTheSpan()
+    public void Should_CheckTheSpan_When_Conformance_PresentConditionalAttribute()
     {
         Assert.AreEqual(1, PresentConditionalReport().SpansChecked);
     }
 
     [TestMethod]
-    public void Conformance_GeneratedHttpServerDefinition_RetainsUnresolvedConditions()
+    public void Should_RetainUnresolvedConditions_When_Conformance_GeneratedHttpServerDefinition()
     {
         Assert.AreSequenceEqual(
             [
@@ -268,25 +310,25 @@ public sealed class ConformanceTests
     }
 
     [TestMethod]
-    public void Conformance_GeneratedHttpServerWithUnresolvedConditions_IsNotConformant()
+    public void Should_BeNotConformant_When_Conformance_GeneratedHttpServerWithUnresolvedConditions()
     {
         Assert.IsFalse(HttpServerReport().IsConformant);
     }
 
     [TestMethod]
-    public void Conformance_GeneratedHttpServerWithRequiredAttributes_ReportsNoIssue()
+    public void Should_ReportNoIssue_When_Conformance_GeneratedHttpServerWithRequiredAttributes()
     {
         Assert.IsEmpty(HttpServerReport().Issues);
     }
 
     [TestMethod]
-    public void Conformance_GeneratedHttpServerDefinition_IsNamedHttpServer()
+    public void Should_BeNamedHttpServer_When_Conformance_GeneratedHttpServerDefinition()
     {
         Assert.AreEqual("http.server", HttpServerReport().DefinitionId);
     }
 
     [TestMethod]
-    public void Conformance_GeneratedHttpServerDefinition_ChecksTheSpan()
+    public void Should_CheckTheSpan_When_Conformance_GeneratedHttpServerDefinition()
     {
         Assert.AreEqual(1, HttpServerReport().SpansChecked);
     }
@@ -345,6 +387,19 @@ public sealed class ConformanceTests
         {
             ["http.request.method"] = "GET", ["url.path"] = "/checkout", ["url.scheme"] = "https"
         }), HttpSpanDefinitions.HttpServer);
+
+    private static ConformanceReport CompleteHttpServerReport(object method, string? extraKey = null, object? extraValue = null)
+    {
+        var attributes = new Dictionary<string, object?>
+        {
+            ["http.request.method"] = method, ["url.path"] = "/orders", ["url.scheme"] = "https",
+            ["error.type"] = "example.Error", ["http.request.method_original"] = "GET",
+            ["http.response.status_code"] = 500L, ["http.route"] = "/orders",
+            ["network.protocol.name"] = "http", ["server.port"] = 443L, ["url.query"] = ""
+        };
+        if (extraKey is not null) attributes[extraKey] = extraValue;
+        return Check(Model(attributes), HttpSpanDefinitions.HttpServer);
+    }
 
     private static SpanDefinition<Server> Definition(string type)
     {

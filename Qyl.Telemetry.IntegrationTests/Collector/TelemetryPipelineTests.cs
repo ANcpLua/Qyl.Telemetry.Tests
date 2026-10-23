@@ -19,8 +19,9 @@ namespace Qyl.Telemetry.IntegrationTests.Collector;
 public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisposable
 {
     private TelemetryPipeline Recorder { get; } = new(testContext);
+    private OtlpRelay? _pendingRelay;
 
-    private static readonly string[] Checkpoints = ["first", "second"];
+    private static readonly string[] s_checkpoints = ["first", "second"];
 
     [TestMethod]
     public async Task TelemetryPipeline_CompletedRootWithHttpChild_IsStoredByTheCollector()
@@ -96,7 +97,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
                 Assert.IsNotNull(child);
                 _ = child.SetTag("checkout.sequence", long.MaxValue);
                 _ = child.SetTag("checkout.accepted", true);
-                _ = child.SetTag("checkout.checkpoints", Checkpoints);
+                _ = child.SetTag("checkout.checkpoints", s_checkpoints);
                 _ = child.AddEvent(new ActivityEvent("order.created", tags: new ActivityTagsCollection
                 {
                     ["checkout.sequence"] = long.MaxValue,
@@ -109,7 +110,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
             Assert.AreEqual(long.MaxValue, captured.GetInt64("checkout.sequence"));
             Assert.IsNull(captured.GetString("checkout.sequence"));
             Assert.IsTrue(Assert.IsInstanceOfType<bool>(captured.Attributes["checkout.accepted"]));
-            Assert.AreSequenceEqual(Checkpoints, captured.GetStrings("checkout.checkpoints"));
+            Assert.AreSequenceEqual(s_checkpoints, captured.GetStrings("checkout.checkpoints"));
             Assert.AreSequenceEqual(["order.created", "order.charged"], captured.Events.Select(item => item.Name));
             Assert.AreEqual(long.MaxValue, captured.Events[0].Attributes["checkout.sequence"]);
             Assert.IsTrue(Assert.IsInstanceOfType<bool>(captured.Events[0].Attributes["checkout.accepted"]));
@@ -148,11 +149,7 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     [DataRow(true)]
     public void OtlpRelay_MissingListenerAddress_ThrowsAtStartup(bool hasFeature)
     {
-        var features = new FeatureCollection();
-        if (hasFeature)
-        {
-            features.Set<IServerAddressesFeature>(new ServerAddressesFeature());
-        }
+        var features = ListenerFeatures(hasFeature);
         var failure = Assert.ThrowsExactly<InvalidOperationException>(() => OtlpRelay.BoundAddress(features));
         Assert.AreEqual("The trace receiver has no address.", failure.Message);
     }
@@ -233,22 +230,24 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     [DataRow(Signals.Traces)]
     [DataRow(Signals.Logs)]
     [DataRow(Signals.Metrics)]
+    [Timeout(30_000, CooperativeCancellation = true)]
     public async Task OtlpRelay_ProducerDisconnectsDuringExport_ForwardsTheAcceptedExport(string signal)
     {
         var pending = new PendingCollector();
         using var collector = pending.Client();
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
-        var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
+        var receiver = _pendingRelay = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
         using var release = pending.Releasing();
         using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(testContext.CancellationToken);
         var send = OtlpHttp.PostAsync(receiver.Address, [], cancelled.Token, signal);
-        await pending.Started.Task.WaitAsync(testContext.CancellationToken);
+        await pending.AwaitStartedAsync(send, TimeProvider.System, testContext.CancellationToken);
         await cancelled.CancelAsync();
         _ = await Assert.ThrowsAsync<OperationCanceledException>(() => send);
         var stop = receiver.DisposeAsync().AsTask();
         Assert.IsFalse(stop.IsCompleted, "Shutdown must join the active export.");
         _ = pending.Complete.TrySetResult();
         await stop;
+        _pendingRelay = null;
         var delivery = Assert.ContainsSingle(receiver.Deliveries);
         Assert.AreEqual(200, delivery.CaptureStatus);
         Assert.AreEqual(200, delivery.CollectorStatus);
@@ -257,14 +256,16 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
     }
 
     [TestMethod]
+    [Timeout(30_000, CooperativeCancellation = true)]
     public async Task OtlpRelay_UpstreamTransportFailure_IsRecordedInDeliveries()
     {
         var pending = new PendingCollector();
         using var collector = pending.Client();
         await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
         await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
+        using var release = pending.Releasing();
         var send = OtlpHttp.PostAsync(receiver.Address, [], testContext.CancellationToken, Signals.Logs);
-        await pending.Started.Task.WaitAsync(testContext.CancellationToken);
+        await pending.AwaitStartedAsync(send, TimeProvider.System, testContext.CancellationToken);
         _ = pending.Complete.TrySetException(new HttpRequestException("upstream unavailable"));
         using var response = await send;
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -276,10 +277,44 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
         Assert.AreEqual(Signals.Logs, Assert.ContainsSingle(capture.Snapshot().Requests).Signal);
     }
 
+    [TestMethod]
+    [Timeout(30_000, CooperativeCancellation = true)]
+    public async Task OtlpRelay_ProducerFinishesBeforeUpstreamStarts_ReportsTheResponse()
+    {
+        var pending = new PendingCollector();
+        using var collector = pending.Client();
+        await using var capture = await OtlpReceiver.StartAsync(testContext.CancellationToken);
+        await using var receiver = await OtlpRelay.StartAsync(capture, new CollectorClient(collector), testContext.CancellationToken);
+        var send = TelemetryLifecycle.Http.GetAsync(new Uri(receiver.Address, "missing"), testContext.CancellationToken);
+        var failure = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            pending.AwaitStartedAsync(send, TimeProvider.System, testContext.CancellationToken));
+        Assert.Contains("404", failure.Message);
+    }
+
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task InstrumentedApplicationFixture_InvalidApplication_RetainsItsEarlyExitOutput()
+    {
+        var assembly = Path.Combine(testContext.TestTempDirectory!, "application-diagnostic-marker.dll");
+        await File.WriteAllTextAsync(assembly, "invalid managed application", testContext.CancellationToken);
+        _ = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            InstrumentedApplicationFixture.StartAsync(assembly, testContext));
+        var workspace = Assert.ContainsSingle(Directory.GetDirectories(testContext.TestTempDirectory!, "qyl-collector-*"));
+        var output = await File.ReadAllTextAsync(Path.Combine(workspace, "application.log"), testContext.CancellationToken);
+        Assert.Contains("application-diagnostic-marker", output);
+    }
+
+    private static FeatureCollection ListenerFeatures(bool hasAddressFeature)
+    {
+        var features = new FeatureCollection();
+        if (hasAddressFeature) features.Set<IServerAddressesFeature>(new ServerAddressesFeature());
+        return features;
+    }
+
     /// <summary>A Collector whose export reply waits until the test completes or fails <see cref="Complete" />.</summary>
     private sealed class PendingCollector
     {
-        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Complete { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <summary>Completes a pending export on disposal so the relay can join it during cleanup.</summary>
@@ -292,10 +327,26 @@ public sealed class TelemetryPipelineTests(TestContext testContext) : IAsyncDisp
             return Reply(HttpStatusCode.OK, []);
         });
 
+        public async Task AwaitStartedAsync(Task<HttpResponseMessage> producer, TimeProvider time,
+            CancellationToken cancellationToken)
+        {
+            _ = await Task.WhenAny(Started.Task, producer)
+                .WaitAsync(TimeSpan.FromSeconds(10), time, cancellationToken);
+            if (Started.Task.IsCompleted) return;
+            using var response = await producer;
+            throw new InvalidOperationException($"The producer returned {(int)response.StatusCode} before the upstream started.");
+        }
+
         public sealed class Release(TaskCompletionSource complete) : IDisposable
         {
             public void Dispose() => _ = complete.TrySetResult();
         }
     }
-    public ValueTask DisposeAsync() => Recorder.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        var failures = new List<Exception>();
+        if (_pendingRelay is not null) await failures.AttemptAsync(_pendingRelay.DisposeAsync);
+        await failures.AttemptAsync(Recorder.DisposeAsync);
+        if (failures.Count > 0) throw new AggregateException("Test fixture cleanup failed.", failures);
+    }
 }

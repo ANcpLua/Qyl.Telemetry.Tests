@@ -16,19 +16,17 @@ public sealed class CaptureLifecycleTests
     {
         var previous = Activity.Current;
         var results = await Task.WhenAll(CaptureAsync(1), CaptureAsync(2));
-        Assert.AreNotEqual(results[0].TraceId, results[1].TraceId);
+        var traces = results.Select(result => result.Trace).ToArray();
+        var spans = traces.Select(trace => Assert.ContainsSingle(trace.Spans)).ToArray();
+        Assert.AreNotEqual(traces[0].TraceId, traces[1].TraceId);
         Assert.AreSame(previous, Activity.Current);
-        for (var index = 0; index < results.Length; index++)
-        {
-            var result = results[index];
-            var span = Assert.ContainsSingle(result.Spans);
-            Assert.AreEqual(result.TraceId, span.TraceId);
-            Assert.AreEqual("capture." + (index + 1), span.Name);
-            Assert.AreEqual(SpanKind.Consumer, span.Kind);
-            Assert.AreEqual(ActivityStatusCode.Error, span.Status);
-            Assert.AreEqual("rich-scope", span.Scope?.Name);
-            Assert.HasCount(2, result.Capture.Spans);
-        }
+        Assert.AreSequenceEqual(["qyl.test", "qyl.test"], results.Select(result => result.AmbientOperation));
+        Assert.AreSequenceEqual(traces.Select(trace => trace.TraceId), spans.Select(span => span.TraceId));
+        Assert.AreSequenceEqual(["capture.1", "capture.2"], spans.Select(span => span.Name));
+        Assert.AreSequenceEqual([SpanKind.Consumer, SpanKind.Consumer], spans.Select(span => span.Kind));
+        Assert.AreSequenceEqual([ActivityStatusCode.Error, ActivityStatusCode.Error], spans.Select(span => span.Status));
+        Assert.AreSequenceEqual(["rich-scope", "rich-scope"], spans.Select(span => span.Scope?.Name));
+        Assert.AreSequenceEqual([2, 2], traces.Select(trace => trace.Capture.Spans.Count));
     }
 
     [TestMethod]
@@ -43,16 +41,13 @@ public sealed class CaptureLifecycleTests
             TestContext.CancellationToken);
         response.EnsureSuccessStatusCode();
         var results = await Task.WhenAll(first, second);
-        foreach (var result in results)
-        {
-            var span = Assert.ContainsSingle(result.Spans);
-            Assert.AreEqual("rich.operation", span.Name);
-            Assert.AreEqual(TraceId, span.TraceId);
-            Assert.AreEqual(SpanKind.Consumer, span.Kind);
-            Assert.AreEqual(ActivityStatusCode.Error, span.Status);
-            Assert.AreEqual("rich-scope", span.Scope?.Name);
-            Assert.AreEqual(1L, Assert.ContainsSingle(result.Receipts).Accepted);
-        }
+        var spans = results.Select(result => Assert.ContainsSingle(result.Spans)).ToArray();
+        Assert.AreSequenceEqual(["rich.operation", "rich.operation"], spans.Select(span => span.Name));
+        Assert.AreSequenceEqual([TraceId, TraceId], spans.Select(span => span.TraceId));
+        Assert.AreSequenceEqual([SpanKind.Consumer, SpanKind.Consumer], spans.Select(span => span.Kind));
+        Assert.AreSequenceEqual([ActivityStatusCode.Error, ActivityStatusCode.Error], spans.Select(span => span.Status));
+        Assert.AreSequenceEqual(["rich-scope", "rich-scope"], spans.Select(span => span.Scope?.Name));
+        Assert.AreSequenceEqual([1L, 1L], results.Select(result => Assert.ContainsSingle(result.Receipts).Accepted));
     }
 
     [TestMethod]
@@ -72,12 +67,12 @@ public sealed class CaptureLifecycleTests
         Assert.AreSame(previous, Activity.Current);
     }
 
-    private Task<TraceEvidence> CaptureAsync(int number)
+    private async Task<(TraceEvidence Trace, string? AmbientOperation)> CaptureAsync(int number)
     {
-        return TelemetryCapture.TraceAsync(async capture =>
+        string? ambientOperation = null;
+        var captured = await TelemetryCapture.TraceAsync(async capture =>
             {
-                Assert.IsNotNull(Activity.Current);
-                Assert.AreEqual("qyl.test", Activity.Current.OperationName);
+                ambientOperation = Activity.Current?.OperationName;
                 var request = RichSpan();
                 request.ResourceSpans[0].ScopeSpans[0].Spans[0].TraceId = Id(capture.TraceId);
                 request.ResourceSpans[0].ScopeSpans[0].Spans[0].Name = "capture." + number;
@@ -87,5 +82,6 @@ public sealed class CaptureLifecycleTests
                 response.EnsureSuccessStatusCode();
             }, trace => trace.Spans.Count == 1 && trace.Capture.Spans.Count == 2,
             cancellationToken: TestContext.CancellationToken);
+        return (captured, ambientOperation);
     }
 }

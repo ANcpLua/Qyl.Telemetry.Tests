@@ -19,7 +19,7 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
     protected const string UnderscoreAttribute = HttpAttributes.RequestHeader + ".x_request_id";
     protected const string AuthorizationAttribute = HttpAttributes.RequestHeader + ".authorization";
     protected const string ResponseIdAttribute = HttpAttributes.ResponseHeader + ".x-response-id";
-    private static readonly string[] RequestValues = ["request-1", "request-2"];
+    private static readonly string[] s_requestValues = ["request-1", "request-2"];
     // HttpClient transmits one comma-joined field; capture must not split that exposed value.
     protected static readonly string[] CapturedRequestValues = ["request-1, request-2"];
     protected static readonly string[] UnderscoreValues = ["underscore-1"];
@@ -44,7 +44,7 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, route);
         Assert.IsTrue(request.Headers.TryAddWithoutValidation(ProbeSignals.RequestHeader, ProbeSignals.RequestId));
-        Assert.IsTrue(request.Headers.TryAddWithoutValidation(RequestIdHeader, RequestValues));
+        Assert.IsTrue(request.Headers.TryAddWithoutValidation(RequestIdHeader, s_requestValues));
         Assert.IsTrue(request.Headers.TryAddWithoutValidation(UnderscoreHeader, UnderscoreValues));
         Assert.IsTrue(request.Headers.TryAddWithoutValidation(AuthorizationHeader, AuthorizationValues));
         var roundTrip = await Application.RoundTripAsync(request, async response =>
@@ -56,7 +56,7 @@ public abstract class CaptureDeliveryFixture(TestContext context) : IAsyncDispos
                 Assert.IsTrue(body.RootElement.GetProperty("informationLoggingEnabled").GetBoolean());
             }
         }, context);
-        _ = Assert.HasServerSpanUnderTheTestClient(roundTrip, "GET /" + route);
+        _ = Assert.That.HasServerSpanUnderTheTestClient(roundTrip, "GET /" + route);
         return roundTrip.Evidence;
     }
 

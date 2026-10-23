@@ -20,7 +20,7 @@ internal sealed class OtlpGrpcMethodProvider : IServiceMethodProvider<OtlpGrpcSe
 {
     // Keep the original uncompressed protobuf bytes. A generated request marshaller would
     // decode before capture, and serializing it again would not reproduce the received wire.
-    private static readonly Marshaller<byte[]> Payload = Marshallers.Create<byte[]>(
+    private static readonly Marshaller<byte[]> s_payload = Marshallers.Create<byte[]>(
         static (bytes, context) => context.Complete(bytes),
         static context => context.PayloadAsNewBuffer());
 
@@ -35,7 +35,7 @@ internal sealed class OtlpGrpcMethodProvider : IServiceMethodProvider<OtlpGrpcSe
     {
         var method = service.FindMethodByName("Export")
             ?? throw new InvalidOperationException($"{service.FullName} declares no Export method.");
-        context.AddUnaryMethod(new Method<byte[], byte[]>(MethodType.Unary, service.FullName, method.Name, Payload, Payload),
+        context.AddUnaryMethod(new Method<byte[], byte[]>(MethodType.Unary, service.FullName, method.Name, s_payload, s_payload),
             [], (instance, bytes, call) => instance.ExportAsync(signal, bytes, call));
     }
 }

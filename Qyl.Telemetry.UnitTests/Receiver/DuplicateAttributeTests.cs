@@ -7,7 +7,8 @@ using Qyl.Telemetry.Tests.Evidence;
 namespace Qyl.Telemetry.UnitTests.Receiver;
 
 [TestClass]
-public sealed class DuplicateAttributeTests
+[TestCategory("Fast")]
+public class DuplicateAttributeTests
 {
     private const string Key = "ConnectionId";
 
@@ -16,7 +17,7 @@ public sealed class DuplicateAttributeTests
     [DataRow(AttributeShape.Integer)]
     [DataRow(AttributeShape.Array)]
     [DataRow(AttributeShape.Bytes)]
-    public void DuplicateAttributes_IdenticalTypedValues_AreCoalescedIntoOneAttribute(AttributeShape shape)
+    public void Should_BeCoalescedIntoOneAttribute_When_DuplicateAttributes_IdenticalTypedValues(AttributeShape shape)
     {
         var (observed, _, _, _) = DecodeIdenticalDuplicates(shape);
         Assert.AreSequenceEqual([Key], observed.Attributes.Keys);
@@ -27,7 +28,7 @@ public sealed class DuplicateAttributeTests
     [DataRow(AttributeShape.Integer)]
     [DataRow(AttributeShape.Array)]
     [DataRow(AttributeShape.Bytes)]
-    public void DuplicateAttributes_IdenticalTypedValues_ReportACoalescingWarning(AttributeShape shape)
+    public void Should_ReportACoalescingWarning_When_DuplicateAttributes_IdenticalTypedValues(AttributeShape shape)
     {
         var (_, warnings, _, _) = DecodeIdenticalDuplicates(shape);
         Assert.AreEqual($"Coalesced identical OTLP attribute: {Key}.", Assert.ContainsSingle(warnings));
@@ -38,7 +39,7 @@ public sealed class DuplicateAttributeTests
     [DataRow(AttributeShape.Integer)]
     [DataRow(AttributeShape.Array)]
     [DataRow(AttributeShape.Bytes)]
-    public void DuplicateAttributes_IdenticalTypedValues_LeaveTheWireMessageUnchanged(AttributeShape shape)
+    public void Should_LeaveTheWireMessageUnchanged_When_DuplicateAttributes_IdenticalTypedValues(AttributeShape shape)
     {
         var (_, _, original, input) = DecodeIdenticalDuplicates(shape);
         Assert.AreSequenceEqual(original, input.ToByteArray());
@@ -47,21 +48,21 @@ public sealed class DuplicateAttributeTests
     [TestMethod]
     [DataRow(AttributeShape.String, "connection-1")]
     [DataRow(AttributeShape.Integer, 1L)]
-    public void DuplicateAttributes_IdenticalScalars_KeepTheTypedValue(AttributeShape shape, object expected)
+    public void Should_KeepTheTypedValue_When_DuplicateAttributes_IdenticalScalars(AttributeShape shape, object expected)
     {
         var (observed, _, _, _) = DecodeIdenticalDuplicates(shape);
         Assert.AreEqual(expected, observed.Attributes[Key]);
     }
 
     [TestMethod]
-    public void DuplicateAttributes_IdenticalArrays_KeepTheOrderedValues()
+    public void Should_KeepTheOrderedValues_When_DuplicateAttributes_IdenticalArrays()
     {
         var (observed, _, _, _) = DecodeIdenticalDuplicates(AttributeShape.Array);
         Assert.AreSequenceEqual(["first", "second"], Assert.IsInstanceOfType<IReadOnlyList<object?>>(observed.Attributes[Key]));
     }
 
     [TestMethod]
-    public void DuplicateAttributes_IdenticalBytes_KeepTheBytes()
+    public void Should_KeepTheBytes_When_DuplicateAttributes_IdenticalBytes()
     {
         var (observed, _, _, _) = DecodeIdenticalDuplicates(AttributeShape.Bytes);
         Assert.AreSequenceEqual<byte>([1, 2], Assert.IsInstanceOfType<byte[]>(observed.Attributes[Key]));
@@ -72,7 +73,7 @@ public sealed class DuplicateAttributeTests
     [DataRow(AttributeShape.Integer)]
     [DataRow(AttributeShape.Array)]
     [DataRow(AttributeShape.Bytes)]
-    public void DuplicateAttributes_ConflictingTypedValues_RemainInvalid(AttributeShape shape)
+    public void Should_RemainInvalid_When_DuplicateAttributes_ConflictingTypedValues(AttributeShape shape)
     {
         var input = new ProtoLog
         {

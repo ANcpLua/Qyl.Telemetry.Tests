@@ -28,11 +28,11 @@ public sealed class PreservedByCollectorAttribute : TelemetryPolicyAttribute
                 continue;
             }
 
-            var storedById = stored.DistinctBy(span => span.SpanId, StringComparer.Ordinal)
-                .ToDictionary(span => span.SpanId, StringComparer.Ordinal);
+            var storedById = stored.DistinctBy(span => (span.TraceId, span.SpanId))
+                .ToDictionary(span => (span.TraceId, span.SpanId));
             foreach (var span in trace.Evidence.Spans.DistinctBy(span => span.SpanId))
             {
-                if (!storedById.TryGetValue(span.SpanId, out var kept))
+                if (!storedById.TryGetValue((span.TraceId, span.SpanId), out var kept))
                 {
                     yield return $"{Describe(span)} span {span.SpanId} was captured but not stored.";
                     continue;
@@ -51,28 +51,45 @@ public sealed class PreservedByCollectorAttribute : TelemetryPolicyAttribute
         if (captured.Kind.ToString() != stored.Kind.ToString()) yield return $"was stored with kind {stored.Kind}.";
         if (captured.Status.ToString() != stored.Status.Code.ToString())
             yield return $"was stored with status {stored.Status.Code} instead of {captured.Status}.";
+        if ((captured.StatusDescription ?? "") != (stored.Status.Message ?? ""))
+            yield return $"was stored with status description '{stored.Status.Message}' instead of '{captured.StatusDescription}'.";
         if (captured.StartTimeUnixNano != stored.StartTimeUnixNano || captured.EndTimeUnixNano != stored.EndTimeUnixNano)
             yield return $"was stored from {stored.StartTimeUnixNano} to {stored.EndTimeUnixNano} instead of "
                 + $"{captured.StartTimeUnixNano} to {captured.EndTimeUnixNano}.";
         if ((captured.Scope?.Name ?? "") != (stored.InstrumentationScope?.ScopeName ?? ""))
             yield return $"was stored with scope '{stored.InstrumentationScope?.ScopeName}'.";
+        if ((captured.Scope?.Version ?? "") != (stored.InstrumentationScope?.ScopeVersion ?? ""))
+            yield return $"was stored with scope version '{stored.InstrumentationScope?.ScopeVersion}' instead of '{captured.Scope?.Version}'.";
+        if ((captured.Scope?.SchemaUrl ?? "") != (stored.InstrumentationScope?.SchemaUrl ?? ""))
+            yield return $"was stored with scope schema '{stored.InstrumentationScope?.SchemaUrl}' instead of '{captured.Scope?.SchemaUrl}'.";
+        foreach (var difference in Differences(captured.Scope?.Attributes ?? new Dictionary<string, object?>(),
+                     stored.InstrumentationScope?.ScopeAttributes, null))
+            yield return "scope " + difference;
         foreach (var difference in Differences(captured.Attributes, stored.Attributes, captured.Resource.Attributes))
             yield return difference;
         foreach (var difference in Differences(captured.Resource.Attributes, stored.Resource.Attributes, null))
             yield return "resource " + difference;
+        var remainingEvents = stored.Events?.ToList() ?? [];
         foreach (var capturedEvent in captured.Events)
         {
-            var storedEvent = stored.Events?.FirstOrDefault(item =>
-                item.Name == capturedEvent.Name && item.TimeUnixNano == capturedEvent.TimeUnixNano);
-            if (storedEvent is null)
+            var index = remainingEvents.FindIndex(item => item.Name == capturedEvent.Name
+                && item.TimeUnixNano == capturedEvent.TimeUnixNano
+                && !Differences(capturedEvent.Attributes, item.Attributes, null).Any());
+            if (index < 0)
+                index = remainingEvents.FindIndex(item => item.Name == capturedEvent.Name && item.TimeUnixNano == capturedEvent.TimeUnixNano);
+            if (index < 0)
             {
                 yield return $"lost event '{capturedEvent.Name}' at {capturedEvent.TimeUnixNano}.";
                 continue;
             }
 
+            var storedEvent = remainingEvents[index];
+            remainingEvents.RemoveAt(index);
             foreach (var difference in Differences(capturedEvent.Attributes, storedEvent.Attributes, null))
                 yield return $"event '{capturedEvent.Name}' {difference}";
         }
+        foreach (var extra in remainingEvents)
+            yield return $"gained event '{extra.Name}' at {extra.TimeUnixNano}.";
     }
 
     /// <summary>Compares typed attributes; <paramref name="resource" /> holds those the Collector may copy onto the record.</summary>
@@ -97,7 +114,9 @@ public sealed class PreservedByCollectorAttribute : TelemetryPolicyAttribute
         }
 
         foreach (var key in values.Keys.Where(key => !captured.ContainsKey(key)).Order(StringComparer.Ordinal))
-            if (resource is null || !resource.TryGetValue(key, out var copied) || !ValueEquals(copied, values[key]))
+            if (!RegistryPolicy.IsPersisted(key))
+                yield return $"retained '{key}', which the persistence policy denies.";
+            else if (resource is null || !resource.TryGetValue(key, out var copied) || !ValueEquals(copied, values[key]))
                 yield return $"gained '{key}' = {TelemetryReport.Format(values[key])}.";
     }
 

@@ -19,8 +19,8 @@ outcome.
    every test, including inherited ones; a method declaration replaces the class
    declaration of the same policy.
 4. Keep scenario values in the test: expected header values, metric points and
-   specific parentage (`Assert.HasSingleNativeSpan`, `Assert.HasParentContext`,
-   `Assert.HasCapturedValues`).
+   specific parentage (`SpanAssertions.HasSingleNativeSpan`, `SpanAssertions.HasParentContext`,
+   `Assert.That.HasCapturedValues`).
 
 ## Policies
 

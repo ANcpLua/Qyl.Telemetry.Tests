@@ -7,7 +7,8 @@ using Qyl.Telemetry.Tests.Capture;
 namespace Qyl.Telemetry.UnitTests.Receiver;
 
 [TestClass]
-public sealed class RawActivityCaptureTests
+[TestCategory("Fast")]
+public class RawActivityCaptureTests
 {
     private const string Key = "http.request.header.x-example";
     private const string DeprecatedGrpcMetadata = "rpc.grpc.request.metadata.authorization";
@@ -15,26 +16,26 @@ public sealed class RawActivityCaptureTests
     private const string NumericArrayKey = "probe.status_codes";
 
     [TestMethod]
-    public void RawActivityCaptureSnapshot_UrlWithQuery_KeepsOnlyThePath()
+    public void Should_KeepOnlyThePath_When_RawActivityCaptureSnapshot_UrlWithQuery()
     {
         Assert.AreEqual("/ok", MutatedAfterCapture().Path);
     }
 
     [TestMethod]
-    public void RawActivityCaptureSnapshot_ArrayMutatedOrReplacedAfterCapture_KeepsTheOriginalValues()
+    public void Should_KeepTheOriginalValues_When_RawActivityCaptureSnapshot_ArrayMutatedOrReplacedAfterCapture()
     {
         CapturedActivityAssertions.RequireStringValues(MutatedAfterCapture().Tags, Key, "first", "first", "", "comma,kept");
     }
 
     [TestMethod]
-    public void RawActivityCaptureSnapshot_TagKeyAddedTwice_KeepsTheValueTheActivityReports()
+    public void Should_KeepTheValueTheActivityReports_When_RawActivityCaptureSnapshot_TagKeyAddedTwice()
     {
         using var activity = new Activity("repeated-tag").AddTag(RepeatedKey, "first").AddTag(RepeatedKey, "second").Start();
         Assert.AreEqual(activity.GetTagItem(RepeatedKey), ActivitySnapshot.Capture(activity).Tags[RepeatedKey]);
     }
 
     [TestMethod]
-    public void RawActivityCaptureSnapshot_Int64ArrayMutatedAfterCapture_KeepsTheOriginalValues()
+    public void Should_KeepTheOriginalValues_When_RawActivityCaptureSnapshot_Int64ArrayMutatedAfterCapture()
     {
         long[] statusCodes = [200, 404];
         using var activity = new Activity("numeric-array").SetTag(NumericArrayKey, statusCodes).Start();
@@ -51,7 +52,7 @@ public sealed class RawActivityCaptureTests
     [DataRow(RawViolation.List)]
     [DataRow(RawViolation.Reordered)]
     [DataRow(RawViolation.DuplicateLost)]
-    public void RawActivityCapture_WrongClrTypeOrChangedSequence_FailsNamingTheKey(RawViolation violation)
+    public void Should_FailNamingTheKey_When_RawActivityCapture_WrongClrTypeOrChangedSequence(RawViolation violation)
     {
         var tags = Tags(violation);
         var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireStringValues(tags, Key, "first", "first", ""));
@@ -66,7 +67,7 @@ public sealed class RawActivityCaptureTests
     [DataRow(RawViolation.List)]
     [DataRow(RawViolation.Reordered)]
     [DataRow(RawViolation.DuplicateLost)]
-    public void RawActivityCapture_WrongClrTypeOrChangedSequence_FailsNamingTheExpectedStringArray(RawViolation violation)
+    public void Should_FailNamingTheExpectedStringArray_When_RawActivityCapture_WrongClrTypeOrChangedSequence(RawViolation violation)
     {
         var tags = Tags(violation);
         var error = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireStringValues(tags, Key, "first", "first", ""));
@@ -74,7 +75,7 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void RawActivityCapture_ChildOfTheExpectedParent_PassesParentCheck()
+    public void Should_PassParentCheck_When_RawActivityCapture_ChildOfTheExpectedParent()
     {
         using var parent = new Activity("parent").SetIdFormat(ActivityIdFormat.W3C).Start();
         using var child = new Activity("child").Start();
@@ -82,7 +83,7 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void RawActivityCapture_MatchingParentSpanInDifferentTrace_FailsAsTraceChanged()
+    public void Should_FailAsTraceChanged_When_RawActivityCapture_MatchingParentSpanInDifferentTrace()
     {
         using var parent = new Activity("parent").SetIdFormat(ActivityIdFormat.W3C).Start();
         using var child = new Activity("child").Start();
@@ -93,7 +94,7 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void RawActivityCapture_MatchingParentSpanInDifferentTrace_FailsNamingTheExpectedTrace()
+    public void Should_FailNamingTheExpectedTrace_When_RawActivityCapture_MatchingParentSpanInDifferentTrace()
     {
         using var parent = new Activity("parent").SetIdFormat(ActivityIdFormat.W3C).Start();
         using var child = new Activity("child").Start();
@@ -104,14 +105,14 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void RawActivityCapture_UniqueSpanIdentity_Passes()
+    public void Should_Pass_When_RawActivityCapture_UniqueSpanIdentity()
     {
         using var activity = new Activity("operation").SetIdFormat(ActivityIdFormat.W3C).Start();
         CapturedActivityAssertions.RequireUniqueSpanIdentities([ActivitySnapshot.Capture(activity)]);
     }
 
     [TestMethod]
-    public void RawActivityCapture_DuplicateSpanIdentity_IsRejected()
+    public void Should_BeRejected_When_RawActivityCapture_DuplicateSpanIdentity()
     {
         using var activity = new Activity("operation").SetIdFormat(ActivityIdFormat.W3C).Start();
         var snapshot = ActivitySnapshot.Capture(activity);
@@ -120,56 +121,56 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_HttpAndGrpc_UseSchemaVersionOne()
+    public void Should_UseSchemaVersionOne_When_RawActivityCaptureReport_HttpAndGrpc()
     {
         using var report = HttpAndGrpcReport(out _);
         Assert.AreEqual(1, report.RootElement.GetProperty("schema_version").GetInt32());
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_ValidCapture_HasPassedStatus()
+    public void Should_HavePassedStatus_When_RawActivityCaptureReport_ValidCapture()
     {
         using var report = HttpAndGrpcReport(out _);
         Assert.AreEqual("passed", report.RootElement.GetProperty("status").GetString());
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_HttpAndGrpc_CountBothSpans()
+    public void Should_CountBothSpans_When_RawActivityCaptureReport_HttpAndGrpc()
     {
         using var report = HttpAndGrpcReport(out _);
         Assert.AreEqual(2, report.RootElement.GetProperty("span_count").GetInt32());
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_NoLateSpans_HasNoAfterDisposalSpans()
+    public void Should_HaveNoAfterDisposalSpans_When_RawActivityCaptureReport_NoLateSpans()
     {
         using var report = HttpAndGrpcReport(out _);
         Assert.AreEqual(0, report.RootElement.GetProperty("after_disposal_spans").GetArrayLength());
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_HttpSpan_HasTheUrlPath()
+    public void Should_HaveTheUrlPath_When_RawActivityCaptureReport_HttpSpan()
     {
         using var report = HttpAndGrpcReport(out _);
         Assert.AreEqual("/ok", report.RootElement.GetProperty("spans")[0].GetProperty("path").GetString());
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_GrpcSpan_HasTheMethodAsPath()
+    public void Should_HaveTheMethodAsPath_When_RawActivityCaptureReport_GrpcSpan()
     {
         using var report = HttpAndGrpcReport(out _);
         Assert.AreEqual("/capture.Service/Unary", report.RootElement.GetProperty("spans")[1].GetProperty("path").GetString());
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_HttpSpan_HasItsTraceId()
+    public void Should_HaveItsTraceId_When_RawActivityCaptureReport_HttpSpan()
     {
         using var report = HttpAndGrpcReport(out var httpTraceId);
         Assert.AreEqual(httpTraceId, report.RootElement.GetProperty("spans")[0].GetProperty("trace_id").GetString());
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_HttpHeaderArray_KeepsEmptyAndCommaValues()
+    public void Should_KeepEmptyAndCommaValues_When_RawActivityCaptureReport_HttpHeaderArray()
     {
         using var report = HttpAndGrpcReport(out _);
         string?[] capturedValues = [.. report.RootElement.GetProperty("spans")[0].GetProperty("captured").GetProperty(Key).EnumerateArray().Select(value => value.GetString())];
@@ -177,14 +178,14 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_GrpcBinaryMetadata_KeepsItsValue()
+    public void Should_KeepItsValue_When_RawActivityCaptureReport_GrpcBinaryMetadata()
     {
         using var report = HttpAndGrpcReport(out _);
         Assert.AreEqual("AAH/", report.RootElement.GetProperty("spans")[1].GetProperty("captured").GetProperty("rpc.response.metadata.trace-bin")[0].GetString());
     }
 
     [TestMethod]
-    public void RawActivityCaptureReport_StringListForClrArray_DoesNotPass()
+    public void Should_NotPass_When_RawActivityCaptureReport_StringListForClrArray()
     {
         List<string> invalidValues = ["value"];
         using var activity = new Activity("wrong-clr-type").SetTag(Key, invalidValues).Start();
@@ -194,14 +195,14 @@ public sealed class RawActivityCaptureTests
     }
 
     [TestMethod]
-    public void RawActivityCaptureDisposal_StoppedNativeSpan_Passes()
+    public void Should_Pass_When_RawActivityCaptureDisposal_StoppedNativeSpan()
     {
         using var activity = new Activity("after-disposal").SetIdFormat(ActivityIdFormat.W3C).Start();
         CapturedActivityAssertions.RequireCaptureStopped([NativeHttpSnapshot(activity)], NativeHttpSource);
     }
 
     [TestMethod]
-    public void RawActivityCaptureDisposal_MissingNativeSpan_Fails()
+    public void Should_Fail_When_RawActivityCaptureDisposal_MissingNativeSpan()
     {
         _ = Assert.ThrowsExactly<InvalidOperationException>(() => CapturedActivityAssertions.RequireCaptureStopped([], NativeHttpSource));
     }
@@ -209,7 +210,7 @@ public sealed class RawActivityCaptureTests
     [TestMethod]
     [DataRow(Key)]
     [DataRow(DeprecatedGrpcMetadata)]
-    public void RawActivityCaptureDisposal_LeftoverCapturedField_FailsAsOutlived(string field)
+    public void Should_FailAsOutlived_When_RawActivityCaptureDisposal_LeftoverCapturedField(string field)
     {
         using var activity = new Activity("after-disposal").SetIdFormat(ActivityIdFormat.W3C).Start();
         var captured = NativeHttpSnapshot(activity) with { Tags = new Dictionary<string, object?> { [field] = new[] { "leftover" } } };

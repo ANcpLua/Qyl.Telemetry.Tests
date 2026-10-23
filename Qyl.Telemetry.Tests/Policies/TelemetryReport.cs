@@ -21,6 +21,7 @@ internal static class TelemetryReport
     internal static string Render(TelemetryInvocation invocation, IReadOnlyList<string> violations)
     {
         var text = new StringBuilder();
+        text.AppendLine($"registry: {SchemaUrl.Qyl}, upstream: {SchemaUrl.Current}, sha256: {RegistrySnapshot.Sha256}");
         foreach (var violation in violations) text.AppendLine(violation);
         foreach (var trace in invocation.Traces)
         {
@@ -85,6 +86,12 @@ internal static class TelemetryReport
         foreach (var root in spans.Where(span => string.IsNullOrEmpty(span.ParentSpanId) || !ids.Contains(span.ParentSpanId))
                      .OrderBy(span => span.StartTimeUnixNano))
             Walk(root, 1);
+        foreach (var unrooted in spans.Where(span => !visited.Contains(span.SpanId)).OrderBy(span => span.StartTimeUnixNano))
+        {
+            if (visited.Contains(unrooted.SpanId)) continue;
+            lines.Add("  unrooted component (cyclic parentage):");
+            Walk(unrooted, 2);
+        }
         return lines;
 
         void Walk(SpanRecord span, int depth)

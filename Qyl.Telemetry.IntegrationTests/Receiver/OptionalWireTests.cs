@@ -60,53 +60,53 @@ public sealed class OptionalWireTests
     }
 
     [TestMethod]
-    [DataRow(MetricShapes.Histogram)]
-    [DataRow(MetricShapes.Exponential)]
-    public async Task OtlpReceiverMetrics_OptionalDistributionFieldsAbsent_StayNullInsteadOfZero(string kind)
+    public async Task OtlpReceiverMetrics_OptionalHistogramFieldsAbsent_StayNullInsteadOfZero()
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        var metric = MetricFixture.Of(kind);
-        if (kind == MetricShapes.Histogram)
-        {
-            var p = metric.Histogram.DataPoints[0];
-            p.ClearSum();
-            p.ClearMin();
-            p.ClearMax();
-        }
-        else
-        {
-            var p = metric.ExponentialHistogram.DataPoints[0];
-            p.ClearSum();
-            p.ClearMin();
-            p.ClearMax();
-            p.Positive = null;
-            p.Negative = null;
-        }
-
+        var metric = MetricFixture.Of(MetricShapes.Histogram);
+        var point = metric.Histogram.DataPoints[0];
+        point.ClearSum();
+        point.ClearMin();
+        point.ClearMax();
         var request = Metrics(null, metric);
         using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
         var observed = Assert.ContainsSingle(receiver.Snapshot().Metrics);
-        Assert.AreEqual("metric." + kind, observed.Name);
+        Assert.AreEqual("metric." + MetricShapes.Histogram, observed.Name);
         Assert.IsNull(observed.Resource.SchemaUrl);
         Assert.IsNull(observed.Scope);
-        if (kind == MetricShapes.Histogram)
-        {
-            var p = Assert.ContainsSingle(Assert.IsInstanceOfType<HistogramData>(observed.Data).Points);
-            Assert.IsNull(p.Sum);
-            Assert.IsNull(p.Min);
-            Assert.IsNull(p.Max);
-        }
-        else
-        {
-            var p = Assert.ContainsSingle(Assert.IsInstanceOfType<ExponentialHistogramData>(observed.Data).Points);
-            Assert.IsNull(p.Sum);
-            Assert.IsNull(p.Min);
-            Assert.IsNull(p.Max);
-            Assert.IsNull(p.Positive);
-            Assert.IsNull(p.Negative);
-        }
+        var captured = Assert.ContainsSingle(Assert.IsInstanceOfType<HistogramData>(observed.Data).Points);
+        Assert.IsNull(captured.Sum);
+        Assert.IsNull(captured.Min);
+        Assert.IsNull(captured.Max);
+    }
+
+    [TestMethod]
+    public async Task OtlpReceiverMetrics_OptionalExponentialHistogramFieldsAbsent_StayNullInsteadOfZero()
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var metric = MetricFixture.Of(MetricShapes.Exponential);
+        var point = metric.ExponentialHistogram.DataPoints[0];
+        point.ClearSum();
+        point.ClearMin();
+        point.ClearMax();
+        point.Positive = null;
+        point.Negative = null;
+        var request = Metrics(null, metric);
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
+            TestContext.CancellationToken, Signals.Metrics);
+        response.EnsureSuccessStatusCode();
+        var observed = Assert.ContainsSingle(receiver.Snapshot().Metrics);
+        Assert.AreEqual("metric." + MetricShapes.Exponential, observed.Name);
+        Assert.IsNull(observed.Resource.SchemaUrl);
+        Assert.IsNull(observed.Scope);
+        var captured = Assert.ContainsSingle(Assert.IsInstanceOfType<ExponentialHistogramData>(observed.Data).Points);
+        Assert.IsNull(captured.Sum);
+        Assert.IsNull(captured.Min);
+        Assert.IsNull(captured.Max);
+        Assert.IsNull(captured.Positive);
+        Assert.IsNull(captured.Negative);
     }
 
     [TestMethod]

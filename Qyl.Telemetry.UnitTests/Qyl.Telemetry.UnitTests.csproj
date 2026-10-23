@@ -1,6 +1,14 @@
 <Project Sdk="MSTest.Sdk">
+  <PropertyGroup>
+    <EnableMSTestSourceGeneration>true</EnableMSTestSourceGeneration>
+    <PublishAot Condition="'$(QylNativeTestRunner)' == 'true'">true</PublishAot>
+    <DefineConstants Condition="'$(PublishAot)' == 'true'">$(DefineConstants);QYL_NATIVE_TEST_RUNNER</DefineConstants>
+    <!-- These tests call the referenced CLI's APIs; they do not launch its executable. -->
+    <ValidateExecutableReferencesMatchSelfContained Condition="'$(PublishAot)' == 'true'">false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj" />
+    <ProjectReference Include="../../packages/Qyl.Cli/Qyl.Cli.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />

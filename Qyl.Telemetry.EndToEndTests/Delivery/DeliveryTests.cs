@@ -11,12 +11,12 @@ public sealed class DeliveryTests(TestContext context)
 {
     private const string TraceTool = "get_trace";
     private const string CapturedKey = HttpAttributes.RequestHeader + ".x-probe-id";
-    private static PreparedDelivery? _delivery;
+    private static PreparedDelivery? s_delivery;
 
     [ClassInitialize]
     [Timeout(1_800_000, CooperativeCancellation = true)]
     public static async Task PublishArtifactsAsync(TestContext context) =>
-        _delivery = await new DeliveryArtifacts(context).PrepareAsync();
+        s_delivery = await new DeliveryArtifacts(context).PrepareAsync();
 
     [TestMethod]
     [ConnectedTrace]
@@ -27,10 +27,10 @@ public sealed class DeliveryTests(TestContext context)
     [Timeout(180_000, CooperativeCancellation = true)]
     public async Task PublishedPackages_ManagedOrNativeAotApplication_ReachTheNativeCollectorAndRealMcp(ExecutableFormat format)
     {
-        Assert.IsNotNull(_delivery);
-        context.AddResultFile(_delivery.ManifestPath);
-        var artifact = format == ExecutableFormat.NativeAot ? _delivery.NativeApplication : _delivery.ManagedApplication;
-        await using var application = await InstrumentedApplicationFixture.StartAsync(artifact, _delivery.NativeCollector,
+        Assert.IsNotNull(s_delivery);
+        context.AddResultFile(s_delivery.ManifestPath);
+        var artifact = Application(s_delivery, format);
+        await using var application = await InstrumentedApplicationFixture.StartAsync(artifact, s_delivery.NativeCollector,
             context, new Dictionary<string, string>
             {
                 ["OTEL_DOTNET_AUTO_TRACES_ASPNETCORE_INSTRUMENTATION_CAPTURE_REQUEST_HEADERS"] = ProbeSignals.RequestHeader
@@ -44,15 +44,16 @@ public sealed class DeliveryTests(TestContext context)
             Assert.AreEqual(format == ExecutableFormat.ManagedAssembly, body.RootElement.GetProperty("isDynamicCodeSupported").GetBoolean());
         }, context);
         var traceId = roundTrip.Evidence.TraceId;
-        var server = Assert.HasServerSpanUnderTheTestClient(roundTrip, "GET /capture");
+        var server = Assert.That.HasServerSpanUnderTheTestClient(roundTrip, "GET /capture");
         Assert.AreSequenceEqual([ProbeSignals.RequestId], server.GetStrings(CapturedKey)!);
         _ = await application.Telemetry.Collector.Client.WaitForSpansAsync(traceId, [server.SpanId], context.CancellationToken);
 
-        await using var mcp = await PublishedMcp.ConnectAsync(_delivery.McpEntryPoint, application.Telemetry.Collector.Address,
+        s_delivery.Mcp.Verify();
+        await using var mcp = await McpProcess.ConnectAsync("node", s_delivery.Mcp.EntryPoint, application.Telemetry.Collector.Address,
             line => context.WriteLine("MCP: " + line), context.CancellationToken);
         var tools = await mcp.ListToolsAsync(cancellationToken: context.CancellationToken);
         Assert.Contains(tool => tool.Name == TraceTool, tools);
-        var result = await mcp.CallToolAsync(PublishedMcp.ToolCall(TraceTool, new JsonObject { ["trace_id"] = traceId }),
+        var result = await mcp.CallToolAsync(McpProcess.ToolCall(TraceTool, new JsonObject { ["trace_id"] = traceId }),
             context.CancellationToken);
         Assert.IsFalse(result.IsError ?? false);
         Assert.IsNotNull(result.StructuredContent);
@@ -69,31 +70,47 @@ public sealed class DeliveryTests(TestContext context)
         Assert.IsFalse(string.IsNullOrEmpty(compactRowServiceNotInstrumentationScope));
         var attributes = observed.GetProperty("attributes").Deserialize<Qyl.Api.Contracts.Common.Attribute[]>();
         Assert.IsNotNull(attributes);
-        Assert.HasCapturedValues(attributes, CapturedKey, ProbeSignals.RequestId);
+        Assert.That.HasCapturedValues(attributes, CapturedKey, ProbeSignals.RequestId);
         Assert.IsFalse(output.GetProperty("has_more").GetBoolean());
-        context.WriteLine($"Executed {format} application {artifact.Sha256} with native Collector {_delivery.NativeCollector.Sha256}.");
+        context.WriteLine($"Executed {format} application {artifact.Sha256} with native Collector {s_delivery.NativeCollector.Sha256}.");
     }
 
     [TestMethod]
-    [DataRow(RequiredStringInput.String)]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task PackagedTypedView_RequiredString_AcceptsAndExposesTheToolName()
+    {
+        var run = await RunSemanticProbeAsync(RequiredStringInput.String);
+        using var report = run.Report;
+        Assert.AreEqual(0, run.ExitCode, run.Error);
+        Assert.IsFalse(report.RootElement.GetProperty("dynamicCodeSupported").GetBoolean());
+        Assert.IsTrue(report.RootElement.GetProperty("created").GetBoolean());
+        Assert.IsTrue(report.RootElement.GetProperty("hasView").GetBoolean());
+        Assert.AreEqual("lookup_stock", report.RootElement.GetProperty("toolName").GetString());
+    }
+
+    [TestMethod]
     [DataRow(RequiredStringInput.Integer)]
     [DataRow(RequiredStringInput.Boolean)]
     [DataRow(RequiredStringInput.Null)]
-    public async Task PackagedTypedView_RequiredStringInput_AcceptsAStringAndRejectsWrongWireTypes(RequiredStringInput input)
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task PackagedTypedView_WrongWireType_RejectsTheView(RequiredStringInput input)
     {
-        using var report = await RunSemanticProbeAsync(input);
-        var expected = input == RequiredStringInput.String;
+        var run = await RunSemanticProbeAsync(input);
+        using var report = run.Report;
+        Assert.AreEqual(0, run.ExitCode, run.Error);
         Assert.IsFalse(report.RootElement.GetProperty("dynamicCodeSupported").GetBoolean());
-        Assert.AreEqual(expected, report.RootElement.GetProperty("created").GetBoolean());
-        Assert.AreEqual(expected, report.RootElement.GetProperty("hasView").GetBoolean());
-        if (expected) Assert.AreEqual("lookup_stock", report.RootElement.GetProperty("toolName").GetString());
-        else Assert.IsFalse(report.RootElement.TryGetProperty("toolName", out _));
+        Assert.IsFalse(report.RootElement.GetProperty("created").GetBoolean());
+        Assert.IsFalse(report.RootElement.GetProperty("hasView").GetBoolean());
+        Assert.IsFalse(report.RootElement.TryGetProperty("toolName", out _));
     }
 
     [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
     public async Task PackagedSignalMetadata_GenAiMainAgent_KeepsPhaseSamplingAndRegistryOwnership()
     {
-        using var report = await RunSemanticProbeAsync(RequiredStringInput.String);
+        var run = await RunSemanticProbeAsync(RequiredStringInput.String);
+        using var report = run.Report;
+        Assert.AreEqual(0, run.ExitCode, run.Error);
         var value = report.RootElement;
         Assert.AreEqual("Start", value.GetProperty("methodPhase").GetString());
         Assert.IsTrue(value.GetProperty("methodSamplingRelevant").GetBoolean());
@@ -104,11 +121,18 @@ public sealed class DeliveryTests(TestContext context)
         Assert.AreEqual("https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev", value.GetProperty("registrySchema").GetString());
     }
 
-    private async Task<JsonDocument> RunSemanticProbeAsync(RequiredStringInput input)
+    private static PublishedExecutable Application(PreparedDelivery delivery, ExecutableFormat format) => format switch
     {
-        Assert.IsNotNull(_delivery);
-        context.AddResultFile(_delivery.ManifestPath);
-        var start = _delivery.SemanticProbe.StartInfo();
+        ExecutableFormat.ManagedAssembly => delivery.ManagedApplication,
+        ExecutableFormat.NativeAot => delivery.NativeApplication,
+        _ => throw new ArgumentOutOfRangeException(nameof(format))
+    };
+
+    private async Task<(int ExitCode, string Error, JsonDocument Report)> RunSemanticProbeAsync(RequiredStringInput input)
+    {
+        var delivery = s_delivery ?? throw new InvalidOperationException("Delivery artifacts have not been prepared.");
+        context.AddResultFile(delivery.ManifestPath);
+        var start = delivery.SemanticProbe.StartInfo();
         start.ArgumentList.Add(input switch
         {
             RequiredStringInput.String => "\"lookup_stock\"",
@@ -117,9 +141,12 @@ public sealed class DeliveryTests(TestContext context)
             RequiredStringInput.Null => "null",
             _ => throw new ArgumentOutOfRangeException(nameof(input))
         });
-        var (exitCode, output, error) = await ChildProcess.RunAsync(start, "the semantic contract consumer", context.CancellationToken);
-        Assert.AreEqual(0, exitCode, error);
-        return JsonDocument.Parse(output);
+        var (exitCode, output, error) = await ChildProcess.RunAsync(start, "the semantic contract consumer", context.CancellationToken,
+            new ChildProcessOptions { ExecutionTimeout = TimeSpan.FromSeconds(30) });
+        var diagnostics = Path.Combine(context.TestTempDirectory!, "semantic-consumer.log");
+        await File.WriteAllTextAsync(diagnostics, $"{delivery.SemanticProbe.Path}\nSHA-256: {delivery.SemanticProbe.Sha256}\n{output}\n{error}", CancellationToken.None);
+        context.AddResultFile(diagnostics);
+        return (exitCode, error, JsonDocument.Parse(output));
     }
 
     public enum RequiredStringInput { String, Integer, Boolean, Null }

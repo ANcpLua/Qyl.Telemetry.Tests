@@ -1,0 +1,1628 @@
+[
+  {
+    "id": "empty-input",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {},
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "status-open",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "status": "open"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "status-resolved",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "status": "resolved"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "status-ignored",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "status": "ignored"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "status-all",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "status": "all"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "quoted-status",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "status": "\"all\""
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "numeric-status",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "status": 0
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "unknown-status",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "status": "closed"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "null-status",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "status": null
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "unknown-member",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "invented": true
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "numeric-string",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "limit": "10"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "fractional-limit",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "limit": 1.1
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "limit-zero",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "limit": 0
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "limit-over-max",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "limit": 101
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-valid-0",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00Z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-1",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23t10:00:00z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-2",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00.123456789Z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-3",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00.123456789123456789Z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-4",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T12:00:00+02:00"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-5",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00+23:59"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-6",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "0000-02-29T00:00:00Z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-7",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2000-02-29T00:00:00Z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-8",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2024-02-29T00:00:00Z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-9",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "9999-12-31T23:59:59.999999999Z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-valid-10",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00-00:00"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "timestamp-invalid-0",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-02-29T10:00:00Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-1",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "1900-02-29T10:00:00Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-2",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-04-31T10:00:00Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-3",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-00-01T10:00:00Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-4",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-13-01T10:00:00Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-5",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T24:00:00Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-6",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:60Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-7",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00+24:00"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-8",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00+02:60"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-9",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23 10:00:00Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-10",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-11",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-12",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00+0200"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "timestamp-invalid-13",
+    "schema": "Mcp.Tools.TriageInput",
+    "value": {
+      "start_time": "2026-10-23T10:00:00Z\n"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-valid-0",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "0"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "int64-valid-1",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "1"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "int64-valid-2",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "-1"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "int64-valid-3",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "9223372036854775807"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "int64-valid-4",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "-9223372036854775808"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "int64-invalid-0",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "01"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-1",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "-0"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-2",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "+1"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-3",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": " 1"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-4",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "1 "
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-5",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "9223372036854775808"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-6",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "-9223372036854775809"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-7",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "1.0"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-8",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": "1e3"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-9",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": 1
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "int64-invalid-10",
+    "schema": "Common.AttributeIntValue",
+    "value": {
+      "type": "int",
+      "value": null
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uint64-valid-0",
+    "schema": "Common.UnixNanos",
+    "value": "0",
+    "valid": true,
+    "roundTrip": false
+  },
+  {
+    "id": "uint64-valid-1",
+    "schema": "Common.UnixNanos",
+    "value": "18446744073709551615",
+    "valid": true,
+    "roundTrip": false
+  },
+  {
+    "id": "uint64-invalid-0",
+    "schema": "Common.UnixNanos",
+    "value": "-1",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uint64-invalid-1",
+    "schema": "Common.UnixNanos",
+    "value": "01",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uint64-invalid-2",
+    "schema": "Common.UnixNanos",
+    "value": "18446744073709551616",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uint64-invalid-3",
+    "schema": "Common.UnixNanos",
+    "value": 1,
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "enum-name",
+    "schema": "OTel.Metrics.MetricAggregation",
+    "value": "avg",
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "enum-invalid-0",
+    "schema": "OTel.Metrics.MetricAggregation",
+    "value": 0,
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "enum-invalid-1",
+    "schema": "OTel.Metrics.MetricAggregation",
+    "value": 77,
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "enum-invalid-2",
+    "schema": "OTel.Metrics.MetricAggregation",
+    "value": "AVG",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "enum-invalid-3",
+    "schema": "OTel.Metrics.MetricAggregation",
+    "value": "\"avg\"",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "enum-invalid-4",
+    "schema": "OTel.Metrics.MetricAggregation",
+    "value": null,
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "attribute-double-0",
+    "schema": "Common.AttributeDoubleValue",
+    "value": {
+      "type": "double",
+      "value": "NaN"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "attribute-double-1",
+    "schema": "Common.AttributeDoubleValue",
+    "value": {
+      "type": "double",
+      "value": "Infinity"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "attribute-double-2",
+    "schema": "Common.AttributeDoubleValue",
+    "value": {
+      "type": "double",
+      "value": "-Infinity"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "attribute-double-3",
+    "schema": "Common.AttributeDoubleValue",
+    "value": {
+      "type": "double",
+      "value": 1.5
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "saved-metric",
+    "schema": "Mcp.Tools.SaveQueryInput",
+    "value": {
+      "name": "fixture",
+      "filter": {
+        "signal": "metrics",
+        "metric_name": "queue.depth",
+        "group_by": [
+          "service.name"
+        ],
+        "matchers": [
+          {
+            "key": "region",
+            "op": "eq",
+            "value": "west"
+          }
+        ]
+      }
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "saved-invalid-0",
+    "schema": "Mcp.Tools.SaveQueryInput",
+    "value": {
+      "name": "fixture",
+      "filter": {
+        "signal": "metrics",
+        "metric_name": "queue.depth",
+        "group_by": [
+          ""
+        ],
+        "matchers": [
+          {
+            "key": "region",
+            "op": "eq",
+            "value": "west"
+          }
+        ]
+      }
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "saved-invalid-1",
+    "schema": "Mcp.Tools.SaveQueryInput",
+    "value": {
+      "name": "fixture",
+      "filter": {
+        "signal": "metrics",
+        "metric_name": "queue.depth",
+        "group_by": [
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x"
+        ],
+        "matchers": [
+          {
+            "key": "region",
+            "op": "eq",
+            "value": "west"
+          }
+        ]
+      }
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "saved-invalid-2",
+    "schema": "Mcp.Tools.SaveQueryInput",
+    "value": {
+      "name": "fixture",
+      "filter": {
+        "signal": "metrics",
+        "metric_name": "queue.depth",
+        "group_by": [
+          "service.name"
+        ],
+        "matchers": [
+          {
+            "key": "region",
+            "op": "eq",
+            "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ]
+      }
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "saved-invalid-3",
+    "schema": "Mcp.Tools.SaveQueryInput",
+    "value": {
+      "name": "fixture",
+      "filter": {
+        "signal": "metrics",
+        "metric_name": "queue.depth",
+        "group_by": [
+          "service.name"
+        ],
+        "matchers": [
+          {
+            "key": "region",
+            "op": "eq",
+            "value": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00"
+          }
+        ]
+      }
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "saved-invalid-4",
+    "schema": "Mcp.Tools.SaveQueryInput",
+    "value": {
+      "name": "fixture",
+      "filter": {
+        "signal": "metric",
+        "metric_name": "queue.depth",
+        "group_by": [
+          "service.name"
+        ],
+        "matchers": [
+          {
+            "key": "region",
+            "op": "eq",
+            "value": "west"
+          }
+        ]
+      }
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "saved-unicode-limit",
+    "schema": "Mcp.Tools.SaveQueryInput",
+    "value": {
+      "name": "fixture",
+      "filter": {
+        "signal": "metrics",
+        "metric_name": "queue.depth",
+        "group_by": [
+          "service.name"
+        ],
+        "matchers": [
+          {
+            "key": "region",
+            "op": "eq",
+            "value": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00"
+          }
+        ]
+      }
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "triage-output",
+    "schema": "Mcp.Tools.TriageOutput",
+    "value": {
+      "window": {
+        "start_time": "2026-10-23T10:00:00Z",
+        "end_time": "2026-10-23T10:00:00.123456789Z"
+      },
+      "coverage": {
+        "examined": 0,
+        "matched": null,
+        "returned": 0,
+        "truncated": false,
+        "scan_complete": true,
+        "as_of": "2026-10-23T10:00:00.123456789Z"
+      },
+      "has_more": false,
+      "failures": [],
+      "regressions": [],
+      "releases": [],
+      "silent_services": []
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "negative-count",
+    "schema": "Mcp.Tools.TriageOutput",
+    "value": {
+      "window": {
+        "start_time": "2026-10-23T10:00:00Z",
+        "end_time": "2026-10-23T10:00:00.123456789Z"
+      },
+      "coverage": {
+        "examined": -1,
+        "matched": null,
+        "returned": 0,
+        "truncated": false,
+        "scan_complete": true,
+        "as_of": "2026-10-23T10:00:00.123456789Z"
+      },
+      "has_more": false,
+      "failures": [],
+      "regressions": [],
+      "releases": [],
+      "silent_services": []
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "null-required-array",
+    "schema": "Mcp.Tools.TriageOutput",
+    "value": {
+      "window": {
+        "start_time": "2026-10-23T10:00:00Z",
+        "end_time": "2026-10-23T10:00:00.123456789Z"
+      },
+      "coverage": {
+        "examined": 0,
+        "matched": null,
+        "returned": 0,
+        "truncated": false,
+        "scan_complete": true,
+        "as_of": "2026-10-23T10:00:00.123456789Z"
+      },
+      "has_more": false,
+      "failures": null,
+      "regressions": [],
+      "releases": [],
+      "silent_services": []
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "unknown-output",
+    "schema": "Mcp.Tools.TriageOutput",
+    "value": {
+      "window": {
+        "start_time": "2026-10-23T10:00:00Z",
+        "end_time": "2026-10-23T10:00:00.123456789Z"
+      },
+      "coverage": {
+        "examined": 0,
+        "matched": null,
+        "returned": 0,
+        "truncated": false,
+        "scan_complete": true,
+        "as_of": "2026-10-23T10:00:00.123456789Z"
+      },
+      "has_more": false,
+      "failures": [],
+      "regressions": [],
+      "releases": [],
+      "silent_services": [],
+      "invented": true
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "missing-array",
+    "schema": "Mcp.Tools.TriageOutput",
+    "value": {
+      "window": {
+        "start_time": "2026-10-23T10:00:00Z",
+        "end_time": "2026-10-23T10:00:00.123456789Z"
+      },
+      "coverage": {
+        "examined": 0,
+        "matched": null,
+        "returned": 0,
+        "truncated": false,
+        "scan_complete": true,
+        "as_of": "2026-10-23T10:00:00.123456789Z"
+      },
+      "has_more": false,
+      "regressions": [],
+      "releases": [],
+      "silent_services": []
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "null-required-object",
+    "schema": "Mcp.Tools.TriageOutput",
+    "value": {
+      "window": {
+        "start_time": "2026-10-23T10:00:00Z",
+        "end_time": "2026-10-23T10:00:00.123456789Z"
+      },
+      "coverage": null,
+      "has_more": false,
+      "failures": [],
+      "regressions": [],
+      "releases": [],
+      "silent_services": []
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uri-valid-0",
+    "schema": "Common.UrlString",
+    "value": "https://example.com/path?q=a%20b",
+    "valid": true,
+    "roundTrip": false
+  },
+  {
+    "id": "uri-valid-1",
+    "schema": "Common.UrlString",
+    "value": "urn:example:fixture",
+    "valid": true,
+    "roundTrip": false
+  },
+  {
+    "id": "uri-valid-2",
+    "schema": "Common.UrlString",
+    "value": "HTTP://EXAMPLE.COM/path",
+    "valid": true,
+    "roundTrip": false
+  },
+  {
+    "id": "uri-valid-3",
+    "schema": "Common.UrlString",
+    "value": "https://[2001:db8::1]:443/a",
+    "valid": true,
+    "roundTrip": false
+  },
+  {
+    "id": "uri-invalid-0",
+    "schema": "Common.UrlString",
+    "value": "not a uri",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uri-invalid-1",
+    "schema": "Common.UrlString",
+    "value": "https://example.com/a b",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uri-invalid-2",
+    "schema": "Common.UrlString",
+    "value": "https://[broken",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uri-invalid-3",
+    "schema": "Common.UrlString",
+    "value": "https://example.com/%ZZ",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "maximum-exact-count",
+    "schema": "Mcp.Tools.TriageOutput",
+    "value": {
+      "window": {
+        "start_time": "2026-10-23T10:00:00Z",
+        "end_time": "2026-10-23T10:00:00.123456789Z"
+      },
+      "coverage": {
+        "examined": 9007199254740991,
+        "matched": null,
+        "returned": 0,
+        "truncated": false,
+        "scan_complete": true,
+        "as_of": "2026-10-23T10:00:00.123456789Z"
+      },
+      "has_more": false,
+      "failures": [],
+      "regressions": [],
+      "releases": [],
+      "silent_services": []
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "inexact-count",
+    "schema": "Mcp.Tools.TriageOutput",
+    "value": {
+      "window": {
+        "start_time": "2026-10-23T10:00:00Z",
+        "end_time": "2026-10-23T10:00:00.123456789Z"
+      },
+      "coverage": {
+        "examined": 9007199254740992,
+        "matched": null,
+        "returned": 0,
+        "truncated": false,
+        "scan_complete": true,
+        "as_of": "2026-10-23T10:00:00.123456789Z"
+      },
+      "has_more": false,
+      "failures": [],
+      "regressions": [],
+      "releases": [],
+      "silent_services": []
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "overflow-count",
+    "schema": "Mcp.Tools.TriageOutput",
+    "value": {
+      "window": {
+        "start_time": "2026-10-23T10:00:00Z",
+        "end_time": "2026-10-23T10:00:00.123456789Z"
+      },
+      "coverage": {
+        "examined": 100000000000000000000,
+        "matched": null,
+        "returned": 0,
+        "truncated": false,
+        "scan_complete": true,
+        "as_of": "2026-10-23T10:00:00.123456789Z"
+      },
+      "has_more": false,
+      "failures": [],
+      "regressions": [],
+      "releases": [],
+      "silent_services": []
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "bytes-valid-0",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": ""
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "bytes-valid-1",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": "AQ=="
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "bytes-valid-2",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": "AQI="
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "bytes-valid-3",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": "AQID"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "bytes-invalid-0",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": "!"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "bytes-invalid-1",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": "AB=="
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "bytes-invalid-2",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": "AAB="
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "bytes-invalid-3",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": "AQ"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "bytes-invalid-4",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": "AQ==\n"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "bytes-invalid-5",
+    "schema": "Common.AttributeBytesValue",
+    "value": {
+      "type": "bytes",
+      "base64": " AQ=="
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "recursive-attribute",
+    "schema": "Common.Attribute",
+    "value": {
+      "key": "fixture",
+      "value": {
+        "type": "kvlist",
+        "values": {
+          "zero": {
+            "type": "int",
+            "value": "0"
+          },
+          "deep": [
+            null,
+            true,
+            "text",
+            {
+              "type": "bytes",
+              "base64": "AQID"
+            },
+            {
+              "type": "double",
+              "value": "NaN"
+            }
+          ]
+        }
+      }
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "recursive-invalid-integer",
+    "schema": "Common.Attribute",
+    "value": {
+      "key": "fixture",
+      "value": {
+        "type": "kvlist",
+        "values": {
+          "bad": {
+            "type": "int",
+            "value": "01"
+          }
+        }
+      }
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "optional-null-present",
+    "schema": "OTel.Metrics.MetricSeriesResult",
+    "value": {
+      "attributes": [],
+      "buckets": [],
+      "value": null
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-null-absent",
+    "schema": "OTel.Metrics.MetricSeriesResult",
+    "value": {
+      "attributes": [],
+      "buckets": []
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "unknown-nested-matcher",
+    "schema": "Mcp.Tools.ListTracesInput",
+    "value": {
+      "matchers": [
+        {
+          "key": "service.name",
+          "op": "exists",
+          "extra": 1
+        }
+      ]
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "optional-error-absent",
+    "schema": "Mcp.Tools.ToolError",
+    "value": {
+      "code": "collector_contract_mismatch",
+      "message": "Contract revision differs.",
+      "retryable": true
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-tracedivergence-a-absent",
+    "schema": "Mcp.Tools.TraceDivergence",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-spandifference-a-absent",
+    "schema": "Mcp.Tools.SpanDifference",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-tracedivergence-b-absent",
+    "schema": "Mcp.Tools.TraceDivergence",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-spandifference-b-absent",
+    "schema": "Mcp.Tools.SpanDifference",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-error-null",
+    "schema": "Mcp.Tools.ToolError",
+    "value": {
+      "code": "collector_contract_mismatch",
+      "message": "Contract revision differs.",
+      "retryable": true,
+      "collector_contract_revision": null
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-tracedivergence-a-null",
+    "schema": "Mcp.Tools.TraceDivergence",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route",
+      "a": null
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-spandifference-a-null",
+    "schema": "Mcp.Tools.SpanDifference",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route",
+      "a": null
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-tracedivergence-b-null",
+    "schema": "Mcp.Tools.TraceDivergence",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route",
+      "b": null
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-spandifference-b-null",
+    "schema": "Mcp.Tools.SpanDifference",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route",
+      "b": null
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-error-value",
+    "schema": "Mcp.Tools.ToolError",
+    "value": {
+      "code": "collector_contract_mismatch",
+      "message": "Contract revision differs.",
+      "retryable": true,
+      "collector_contract_revision": "sha256:0123456789abcdef"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-tracedivergence-a-value",
+    "schema": "Mcp.Tools.TraceDivergence",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route",
+      "a": "/orders"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-spandifference-a-value",
+    "schema": "Mcp.Tools.SpanDifference",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route",
+      "a": "/orders"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-tracedivergence-b-value",
+    "schema": "Mcp.Tools.TraceDivergence",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route",
+      "b": "/orders"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "optional-spandifference-b-value",
+    "schema": "Mcp.Tools.SpanDifference",
+    "value": {
+      "kind": "attribute",
+      "key": "http.route",
+      "b": "/orders"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "page-trace",
+    "schema": "CursorPageTrace",
+    "value": {
+      "items": [],
+      "has_more": false
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "page-span",
+    "schema": "CursorPageSpan",
+    "value": {
+      "items": [],
+      "has_more": false
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "page-logrecord",
+    "schema": "CursorPageLogRecord",
+    "value": {
+      "items": [],
+      "has_more": false
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "page-metricdescriptor",
+    "schema": "CursorPageMetricDescriptor",
+    "value": {
+      "items": [],
+      "has_more": false
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "page-metricseries",
+    "schema": "CursorPageMetricSeries",
+    "value": {
+      "items": [],
+      "has_more": false
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "page-metricpoint",
+    "schema": "CursorPageMetricPoint",
+    "value": {
+      "items": [],
+      "has_more": false
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "page-sessionentity",
+    "schema": "CursorPageSessionEntity",
+    "value": {
+      "items": [],
+      "has_more": false
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "page-annotation",
+    "schema": "CursorPageAnnotation",
+    "value": {
+      "items": [],
+      "has_more": false
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "page-savedquery",
+    "schema": "CursorPageSavedQuery",
+    "value": {
+      "items": [],
+      "has_more": false
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "metric-timestamp-0",
+    "schema": "OTel.Metrics.MetricQueryResult",
+    "value": {
+      "numeric_representation": "float64",
+      "approximate": false,
+      "name": "latency",
+      "kind": "gauge",
+      "aggregation": "last",
+      "step_ms": 1000,
+      "series": [],
+      "truncated": false,
+      "start_time": "2026-10-23T12:34:56.123456789+02:30",
+      "end_time": "2026-10-23T12:34:56.123456789+02:30"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "metric-timestamp-1",
+    "schema": "OTel.Metrics.MetricQueryResult",
+    "value": {
+      "numeric_representation": "float64",
+      "approximate": false,
+      "name": "latency",
+      "kind": "gauge",
+      "aggregation": "last",
+      "step_ms": 1000,
+      "series": [],
+      "truncated": false,
+      "start_time": "2026-10-23t12:34:56.123456789012z",
+      "end_time": "2026-10-23t12:34:56.123456789012z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "metric-timestamp-2",
+    "schema": "OTel.Metrics.MetricQueryResult",
+    "value": {
+      "numeric_representation": "float64",
+      "approximate": false,
+      "name": "latency",
+      "kind": "gauge",
+      "aggregation": "last",
+      "step_ms": 1000,
+      "series": [],
+      "truncated": false,
+      "start_time": "0000-02-29T00:00:00Z",
+      "end_time": "0000-02-29T00:00:00Z"
+    },
+    "valid": true,
+    "roundTrip": true
+  },
+  {
+    "id": "metric-timestamp-invalid",
+    "schema": "OTel.Metrics.MetricQueryResult",
+    "value": {
+      "numeric_representation": "float64",
+      "approximate": false,
+      "name": "latency",
+      "kind": "gauge",
+      "aggregation": "last",
+      "step_ms": 1000,
+      "series": [],
+      "truncated": false,
+      "start_time": "2026-02-30T12:00:00Z",
+      "end_time": "2026-10-23T12:00:01Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "metric-timestamp-missing-offset",
+    "schema": "OTel.Metrics.MetricQueryResult",
+    "value": {
+      "numeric_representation": "float64",
+      "approximate": false,
+      "name": "latency",
+      "kind": "gauge",
+      "aggregation": "last",
+      "step_ms": 1000,
+      "series": [],
+      "truncated": false,
+      "start_time": "2026-10-23T12:00:00",
+      "end_time": "2026-10-23T12:00:01Z"
+    },
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uppercase-trace-id",
+    "schema": "Common.TraceId",
+    "value": "ABCDEF0123456789ABCDEF0123456789",
+    "valid": false,
+    "roundTrip": false
+  },
+  {
+    "id": "uppercase-span-id",
+    "schema": "Common.SpanId",
+    "value": "ABCDEF0123456789",
+    "valid": false,
+    "roundTrip": false
+  }
+]

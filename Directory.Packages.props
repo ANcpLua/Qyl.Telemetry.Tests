@@ -1,5 +1,7 @@
 <Project>
-  <PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="JetBrains.Annotations" Version="$(JetBrainsAnnotationsVersion)" />
     <PackageVersion Include="Fallout.Common" Version="$(FalloutVersion)" />
@@ -9,17 +11,15 @@
     <PackageVersion Include="Qyl.Telemetry.SemanticConventions" Version="$(QylSemanticConventionsVersion)" />
     <PackageVersion Include="Qyl.Telemetry.SemanticConventions.Incubating" Version="$(QylSemanticConventionsVersion)" />
     <PackageVersion Include="Qyl.Telemetry.Hosting" Version="$(QylTelemetryVersion)" />
-    <PackageVersion Include="Qyl.Orchestration" Version="$(QylPlatformVersion)" />
-    <PackageVersion Include="Qyl.Api.Contracts" Version="$(QylApiContractsVersion)" />
     <PackageVersion Include="Google.Api.CommonProtos" Version="$(GoogleApiCommonProtosVersion)" />
     <PackageVersion Include="Google.Protobuf" Version="$(GoogleProtobufVersion)" />
-    <PackageVersion Include="Grpc.AspNetCore.Server" Version="$(GrpcVersion)" />
-    <PackageVersion Include="Grpc.Tools" Version="$(GrpcVersion)" />
-    <PackageVersion Include="Grpc.Net.Client" Version="$(GrpcVersion)" />
+    <PackageVersion Include="Grpc.AspNetCore.Server" Version="$(GrpcAspNetCoreVersion)" />
+    <PackageVersion Include="Grpc.Tools" Version="$(GrpcToolsVersion)" />
+    <PackageVersion Include="Grpc.Net.Client" Version="$(GrpcAspNetCoreVersion)" />
     <PackageVersion Include="OpenTelemetry" Version="$(OpenTelemetryVersion)" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="$(OpenTelemetryVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="$(DotNetRuntimeVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="$(DotNetExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="ModelContextProtocol" Version="$(ModelContextProtocolVersion)" />
   </ItemGroup>
 </Project>

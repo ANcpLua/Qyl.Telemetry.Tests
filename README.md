@@ -1,27 +1,13 @@
-# Qyl telemetry tests
+`Qyl.Telemetry.Tests` provides shared test support. `Qyl.Telemetry.UnitTests`, `Qyl.Telemetry.IntegrationTests`, and `Qyl.Telemetry.EndToEndTests` cover the three test scopes described in [src/AGENTS.md](src/AGENTS.md). New tests use MSTest 4.5.1. Package versions belong in `Directory.Packages.props`, not individual project files.
 
-Test support and suites for Qyl telemetry.
+The repository build and test entry point is `Qyl.Telemetry.Tests.slnx`, containing exactly those four primary projects. Run tests through `pwsh ./eng/test.ps1`; the default unit selection uses the component-specific `Fast` category. Full build, coverage and inspection run through `./build.sh`.
 
-| Project | Contents |
-| --- | --- |
-| `Qyl.Telemetry.Tests` | Support library: OTLP receiver, typed evidence, assertions, telemetry policies, Collector and application fixtures. |
-| `Qyl.Telemetry.Tests.Capture` | NativeAOT Activity snapshots, CLR-array assertions and JSON reports, without MSTest or Collector dependencies. |
-| `Qyl.Telemetry.UnitTests` | Deterministic decoding, registry validation, evidence, assertion and policy tests. |
-| `Qyl.Telemetry.IntegrationTests` | Real OTLP transports, `AddQyl()` registration, receiver, Collector lifecycle and storage. |
-| `Qyl.Telemetry.EndToEndTests` | Instrumented application to Collector, REST and MCP; published-package and NativeAOT delivery. |
-| `evals/qyl-investigate` | Replays of the connector reviewer prompts through Claude Code against mcp.qyl.at, scored for tools chosen, findings named, tokens and cost; `eng/evals/replay.py` and `compare.py`. |
+Unit enables MSTest 4.5.1 source generation in its default `ReflectionFree` mode. Integration, EndToEnd and the invocation probe retain the managed Microsoft.Testing.Platform runner because the pinned generator omits classes declared with the custom `[TracePerTest]` attribute. The generated Unit metadata and direct method invokers are separate from NativeAOT publication. Publish and execute the native Unit runner through `pwsh ./eng/test.ps1 -Suite Unit -NativeAot`; `-RuntimeIdentifier` defaults to the current machine. The script scopes `PublishAot` to Unit through `QylNativeTestRunner`, preserving the referenced libraries' target frameworks.
 
-## Run
+Publishing telemetry outside an active `[TracePerTest]` invocation requires an untrimmed managed runner so the plain-class policy guard can inspect the running test's attributes. A runner without dynamic code rejects that publication before reflection, and a managed guard rejects an unresolved active test class. The process-owner host is a build dependency and its payload travels under `process-host/` in test build and publish outputs.
 
-Requires .NET SDK 10.0.402 and Node.js 24.
+Shared product and runtime pins are imported from the parent qyl `Version.props`; this repository keeps only its test-specific pins. Contracts, CLI and orchestration use project references. SemanticConventions also uses the local source checkout when present, with the shared package pin as the fallback. `Qyl.Telemetry.Hosting` remains a package dependency because its source is not in this checkout.
 
-```sh
-./build.sh                    # Check: build, three suites with coverage, InspectCode
-./build.sh --target Test      # or Coverage, InspectCode
-dotnet test --project Qyl.Telemetry.UnitTests/Qyl.Telemetry.UnitTests.csproj -c Release
-```
+Rider's ReSharper Build can remain enabled. Real IDE builds explicitly build local project references before resolving their assemblies, preserving the selected Debug or Release configuration and building their transitive dependencies. Design-time builds do not run this step. The solution still contains only the four primary projects.
 
-Results: `artifacts/results` (TRX), `artifacts/coverage` (merged, informational),
-`artifacts/inspection.sarif` (any finding fails), `artifacts/delivery` (delivery
-artifacts and logs). Versions: `Version.props`, `global.json`.
-The first delivery run needs network access and a native compiler.
+Projects with `UsesQylCollector=true` build the parent Collector and stage its output under `qyl/collector` beside the tests. They do not download a published Collector package, so local contract and Collector changes are exercised together on the next build.

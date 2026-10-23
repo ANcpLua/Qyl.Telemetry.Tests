@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Qyl.Api.Contracts;
 using Qyl.Api.Contracts.Common.Pagination;
 using StoredLogRecord = Qyl.Api.Contracts.OTel.Logs.LogRecord;
 using Qyl.Api.Contracts.OTel.Metrics;
@@ -18,8 +18,8 @@ namespace Qyl.Telemetry.Tests.Collector;
 [JetBrains.Annotations.PublicAPI]
 public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider)
 {
-    internal static readonly TimeSpan WaitDeadline = TimeSpan.FromSeconds(20);
-    internal static readonly TimeSpan PollingInterval = TimeSpan.FromMilliseconds(100);
+    internal static TimeSpan WaitDeadline { get; } = TimeSpan.FromSeconds(20);
+    internal static TimeSpan PollingInterval { get; } = TimeSpan.FromMilliseconds(100);
 
     /// <summary>Reads through <paramref name="client" /> on the system clock.</summary>
     /// <param name="client">A client whose base address is the qyl collector.</param>
@@ -29,10 +29,10 @@ public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider
 
     public TimeProvider TimeProvider { get; } = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
 
-    public Task<JsonElement> ReadTraceAsync(string traceId, CancellationToken cancellationToken = default)
+    public async Task<JsonElement> ReadTraceAsync(string traceId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(traceId);
-        return ReadAsync<JsonElement>(TraceRoute(traceId), cancellationToken);
+        return ContractJson.Serialize(await ReadAsync<StoredTrace>(TraceRoute(traceId), cancellationToken).ConfigureAwait(false));
     }
 
     private static string TraceRoute(string traceId) => $"api/v1/traces/{Uri.EscapeDataString(traceId)}";
@@ -169,12 +169,8 @@ public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider
     public async Task<IReadOnlyList<SpanEvent>> SpanEventsAsync(string traceId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(traceId);
-        var trace = await ReadAsync<JsonElement>(TraceRoute(traceId), cancellationToken).ConfigureAwait(false);
-        return [.. trace.GetProperty("spans").EnumerateArray()
-            .Where(span => span.TryGetProperty("events", out var events) && events.ValueKind == JsonValueKind.Array)
-            .SelectMany(span => span.GetProperty("events").EnumerateArray())
-            .Select(spanEvent => spanEvent.Deserialize<SpanEvent>()
-                ?? throw new InvalidDataException("qyl returned an empty span event."))];
+        var trace = await ReadAsync<StoredTrace>(TraceRoute(traceId), cancellationToken).ConfigureAwait(false);
+        return [.. trace.Spans.SelectMany(span => span.Events ?? [])];
     }
 
     /// <summary>Queries metric buckets for an explicit time window; metrics are not individual trace events.</summary>
@@ -195,18 +191,26 @@ public sealed class CollectorClient(HttpClient client, TimeProvider timeProvider
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(operation);
         ArgumentNullException.ThrowIfNull(input);
-        using var response = await client.PostAsJsonAsync($"api/v1/analysis/{Uri.EscapeDataString(operation)}", input, cancellationToken)
+        using var content = new StringContent(input.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync($"api/v1/analysis/{Uri.EscapeDataString(operation)}", content, cancellationToken)
             .ConfigureAwait(false);
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"{operation} returned {(int)response.StatusCode}: {body}", null, response.StatusCode);
-        return JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web)
-            ?? throw new InvalidDataException($"{operation} returned an empty JSON response.");
+        using var document = JsonDocument.Parse(body);
+        ContractJson.Require(ContractTypes.Analysis(operation).Output, document.RootElement);
+        return typeof(T) == typeof(JsonElement) ? (T)(object)document.RootElement.Clone()
+            : ContractJson.Deserialize<T>(document.RootElement) ?? throw new InvalidDataException($"{operation} returned an empty JSON response.");
     }
 
-    private async Task<T> ReadAsync<T>(string route, CancellationToken cancellationToken) =>
-        await client.GetFromJsonAsync<T>(route, cancellationToken).ConfigureAwait(false)
-        ?? throw new InvalidDataException("qyl returned an empty JSON response.");
+    private async Task<T> ReadAsync<T>(string route, CancellationToken cancellationToken)
+    {
+        using var response = await client.GetAsync(route, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (body.Trim() == "null") throw new InvalidDataException("qyl returned an empty JSON response.");
+        return ContractJson.Deserialize<T>(body) ?? throw new InvalidDataException("qyl returned an empty JSON response.");
+    }
 
     private static string Timestamp(DateTimeOffset value) =>
         Uri.EscapeDataString(value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));

@@ -5,7 +5,7 @@ description: Use or extend the Qyl.Telemetry.Tests support library (OTLP receive
 
 # Telemetry support library
 
-Read the root skill `/Users/alexandernachtmann/RiderProjects/Qyl.Telemetry.Tests/SKILL.md` (section "Test-code rules") first; it binds every test and every support change. APIs and their sources: [api.md](references/api.md). Policies: [telemetry-policies.md](references/telemetry-policies.md).
+Read the [root skill](../../../SKILL.md) (sections "MSTest 4.5.1 and MTP: verified usage" and "Test-code rules") first; it binds every test and every support change. APIs and their sources: [api.md](references/api.md). Policies: [telemetry-policies.md](references/telemetry-policies.md).
 
 ## What lives where
 
@@ -22,4 +22,4 @@ Read the root skill `/Users/alexandernachtmann/RiderProjects/Qyl.Telemetry.Tests
 
 ## Gate
 
-`dotnet build <project> -c Release` for every touched project, `dotnet test --project Qyl.Telemetry.UnitTests/Qyl.Telemetry.UnitTests.csproj -c Release`, `./build.sh --target InspectCode` to zero findings, then push; CI runs `./build.sh` (Fallout `Check`). Report executed, passed, failed and skipped counts, never "green" alone.
+`dotnet build <project> -c Release` for every touched project, `pwsh ./eng/test.ps1 -Suite Unit -NoRestore`, `./build.sh --target InspectCode` to zero findings, then push; CI runs `./build.sh` (Fallout `Check`). Report executed, passed, failed and skipped counts, never "green" alone.

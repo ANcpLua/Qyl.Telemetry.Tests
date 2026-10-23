@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
 using Qyl.Telemetry.SemanticConventions;
 
@@ -50,9 +52,25 @@ public abstract class TelemetryPolicyAttribute : Attribute
         string? name;
         try { name = context?.FullyQualifiedTestClassName; }
         catch (InvalidOperationException) { return; }
-        var type = name is null ? null : AppDomain.CurrentDomain.GetAssemblies()
+        if (name is not null) RejectUnverifiedPolicies(name);
+    }
+
+    internal static void RejectUnverifiedPolicies(string testClassName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(testClassName);
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+            throw new InvalidOperationException("Telemetry published outside a [TracePerTest] invocation cannot verify policies in a NativeAOT test runner. Use [TracePerTest] for telemetry publication.");
+        RejectManagedUnverifiedPolicies(testClassName);
+    }
+
+    [RequiresUnreferencedCode("The plain-test policy guard resolves the running test class by name and inspects its policy attributes. It requires an untrimmed managed test process.")]
+    private static void RejectManagedUnverifiedPolicies(string name)
+    {
+        var type = AppDomain.CurrentDomain.GetAssemblies()
             .Select(assembly => assembly.GetType(name, throwOnError: false)).OfType<Type>().FirstOrDefault();
-        if (type is null || type.IsDefined(typeof(TracePerTestAttribute), inherit: false)) return;
+        if (type is null)
+            throw new InvalidOperationException($"Cannot verify telemetry policies because the active test class '{name}' could not be resolved. Use [TracePerTest] for telemetry publication.");
+        if (type.IsDefined(typeof(TracePerTestAttribute), inherit: false)) return;
         var policies = type.GetCustomAttributes<TelemetryPolicyAttribute>(inherit: true)
             .Concat(type.GetMethods().SelectMany(test => test.GetCustomAttributes<TelemetryPolicyAttribute>(inherit: true)))
             .Select(policy => policy.Name).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();

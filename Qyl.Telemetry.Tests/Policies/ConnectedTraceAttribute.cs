@@ -21,6 +21,8 @@ public sealed class ConnectedTraceAttribute : TelemetryPolicyAttribute
             }
 
             var known = spans.Select(span => span.SpanId).Append(trace.RootSpanId).ToHashSet(StringComparer.Ordinal);
+            var parents = spans.ToDictionary(span => span.SpanId, span => span.ParentSpanId, StringComparer.Ordinal);
+            var cyclic = new Dictionary<string, bool>(StringComparer.Ordinal);
             foreach (var span in spans)
             {
                 if (TelemetryId.IsAbsent(span.ParentSpanId))
@@ -33,7 +35,24 @@ public sealed class ConnectedTraceAttribute : TelemetryPolicyAttribute
                     yield return $"{Describe(span)} names parent {span.ParentSpanId}, which is neither a captured span "
                         + "nor the test root.";
                 }
+                else if (HasCyclicParentage(span.SpanId, parents, cyclic))
+                    yield return $"{Describe(span)} has cyclic parentage in trace {trace.Evidence.TraceId}.";
             }
         }
+    }
+
+    private static bool HasCyclicParentage(string id, Dictionary<string, string?> parents,
+        Dictionary<string, bool> known)
+    {
+        var path = new HashSet<string>(StringComparer.Ordinal);
+        var cycle = false;
+        while (!TelemetryId.IsAbsent(id) && parents.TryGetValue(id, out var parent))
+        {
+            if (known.TryGetValue(id, out cycle)) break;
+            if (!path.Add(id)) { cycle = true; break; }
+            id = parent ?? "";
+        }
+        foreach (var visited in path) known[visited] = cycle;
+        return cycle;
     }
 }

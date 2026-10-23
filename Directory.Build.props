@@ -8,6 +8,7 @@
     <MSTestAnalysisMode>Recommended</MSTestAnalysisMode>
     <TestingExtensionsProfile>AllMicrosoft</TestingExtensionsProfile>
     <IsPackable>false</IsPackable>
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
   </PropertyGroup>
   <ItemGroup><PackageReference Include="JetBrains.Annotations" PrivateAssets="all" /></ItemGroup>
 </Project>

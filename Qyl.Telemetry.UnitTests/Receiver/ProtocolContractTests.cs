@@ -6,7 +6,8 @@ using OpenTelemetry.Proto.Collector.Trace.V1;
 namespace Qyl.Telemetry.UnitTests.Receiver;
 
 [TestClass]
-public sealed class ProtocolContractTests
+[TestCategory("Fast")]
+public class ProtocolContractTests
 {
     private const string Trace = "trace";
     private const string Logs = "logs";
@@ -19,7 +20,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace)]
     [DataRow(Logs)]
     [DataRow(Metrics)]
-    public void GeneratedProtocol_ExportService_HasTheOfficialFullName(string signal)
+    public void Should_HaveTheOfficialFullName_When_GeneratedProtocol_ExportService(string signal)
     {
         var service = Assert.ContainsSingle(Descriptor(signal).Services);
         Assert.AreEqual($"opentelemetry.proto.collector.{signal}.v1.{Service(signal)}Service", service.FullName);
@@ -29,7 +30,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace)]
     [DataRow(Logs)]
     [DataRow(Metrics)]
-    public void GeneratedProtocol_ExportService_HasOnlyTheExportMethod(string signal)
+    public void Should_HaveOnlyTheExportMethod_When_GeneratedProtocol_ExportService(string signal)
     {
         Assert.AreEqual("Export", Assert.ContainsSingle(ExportService(signal).Methods).Name);
     }
@@ -38,7 +39,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace)]
     [DataRow(Logs)]
     [DataRow(Metrics)]
-    public void GeneratedProtocol_ExportMethod_IsNotClientStreaming(string signal)
+    public void Should_BeNotClientStreaming_When_GeneratedProtocol_ExportMethod(string signal)
     {
         Assert.IsFalse(Export(signal).IsClientStreaming);
     }
@@ -47,7 +48,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace)]
     [DataRow(Logs)]
     [DataRow(Metrics)]
-    public void GeneratedProtocol_ExportMethod_IsNotServerStreaming(string signal)
+    public void Should_BeNotServerStreaming_When_GeneratedProtocol_ExportMethod(string signal)
     {
         Assert.IsFalse(Export(signal).IsServerStreaming);
     }
@@ -56,7 +57,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace, ResourceSpans)]
     [DataRow(Logs, ResourceLogs)]
     [DataRow(Metrics, ResourceMetrics)]
-    public void GeneratedProtocol_ExportRequestResourceField_IsFieldOne(string signal, string resourceField)
+    public void Should_BeFieldOne_When_GeneratedProtocol_ExportRequestResourceField(string signal, string resourceField)
     {
         var resource = Export(signal).InputType.FindFieldByName(resourceField);
         Assert.IsNotNull(resource);
@@ -67,7 +68,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace, ResourceSpans)]
     [DataRow(Logs, ResourceLogs)]
     [DataRow(Metrics, ResourceMetrics)]
-    public void GeneratedProtocol_ExportRequestResourceField_IsRepeated(string signal, string resourceField)
+    public void Should_BeRepeated_When_GeneratedProtocol_ExportRequestResourceField(string signal, string resourceField)
     {
         var resource = Export(signal).InputType.FindFieldByName(resourceField);
         Assert.IsNotNull(resource);
@@ -78,7 +79,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace, ResourceSpans)]
     [DataRow(Logs, ResourceLogs)]
     [DataRow(Metrics, ResourceMetrics)]
-    public void GeneratedProtocol_ExportRequestResourceField_IsAMessage(string signal, string resourceField)
+    public void Should_BeAMessage_When_GeneratedProtocol_ExportRequestResourceField(string signal, string resourceField)
     {
         var resource = Export(signal).InputType.FindFieldByName(resourceField);
         Assert.IsNotNull(resource);
@@ -89,7 +90,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace)]
     [DataRow(Logs)]
     [DataRow(Metrics)]
-    public void GeneratedProtocol_ExportResponsePartialSuccess_IsFieldOne(string signal)
+    public void Should_BeFieldOne_When_GeneratedProtocol_ExportResponsePartialSuccess(string signal)
     {
         var partial = Export(signal).OutputType.FindFieldByName("partial_success");
         Assert.IsNotNull(partial);
@@ -100,7 +101,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace)]
     [DataRow(Logs)]
     [DataRow(Metrics)]
-    public void GeneratedProtocol_ExportRequestType_IsInternal(string signal)
+    public void Should_BeInternal_When_GeneratedProtocol_ExportRequestType(string signal)
     {
         Assert.IsFalse(Export(signal).InputType.ClrType.IsPublic);
     }
@@ -109,7 +110,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace)]
     [DataRow(Logs)]
     [DataRow(Metrics)]
-    public void GeneratedProtocol_ExportResponseType_IsInternal(string signal)
+    public void Should_BeInternal_When_GeneratedProtocol_ExportResponseType(string signal)
     {
         Assert.IsFalse(Export(signal).OutputType.ClrType.IsPublic);
     }
@@ -118,7 +119,7 @@ public sealed class ProtocolContractTests
     [DataRow(Trace)]
     [DataRow(Logs)]
     [DataRow(Metrics)]
-    public void GeneratedProtocol_DescriptorFile_HasTheOfficialPath(string signal)
+    public void Should_HaveTheOfficialPath_When_GeneratedProtocol_DescriptorFile(string signal)
     {
         Assert.AreEqual($"opentelemetry/proto/collector/{signal}/v1/{signal}_service.proto", Descriptor(signal).Name);
     }

@@ -11,29 +11,32 @@ public sealed class TransportTests
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow("unknown", OtlpReceiver.ProtobufMediaType, null, HttpStatusCode.NotFound)]
-    [DataRow(Signals.Traces, "application/json", null, HttpStatusCode.UnsupportedMediaType)]
-    [DataRow(Signals.Traces, null, null, HttpStatusCode.UnsupportedMediaType)]
-    [DataRow(Signals.Traces, OtlpReceiver.ProtobufMediaType, "br", HttpStatusCode.UnsupportedMediaType)]
-    [DataRow(Signals.Traces, "application/x-protobuf; charset=utf-8", null, HttpStatusCode.OK)]
-    public async Task HttpReceiver_RouteMediaTypeAndEncoding_ReturnTheExactStatus(string signal, string? media,
-        string? encoding, HttpStatusCode expected)
+    [DataRow("unknown", OtlpReceiver.ProtobufMediaType, null, HttpStatusCode.NotFound, Google.Rpc.Code.NotFound, OtlpReceiver.ProtobufMediaType)]
+    [DataRow(Signals.Traces, "application/json", null, HttpStatusCode.UnsupportedMediaType, Google.Rpc.Code.Unimplemented, "application/json")]
+    [DataRow(Signals.Traces, null, null, HttpStatusCode.UnsupportedMediaType, Google.Rpc.Code.Unimplemented, OtlpReceiver.ProtobufMediaType)]
+    [DataRow(Signals.Traces, OtlpReceiver.ProtobufMediaType, "br", HttpStatusCode.UnsupportedMediaType, Google.Rpc.Code.Unimplemented, OtlpReceiver.ProtobufMediaType)]
+    public async Task HttpReceiver_InvalidRouteMediaTypeOrEncoding_ReturnsTheProtocolError(string signal, string? media,
+        string? encoding, HttpStatusCode expected, Google.Rpc.Code expectedCode, string errorMedia)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
-        using var content = new ByteArrayContent([]);
-        content.Headers.ContentType = media is null ? null : MediaTypeHeaderValue.Parse(media);
-        if (encoding is not null) content.Headers.ContentEncoding.Add(encoding);
+        using var content = Content(media, encoding);
         using var response = await TelemetryLifecycle.Http.PostAsync(new Uri(receiver.Endpoint, "v1/" + signal),
             content, TestContext.CancellationToken);
         Assert.AreEqual(expected, response.StatusCode);
-        if (expected != HttpStatusCode.OK)
-        {
-            var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken,
-                media == "application/json" ? "application/json" : OtlpReceiver.ProtobufMediaType);
-            Assert.AreEqual(expected == HttpStatusCode.NotFound ? (int)Google.Rpc.Code.NotFound : (int)Google.Rpc.Code.Unimplemented, error.Code);
-            Assert.IsFalse(string.IsNullOrWhiteSpace(error.Message));
-            Assert.AreEqual(error.Message, Assert.ContainsSingle(receiver.Snapshot().Receipts).Error);
-        }
+        var error = await Assert.That.HasOtlpErrorAsync(response, TestContext.CancellationToken, errorMedia);
+        Assert.AreEqual((int)expectedCode, error.Code);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(error.Message));
+        Assert.AreEqual(error.Message, Assert.ContainsSingle(receiver.Snapshot().Receipts).Error);
+    }
+
+    [TestMethod]
+    public async Task HttpReceiver_ProtobufMediaTypeWithCharset_IsAccepted()
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        using var content = Content("application/x-protobuf; charset=utf-8", null);
+        using var response = await TelemetryLifecycle.Http.PostAsync(new Uri(receiver.Endpoint, "v1/" + Signals.Traces),
+            content, TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
     }
 
     [TestMethod]
@@ -63,8 +66,16 @@ public sealed class TransportTests
         Assert.AreEqual(Signals.Logs, receipt.Signal);
         Assert.IsFalse(string.IsNullOrEmpty(receipt.Error));
         Assert.AreEqual(0L, receipt.Accepted);
-        var error = await Assert.HasOtlpErrorAsync(response, TestContext.CancellationToken);
+        var error = await Assert.That.HasOtlpErrorAsync(response, TestContext.CancellationToken);
         Assert.AreEqual((int)Google.Rpc.Code.InvalidArgument, error.Code);
         Assert.AreEqual(receipt.Error, error.Message);
+    }
+
+    private static ByteArrayContent Content(string? media, string? encoding)
+    {
+        var content = new ByteArrayContent([]);
+        content.Headers.ContentType = media is null ? null : MediaTypeHeaderValue.Parse(media);
+        if (encoding is not null) content.Headers.ContentEncoding.Add(encoding);
+        return content;
     }
 }

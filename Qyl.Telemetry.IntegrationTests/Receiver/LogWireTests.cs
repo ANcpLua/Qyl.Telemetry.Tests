@@ -91,7 +91,56 @@ public sealed class LogWireTests
         Assert.AreEqual("log-scope-schema", observed.Scope?.SchemaUrl);
         Assert.AreEqual("keep this failure", observed.Attributes["exception.message"]);
         Assert.AreEqual("exact stack", observed.Attributes["exception.stacktrace"]);
-        CheckBody(bodyKind, observed.Body);
+    }
+
+    [TestMethod]
+    [DataRow(TextBody, "message")]
+    [DataRow(IntegerBody, -42L)]
+    [DataRow(DoubleBody, 0.25)]
+    [DataRow(BooleanBody, true)]
+    public async Task OtlpReceiverLogs_ScalarBody_KeepsItsValueAndType(string kind, object expected)
+    {
+        var body = await ReadBodyAsync(kind);
+        Assert.AreEqual(expected, body);
+    }
+
+    [TestMethod]
+    public async Task OtlpReceiverLogs_BytesBody_KeepsEveryByte()
+    {
+        var body = await ReadBodyAsync(BytesBody);
+        Assert.AreSequenceEqual(new byte[] { 0, 255 }, Assert.IsInstanceOfType<byte[]>(body));
+    }
+
+    [TestMethod]
+    public async Task OtlpReceiverLogs_ArrayBody_KeepsOrderedTypedValues()
+    {
+        var body = await ReadBodyAsync(ArrayBody);
+        Assert.AreSequenceEqual(["item", 7L], Assert.IsInstanceOfType<IReadOnlyList<object?>>(body));
+    }
+
+    [TestMethod]
+    public async Task OtlpReceiverLogs_MapBody_KeepsItsBooleanEntry()
+    {
+        var body = await ReadBodyAsync(MapBody);
+        var map = Assert.IsInstanceOfType<IReadOnlyDictionary<string, object?>>(body);
+        Assert.IsFalse(Assert.IsInstanceOfType<bool>(map["key"]));
+    }
+
+    [TestMethod]
+    public async Task OtlpReceiverLogs_EmptyBody_StaysNull()
+    {
+        var body = await ReadBodyAsync(EmptyBody);
+        Assert.IsNull(body);
+    }
+
+    private async Task<object?> ReadBodyAsync(string kind)
+    {
+        await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
+        var request = Logs(null, new ProtoLog { Body = Body(kind) });
+        using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
+            TestContext.CancellationToken, Signals.Logs);
+        response.EnsureSuccessStatusCode();
+        return receiver.Snapshot().Logs.Single().Body;
     }
 
     private static AnyValue Body(string kind)
@@ -112,23 +161,4 @@ public sealed class LogWireTests
         };
     }
 
-    private static void CheckBody(string kind, object? body)
-    {
-        switch (kind)
-        {
-            case TextBody: Assert.AreEqual("message", body); break;
-            case IntegerBody: Assert.AreEqual(-42L, body); break;
-            case DoubleBody: Assert.AreEqual(0.25, body); break;
-            case BooleanBody: Assert.IsTrue(Assert.IsInstanceOfType<bool>(body)); break;
-            case BytesBody: Assert.AreSequenceEqual(new byte[] { 0, 255 }, Assert.IsInstanceOfType<byte[]>(body)); break;
-            case ArrayBody:
-                Assert.AreSequenceEqual(["item", 7L],
-                    Assert.IsInstanceOfType<IReadOnlyList<object?>>(body)); break;
-            case MapBody:
-                Assert.IsFalse(
-                    Assert.IsInstanceOfType<bool>(
-                        Assert.IsInstanceOfType<IReadOnlyDictionary<string, object?>>(body)["key"])); break;
-            case EmptyBody: Assert.IsNull(body); break;
-        }
-    }
 }

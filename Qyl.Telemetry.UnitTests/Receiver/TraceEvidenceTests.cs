@@ -4,62 +4,63 @@ namespace Qyl.Telemetry.UnitTests.Receiver;
 
 /// <summary>Checks trace relationships against canonical records without changing captured evidence.</summary>
 [TestClass]
-public sealed class TraceEvidenceTests
+[TestCategory("Fast")]
+public class TraceEvidenceTests
 {
     [TestMethod]
-    public void TraceEvidence_SelectedTrace_KeepsTheOriginalCaptureInstance()
+    public void Should_KeepTheOriginalCaptureInstance_When_TraceEvidence_SelectedTrace()
     {
         var (capture, trace, _) = SelectedTrace();
         Assert.AreSame(capture, trace.Capture);
     }
 
     [TestMethod]
-    public void TraceEvidence_SelectedTrace_KeepsUnrelatedCapturedSpans()
+    public void Should_KeepUnrelatedCapturedSpans_When_TraceEvidence_SelectedTrace()
     {
         var (_, trace, _) = SelectedTrace();
         Assert.HasCount(2, trace.Capture.Spans);
     }
 
     [TestMethod]
-    public void TraceEvidence_SelectedTrace_SpansAreOnlyItsOwn()
+    public void Should_SelectOnlyItsOwnSpans_When_TraceEvidence_SelectedTrace()
     {
         var (_, trace, selected) = SelectedTrace();
         Assert.AreSame(selected, Assert.ContainsSingle(trace.Spans));
     }
 
     [TestMethod]
-    public void TraceEvidenceCalls_CrossServiceClientServerChain_IsTheOnlyCall()
+    public void Should_BeTheOnlyCall_When_TraceEvidenceCalls_CrossServiceClientServerChain()
     {
         var call = Assert.ContainsSingle(MixedCallTrace().Calls);
         Assert.AreEqual(("orders", "payments"), (call.From, call.To));
     }
 
     [TestMethod]
-    public void TraceEvidence_RepeatedExport_KeepsEverySpanRecord()
+    public void Should_KeepEverySpanRecord_When_TraceEvidence_RepeatedExport()
     {
         Assert.HasCount(8, MixedCallTrace().Spans);
     }
 
     [TestMethod]
-    public void TraceEvidence_Services_AreDistinctAndOrdered()
+    public void Should_BeDistinctAndOrdered_When_TraceEvidence_Services()
     {
         Assert.AreSequenceEqual(["a", "test", "z"], StoreTrace().Services);
     }
 
     [TestMethod]
-    public void TraceEvidenceStores_OfOneService_AreDistinctByNamespace()
+    public void Should_BeDistinctByNamespace_When_TraceEvidenceStores_OfOneService()
     {
         Assert.AreSequenceEqual(["another", "first"], StoreTrace().StoresOf("a").Select(store => store.Namespace).Order(StringComparer.Ordinal));
     }
 
     [TestMethod]
-    public void TraceEvidenceStores_OfAnUnknownService_AreEmpty()
+    public void Should_BeEmpty_When_TraceEvidenceStores_OfAnUnknownService()
     {
         Assert.IsEmpty(StoreTrace().StoresOf("missing"));
     }
 
     [TestMethod]
-    public void TraceEvidenceStores_SameNamespaceOnDifferentServers_AreDistinct()
+    public void Should_BeDistinct_When_TraceEvidenceStores_SameNamespaceOnDifferentServers()
     {
         var trace = TestSpan.Trace(TestSpan.Create("orders", "1", store: "orders", server: "db-a"),
             TestSpan.Create("orders", "2", store: "orders", server: "db-b"));

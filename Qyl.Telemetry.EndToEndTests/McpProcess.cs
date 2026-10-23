@@ -3,12 +3,12 @@ using System.Text.Json.Nodes;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 
-namespace Qyl.Telemetry.EndToEndTests.Delivery;
+namespace Qyl.Telemetry.EndToEndTests;
 
-/// <summary>Starts the published qyl MCP server over stdio against a Collector and builds its tool calls.</summary>
-internal static class PublishedMcp
+/// <summary>Starts a qyl MCP entry point over stdio against its matching Collector and builds tool calls.</summary>
+internal static class McpProcess
 {
-    internal static async Task<McpClient> ConnectAsync(string entryPoint, Uri collector, Action<string>? standardErrorLine,
+    internal static async Task<McpClient> ConnectAsync(string command, string entryPoint, Uri collector, Action<string>? standardErrorLine,
         CancellationToken cancellationToken)
     {
         var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
@@ -16,7 +16,7 @@ internal static class PublishedMcp
         environment["QYL_MCP_TELEMETRY"] = "0";
         var transport = new StdioClientTransport(new StdioClientTransportOptions
         {
-            Name = "published-qyl-mcp", Command = "node", Arguments = [entryPoint, "--stdio"],
+            Name = "qyl-mcp", Command = command, Arguments = [entryPoint, "--stdio"],
             InheritEnvironmentVariables = false, EnvironmentVariables = environment,
             ShutdownTimeout = TimeSpan.FromSeconds(10), StandardErrorLines = standardErrorLine
         });

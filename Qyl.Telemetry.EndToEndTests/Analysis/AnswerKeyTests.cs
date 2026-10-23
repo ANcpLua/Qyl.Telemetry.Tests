@@ -9,32 +9,32 @@ namespace Qyl.Telemetry.EndToEndTests.Analysis;
 [DoNotParallelize]
 public sealed class AnswerKeyTests(TestContext context)
 {
-    private static readonly SharedAnalysisSession Shared = new();
-    private static AnswerKey? _key;
+    private static readonly SharedAnalysisSession s_shared = new();
+    private static AnswerKey? s_key;
 
-    private static AnalysisSession Session => Shared.Session;
-    private static AnswerKey Key => _key ?? throw new InvalidOperationException("The answer key was not seeded.");
+    private static AnalysisSession Session => s_shared.Session;
+    private static AnswerKey Key => s_key ?? throw new InvalidOperationException("The answer key was not seeded.");
 
     [ClassInitialize]
     [Timeout(300_000, CooperativeCancellation = true)]
     public static async Task SeedAsync(TestContext context)
     {
-        var session = await Shared.StartAsync(context);
-        _key = new AnswerKey(session.TimeProvider.GetUtcNow());
-        await _key.Incidents.SendAndWaitAsync(session.Client, "db-root", context.CancellationToken);
+        var session = await s_shared.StartAsync(context);
+        s_key = new AnswerKey(session.TimeProvider.GetUtcNow());
+        await s_key.Incidents.SendAndWaitAsync(session.Client, "db-root", context.CancellationToken);
     }
 
     [ClassCleanup]
-    public static Task StopAsync() => Shared.StopAsync();
+    public static Task StopAsync() => s_shared.StopAsync();
 
     [TestMethod]
     [DataRow(AnalysisPath.Http)]
     [DataRow(AnalysisPath.Mcp)]
     public async Task Triage_SeededIncidents_RanksReleaseFailureFirstAndKeepsRareSilentAndSessionFindings(AnalysisPath path)
     {
-        var triage = await AskAsync<TriageOutput>(path, "triage", Key.Window(("matchers", new JsonArray(AnswerKey.Matcher("service.name", "in",
-            new JsonArray("checkout", "orders-db", "payments", "billing", "sessions"))))));
-        var checkout = await CheckoutFailureAsync(path);
+        var triage = await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, Key.Window(("matchers", new JsonArray(AnswerKey.Matcher("service.name", "in",
+            new JsonArray("checkout", "orders-db", "payments", "billing", "sessions"))))), context.CancellationToken);
+        var checkout = Assert.ContainsSingle(await CheckoutFailuresAsync(path));
         var first = triage.Failures[0];
         Assert.AreEqual(checkout.FailureId, first.FailureId);
         Assert.AreEqual(AnswerKey.Release, first.CoincidingRelease?.Version);
@@ -57,8 +57,8 @@ public sealed class AnswerKeyTests(TestContext context)
             ["start_time"] = AnswerKey.Iso(Key.T + Minute - 10 * Millisecond),
             ["end_time"] = AnswerKey.Iso(Key.T + Minute + 500 * Millisecond)
         };
-        var first = await AskAsync<TriageOutput>(path, "triage", input);
-        var second = await AskAsync<TriageOutput>(path, "triage", input);
+        var first = await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, input, context.CancellationToken);
+        var second = await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, input, context.CancellationToken);
         Assert.HasCount(2, first.Failures);
         Assert.AreSequenceEqual(first.Failures.Select(failure => failure.FailureId), second.Failures.Select(failure => failure.FailureId));
     }
@@ -68,7 +68,7 @@ public sealed class AnswerKeyTests(TestContext context)
     [DataRow(AnalysisPath.Mcp)]
     public async Task FailureContext_DatabaseTimeoutIncident_NamesTheTimeoutAsRootCause(AnalysisPath path)
     {
-        var failure = await AskAsync<GetFailureContextOutput>(path, "get_failure_context", Key.Window(("trace_id", Key["db-root"].TraceId)));
+        var failure = await Session.AskAsync<GetFailureContextOutput>(path, AnalysisTools.FailureContext, Key.Window(("trace_id", Key["db-root"].TraceId)), context.CancellationToken);
         Assert.AreEqual(Key["db-timeout"].SpanId, failure.Observed.RootCauseSpan?.SpanId);
     }
 
@@ -81,8 +81,8 @@ public sealed class AnswerKeyTests(TestContext context)
         var arrival = incidents.Span($"arrival-{path}-{Guid.NewGuid():N}", "arrival-test", "arrival",
             Nanoseconds(Session.TimeProvider.GetUtcNow()) - Millisecond, 1, error: true);
         await incidents.SendAsync(Session.Client, context.CancellationToken);
-        var output = await AskAsync<GetFailureContextOutput>(path, "get_failure_context",
-            new JsonObject { ["trace_id"] = arrival.TraceId, ["lookback_minutes"] = 60 });
+        var output = await Session.AskAsync<GetFailureContextOutput>(path, AnalysisTools.FailureContext,
+            new JsonObject { ["trace_id"] = arrival.TraceId, ["lookback_minutes"] = 60 }, context.CancellationToken);
         Assert.IsFalse(output.Settled);
     }
 
@@ -91,12 +91,12 @@ public sealed class AnswerKeyTests(TestContext context)
     [DataRow(AnalysisPath.Mcp)]
     public async Task CompareGroups_ErrorGroup_DiscriminatesByRegionAndRelease(AnalysisPath path)
     {
-        var output = await AskAsync<CompareGroupsOutput>(path, "compare_groups", Key.Window(
+        var output = await Session.AskAsync<CompareGroupsOutput>(path, AnalysisTools.CompareGroups, Key.Window(
             ("matchers", new JsonArray(AnswerKey.Matcher("service.name", "eq", "regional"))), ("signal", "spans"),
             ("group_a", new JsonObject { ["matchers"] = new JsonArray(new JsonObject { ["key"] = "error.type", ["op"] = "exists" }) }),
-            ("group_b", "rest"), ("attribute_scope", "both")));
-        Assert.AreEquivalent(["cloud.region=eu", "service.version=2.3"],
-            output.Discriminators.Take(2).Select(association => $"{association.Key}={association.Value}"));
+            ("group_b", "rest"), ("attribute_scope", "both")), context.CancellationToken);
+        Assert.AreSequenceEqual(["cloud.region=eu", "service.version=2.3"],
+            output.Discriminators.Take(2).Select(association => $"{association.Key}={association.Value}"), SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]
@@ -104,9 +104,9 @@ public sealed class AnswerKeyTests(TestContext context)
     [DataRow(AnalysisPath.Mcp)]
     public async Task VerifyFix_FourRequestsAfterFix_IsPendingForNinetySixMore(AnalysisPath path)
     {
-        var checkout = await CheckoutFailureAsync(path);
-        var verification = await AskAsync<VerifyFixOutput>(path, "verify_fix",
-            Key.Window(("failure_id", checkout.FailureId), ("since", AnswerKey.Iso(Key.T2))));
+        var checkout = Assert.ContainsSingle(await CheckoutFailuresAsync(path));
+        var verification = await Session.AskAsync<VerifyFixOutput>(path, AnalysisTools.VerifyFix,
+            Key.Window(("failure_id", checkout.FailureId), ("since", AnswerKey.Iso(Key.T2))), context.CancellationToken);
         Assert.AreEqual("pending", verification.Verdict);
         Assert.AreEqual(AnswerKey.FixRequestsNeeded, verification.Needs?.Requests);
     }
@@ -116,16 +116,16 @@ public sealed class AnswerKeyTests(TestContext context)
     [DataRow(AnalysisPath.Mcp)]
     public async Task VerifyFix_InsufficientEvidence_NeverVerifies(AnalysisPath path)
     {
-        var checkout = await CheckoutFailureAsync(path);
+        var checkout = Assert.ContainsSingle(await CheckoutFailuresAsync(path));
         var since = AnswerKey.Iso(Key.Now - Minute);
-        var waiting = await AskAsync<VerifyFixOutput>(path, "verify_fix", Key.Window(("failure_id", checkout.FailureId), ("since", since)));
+        var waiting = await Session.AskAsync<VerifyFixOutput>(path, AnalysisTools.VerifyFix, Key.Window(("failure_id", checkout.FailureId), ("since", since)), context.CancellationToken);
         Assert.AreEqual("pending", waiting.Verdict);
         Assert.AreEqual(0L, waiting.After.Requests);
-        var unobserved = await AskAsync<VerifyFixOutput>(path, "verify_fix", Key.Window(("failure_id", checkout.FailureId), ("since", since),
-            ("min_requests", 0), ("min_minutes", 0)));
+        var unobserved = await Session.AskAsync<VerifyFixOutput>(path, AnalysisTools.VerifyFix, Key.Window(("failure_id", checkout.FailureId), ("since", since),
+            ("min_requests", 0), ("min_minutes", 0)), context.CancellationToken);
         Assert.AreEqual("inconclusive", unobserved.Verdict, "Zero requests after the change cannot pass, even without thresholds.");
-        var recurring = await AskAsync<VerifyFixOutput>(path, "verify_fix", Key.Window(("failure_id", checkout.FailureId),
-            ("since", AnswerKey.Iso(Key.T - Minute)), ("min_requests", 0), ("min_minutes", 0)));
+        var recurring = await Session.AskAsync<VerifyFixOutput>(path, AnalysisTools.VerifyFix, Key.Window(("failure_id", checkout.FailureId),
+            ("since", AnswerKey.Iso(Key.T - Minute)), ("min_requests", 0), ("min_minutes", 0)), context.CancellationToken);
         Assert.AreEqual("failed", recurring.Verdict);
         Assert.Contains(Key["db-root"].TraceId, recurring.Recurrences);
     }
@@ -135,8 +135,8 @@ public sealed class AnswerKeyTests(TestContext context)
     [DataRow(AnalysisPath.Mcp)]
     public async Task QueryMetric_HistogramP95_StaysInSecondsAndIsApproximate(AnalysisPath path)
     {
-        var output = await AskAsync<QueryMetricOutput>(path, "query_metric", Key.Window(("metric_name", "http.server.request.duration"),
-            ("aggregation", "p95"), ("group_by", new JsonArray("http.route")), ("step_ms", 3_600_000)));
+        var output = await Session.AskAsync<QueryMetricOutput>(path, AnalysisTools.QueryMetric, Key.Window(("metric_name", "http.server.request.duration"),
+            ("aggregation", "p95"), ("group_by", new JsonArray("http.route")), ("step_ms", 3_600_000)), context.CancellationToken);
         Assert.AreEqual("s", output.Unit);
         Assert.IsTrue(output.Approximate);
         Assert.IsNotNull(output.Series);
@@ -151,18 +151,15 @@ public sealed class AnswerKeyTests(TestContext context)
     [DataRow(AnalysisPath.Mcp)]
     public async Task QueryMetric_CumulativeCounterIncrease_IsExact(AnalysisPath path)
     {
-        var output = await AskAsync<QueryMetricOutput>(path, "query_metric", Key.Window(("metric_name", "requests.total"),
-            ("function", "increase"), ("step_ms", 3_600_000)));
+        var output = await Session.AskAsync<QueryMetricOutput>(path, AnalysisTools.QueryMetric, Key.Window(("metric_name", "requests.total"),
+            ("function", "increase"), ("step_ms", 3_600_000)), context.CancellationToken);
         Assert.IsNotNull(output.Series);
         Assert.AreEqual(AnswerKey.CounterIncrease, output.Series.SelectMany(series => series.Buckets).Sum(bucket => bucket.Value ?? 0));
     }
 
-    private Task<T> AskAsync<T>(AnalysisPath path, string tool, JsonObject input) =>
-        Session.AskAsync<T>(path, tool, input, context.CancellationToken);
-
-    private async Task<TriageFailure> CheckoutFailureAsync(AnalysisPath path) =>
-        Assert.ContainsSingle((await AskAsync<TriageOutput>(path, "triage", Key.Window(("service_name", "checkout"), ("status", "all"))))
-            .Failures.Where(failure => failure.Operation == "checkout"));
+    private async Task<IEnumerable<TriageFailure>> CheckoutFailuresAsync(AnalysisPath path) =>
+        (await Session.AskAsync<TriageOutput>(path, AnalysisTools.Triage, Key.Window(("service_name", "checkout"), ("status", "all")), context.CancellationToken))
+            .Failures.Where(failure => failure.Operation == "checkout");
 
     private static HashSet<string> TraceIds(string prefix) => Key.Incidents.Keys.Where(pair => pair.Key.StartsWith(prefix, StringComparison.Ordinal))
         .Select(pair => pair.Value.TraceId).ToHashSet(StringComparer.Ordinal);

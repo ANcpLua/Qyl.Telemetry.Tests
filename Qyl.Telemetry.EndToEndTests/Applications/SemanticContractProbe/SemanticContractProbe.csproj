@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Qyl.Telemetry.SemanticConventions" />
-    <PackageReference Include="Qyl.Telemetry.SemanticConventions.Incubating" />
+    <ProjectReference Include="../../../../Qyl.Telemetry.SemanticConventions/src/Qyl.Telemetry.SemanticConventions/Qyl.Telemetry.SemanticConventions.csproj" Condition="'$(UseLocalQylSemanticConventions)' != 'false' And Exists('../../../../Qyl.Telemetry.SemanticConventions/src/Qyl.Telemetry.SemanticConventions/Qyl.Telemetry.SemanticConventions.csproj')" />
+    <PackageReference Include="Qyl.Telemetry.SemanticConventions" Condition="'$(UseLocalQylSemanticConventions)' == 'false' Or !Exists('../../../../Qyl.Telemetry.SemanticConventions/src/Qyl.Telemetry.SemanticConventions/Qyl.Telemetry.SemanticConventions.csproj')" />
+    <ProjectReference Include="../../../../Qyl.Telemetry.SemanticConventions/src/Qyl.Telemetry.SemanticConventions.Incubating/Qyl.Telemetry.SemanticConventions.Incubating.csproj" Condition="'$(UseLocalQylSemanticConventions)' != 'false' And Exists('../../../../Qyl.Telemetry.SemanticConventions/src/Qyl.Telemetry.SemanticConventions.Incubating/Qyl.Telemetry.SemanticConventions.Incubating.csproj')" />
+    <PackageReference Include="Qyl.Telemetry.SemanticConventions.Incubating" Condition="'$(UseLocalQylSemanticConventions)' == 'false' Or !Exists('../../../../Qyl.Telemetry.SemanticConventions/src/Qyl.Telemetry.SemanticConventions.Incubating/Qyl.Telemetry.SemanticConventions.Incubating.csproj')" />
   </ItemGroup>
 </Project>

@@ -8,14 +8,36 @@ jobs:
   tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      DOTNET_PROCESSOR_COUNT: 2
+    defaults:
+      run:
+        working-directory: qyl/Qyl.Telemetry.Tests
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the source dependencies
+        uses: actions/checkout@v4
+        with:
+          repository: ANcpLua/qyl
+          ref: ${{ vars.QYL_SOURCE_REF }}
+          path: qyl
+      - name: Check out the telemetry tests
+        uses: actions/checkout@v4
+        with:
+          path: qyl/Qyl.Telemetry.Tests
       - uses: actions/setup-dotnet@v4
         with:
-          global-json-file: global.json
+          global-json-file: qyl/Qyl.Telemetry.Tests/global.json
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+      - name: Restore TypeScript contract dependencies
+        working-directory: qyl/services/qyl.mcp
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Verify the PowerShell test runner
+        run: pwsh --version
       - name: Install NativeAOT prerequisites
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev libssl-dev
       - name: Test, measure coverage and inspect source
@@ -26,9 +48,9 @@ jobs:
         with:
           name: telemetry-verification
           path: |
-            artifacts/results
-            artifacts/coverage
-            artifacts/inspection.sarif
-            artifacts/delivery/**/prepared-*.json
-            artifacts/delivery/**/logs/*.log
+            qyl/Qyl.Telemetry.Tests/artifacts/results
+            qyl/Qyl.Telemetry.Tests/artifacts/coverage
+            qyl/Qyl.Telemetry.Tests/artifacts/inspection.sarif
+            qyl/Qyl.Telemetry.Tests/artifacts/delivery/**/prepared-*.json
+            qyl/Qyl.Telemetry.Tests/artifacts/delivery/**/logs/*.log
           if-no-files-found: warn

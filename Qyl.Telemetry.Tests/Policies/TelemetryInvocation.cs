@@ -14,7 +14,7 @@ internal sealed record PublishedTrace(TraceEvidence Evidence, string RootSpanId)
 internal sealed class TelemetryInvocation : IDisposable
 {
     private const int ReportedViolations = 25;
-    private static readonly AsyncLocal<TelemetryInvocation?> Active = new();
+    private static readonly AsyncLocal<TelemetryInvocation?> s_active = new();
     private readonly ConcurrentQueue<PublishedTrace> _traces = new();
     private readonly TelemetryInvocation? _previous;
 
@@ -33,18 +33,18 @@ internal sealed class TelemetryInvocation : IDisposable
 
     internal static TelemetryInvocation Begin(IReadOnlyList<TelemetryPolicyAttribute> policies)
     {
-        var invocation = new TelemetryInvocation(policies, Active.Value);
-        Active.Value = invocation;
+        var invocation = new TelemetryInvocation(policies, s_active.Value);
+        s_active.Value = invocation;
         return invocation;
     }
 
     internal static bool Requires<TPolicy>() where TPolicy : TelemetryPolicyAttribute =>
-        Active.Value?.Policies.OfType<TPolicy>().Any() == true;
+        s_active.Value?.Policies.OfType<TPolicy>().Any() == true;
 
     internal static void Publish(PublishedTrace trace)
     {
         ArgumentNullException.ThrowIfNull(trace);
-        if (Active.Value is { } invocation) invocation._traces.Enqueue(trace);
+        if (s_active.Value is { } invocation) invocation._traces.Enqueue(trace);
         else TelemetryPolicyAttribute.RejectUnverifiedPolicies();
     }
 
@@ -71,5 +71,5 @@ internal sealed class TelemetryInvocation : IDisposable
         }
     }
 
-    public void Dispose() => Active.Value = _previous;
+    public void Dispose() => s_active.Value = _previous;
 }

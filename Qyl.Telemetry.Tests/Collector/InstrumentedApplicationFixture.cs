@@ -9,12 +9,16 @@ public sealed class InstrumentedApplicationFixture : IAsyncDisposable
 {
     public const string ServiceName = "telemetry-probe";
     private readonly QylApplication _application;
+    private readonly TestContext _context;
+    private readonly string _logPath;
     private int _disposed;
 
-    private InstrumentedApplicationFixture(TelemetryPipeline telemetry, QylApplication application)
+    private InstrumentedApplicationFixture(TelemetryPipeline telemetry, QylApplication application, TestContext context, string logPath)
     {
         Telemetry = telemetry;
         _application = application;
+        _context = context;
+        _logPath = logPath;
         Client = new HttpClient { BaseAddress = application.GetEndpoint(ServiceName) };
     }
 
@@ -42,9 +46,11 @@ public sealed class InstrumentedApplicationFixture : IAsyncDisposable
         executable.VerifyIntegrity();
         var telemetry = new TelemetryPipeline(context, collector);
         QylApplication? application = null;
+        string? logPath = null;
         try
         {
             await telemetry.StartAsync(cancellationToken).ConfigureAwait(false);
+            logPath = Path.Combine(telemetry.Collector.DataDirectory, "application.log");
             var builder = new QylApplicationBuilder { StartupTimeoutSeconds = 30, MaxRestarts = 0 };
             var service = builder.AddExecutable(ServiceName, executable.Command, executable.Arguments, Path.GetDirectoryName(executable.Path))
                 .WithoutEnvironmentPrefix("OTEL_")
@@ -68,12 +74,14 @@ public sealed class InstrumentedApplicationFixture : IAsyncDisposable
 
             application = builder.Build();
             await application.StartAsync(cancellationToken).ConfigureAwait(false);
-            return new InstrumentedApplicationFixture(telemetry, application);
+            return new InstrumentedApplicationFixture(telemetry, application, context, logPath);
         }
         catch (Exception startupFailure)
         {
             var errors = new List<Exception> { startupFailure };
             if (application is not null) await errors.AttemptAsync(application.DisposeAsync).ConfigureAwait(false);
+            if (application is not null && logPath is not null)
+                await errors.AttemptAsync(() => SaveOutputAsync(application, context, logPath)).ConfigureAwait(false);
             await errors.AttemptAsync(telemetry.DisposeAsync).ConfigureAwait(false);
             if (errors.Count > 1) throw new AggregateException("Application startup and cleanup failed.", errors);
             throw;
@@ -109,7 +117,14 @@ public sealed class InstrumentedApplicationFixture : IAsyncDisposable
         Client.Dispose();
         var errors = new List<Exception>();
         await errors.AttemptAsync(_application.DisposeAsync).ConfigureAwait(false);
+        await errors.AttemptAsync(() => SaveOutputAsync(_application, _context, _logPath)).ConfigureAwait(false);
         await errors.AttemptAsync(Telemetry.DisposeAsync).ConfigureAwait(false);
         if (errors.Count > 0) throw new AggregateException("Application fixture cleanup failed.", errors);
+    }
+
+    private static async ValueTask SaveOutputAsync(QylApplication application, TestContext context, string path)
+    {
+        await File.WriteAllLinesAsync(path, application.GetOutput(ServiceName), CancellationToken.None).ConfigureAwait(false);
+        context.AddResultFile(path);
     }
 }

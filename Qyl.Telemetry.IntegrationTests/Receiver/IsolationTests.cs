@@ -11,20 +11,20 @@ namespace Qyl.Telemetry.IntegrationTests.Receiver;
 [TracePerTest]
 public sealed class IsolationTests
 {
-    private static readonly ConcurrentDictionary<string, byte> SeenTraceIds = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, byte> s_seenTraceIds = new(StringComparer.Ordinal);
 
     [UsedImplicitly] public TestContext TestContext { get; set; } = null!;
 
     [ClassInitialize]
     public static void InitializeRows(TestContext context)
     {
-        SeenTraceIds.Clear();
+        s_seenTraceIds.Clear();
     }
 
     [ClassCleanup]
     public static void CleanupRows()
     {
-        SeenTraceIds.Clear();
+        s_seenTraceIds.Clear();
     }
 
     [TestMethod]
@@ -37,7 +37,7 @@ public sealed class IsolationTests
         var root = Activity.Current;
         Assert.IsNotNull(root);
         Assert.AreEqual(TracePerTestAttribute.ActivityName, root.OperationName);
-        Assert.IsTrue(SeenTraceIds.TryAdd(root.TraceId.ToHexString(), 0),
+        Assert.IsTrue(s_seenTraceIds.TryAdd(root.TraceId.ToHexString(), 0),
             "Each native DataRow must own a distinct trace ID.");
         Assert.AreEqual("0000000000000000", root.ParentSpanId.ToHexString());
         var capture = await TelemetryCapture.TraceAsync(async test =>

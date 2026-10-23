@@ -13,7 +13,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using OpenTelemetry.Proto.Collector.Logs.V1;
 using OpenTelemetry.Proto.Collector.Metrics.V1;
@@ -33,7 +32,7 @@ using ProtoSpan = OpenTelemetry.Proto.Trace.V1.Span;
 namespace Qyl.Telemetry.Tests;
 
 [PublicAPI]
-public sealed class OtlpReceiver : IAsyncDisposable
+public sealed partial class OtlpReceiver : IAsyncDisposable
 {
     internal const int DefaultMaxPayloadBytes = 16 * 1024 * 1024;
 
@@ -41,7 +40,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
     internal const string ProtobufMediaType = "application/x-protobuf";
 
     /// <summary>How long a capture waits for its required evidence unless the caller says otherwise.</summary>
-    internal static readonly TimeSpan DefaultEvidenceTimeout = TimeSpan.FromSeconds(10);
+    internal static TimeSpan DefaultEvidenceTimeout { get; } = TimeSpan.FromSeconds(10);
     private readonly int _maxPayloadBytes;
     private readonly TimeProvider _timeProvider;
     private readonly Lock _gate = new();
@@ -141,7 +140,8 @@ public sealed class OtlpReceiver : IAsyncDisposable
         receiver._application.UseWhen(
             static context => context.GetEndpoint()?.Metadata.GetMetadata<GrpcMethodMetadata>() is null,
             static httpBranch => httpBranch.UseRequestDecompression());
-        receiver._application.MapPost("/v1/{signal}", receiver.ReceiveAsync);
+        RequestDelegate receive = context => receiver.ReceiveAsync(context, (string)context.Request.RouteValues["signal"]!);
+        receiver._application.MapPost("/v1/{signal}", receive);
         receiver._application.MapGrpcService<OtlpGrpcService>();
         return await receiver._application.StartOwnedAsync(() =>
         {
@@ -323,7 +323,7 @@ public sealed class OtlpReceiver : IAsyncDisposable
         };
 
         foreach (var warning in decoder.Warnings)
-            _application.Logger.LogWarning("OTLP decoding warning: {Warning}", warning);
+            LogOtlpDecodingWarningWarning(_application.Logger, warning);
         Publish(new ExportReceipt(signal, accepted, rejected,
             errors.Count == 0 ? null : string.Join(" ", errors.Distinct()))
         {

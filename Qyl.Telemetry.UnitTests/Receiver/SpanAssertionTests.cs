@@ -3,7 +3,8 @@ using Qyl.Telemetry.SemanticConventions;
 namespace Qyl.Telemetry.UnitTests.Receiver;
 
 [TestClass]
-public sealed class SpanAssertionTests
+[TestCategory("Fast")]
+public class SpanAssertionTests
 {
     private const string Parent = "0011223344556677";
     private const string Child = "8899aabbccddeeff";
@@ -11,46 +12,44 @@ public sealed class SpanAssertionTests
     private const string Operation = "request";
 
     [TestMethod]
-    public void SpanAssertions_NativeSpanWithMatchingSourceOperationAndKind_IsReturned()
+    public void Should_BeReturned_When_SpanAssertions_NativeSpanWithMatchingSourceOperationAndKind()
     {
         var span = NativeSpan();
-        Assert.AreSame(span, Assert.HasSingleNativeSpan([span], Source, Operation, SpanKind.Server));
+        Assert.AreSame(span, SpanAssertions.HasSingleNativeSpan([span], Source, Operation, SpanKind.Server));
     }
 
     [TestMethod]
-    [DataRow(OwnershipMismatch.Source)]
-    [DataRow(OwnershipMismatch.Operation)]
-    [DataRow(OwnershipMismatch.Kind)]
-    [DataRow(OwnershipMismatch.Duplicate)]
-    public void SpanAssertions_SubstitutedOrDuplicateInstrumentation_FailsNativeOwnership(OwnershipMismatch mismatch)
+    [DataRow("replacement.source", Operation, SpanKind.Server, 1)]
+    [DataRow(Source, "replacement", SpanKind.Server, 1)]
+    [DataRow(Source, Operation, SpanKind.Internal, 1)]
+    [DataRow(Source, Operation, SpanKind.Server, 2)]
+    public void Should_FailNativeOwnership_When_SpanAssertions_SubstitutedOrDuplicateInstrumentation(
+        string source, string operation, SpanKind kind, int observedCount)
     {
-        var span = NativeSpan();
-        IEnumerable<SpanRecord> observed = mismatch == OwnershipMismatch.Duplicate ? [span, span] : [span];
-        Assert.ThrowsExactly<AssertFailedException>(() => Assert.HasSingleNativeSpan(observed,
-            mismatch == OwnershipMismatch.Source ? "replacement.source" : Source,
-            mismatch == OwnershipMismatch.Operation ? "replacement" : Operation,
-            mismatch == OwnershipMismatch.Kind ? SpanKind.Internal : SpanKind.Server));
+        var observed = Enumerable.Repeat(NativeSpan(), observedCount);
+        Assert.ThrowsExactly<AssertFailedException>(() =>
+            SpanAssertions.HasSingleNativeSpan(observed, source, operation, kind));
     }
 
     [TestMethod]
-    public void SpanAssertions_SpanUnderItsParentContext_PassesParentCheck()
+    public void Should_PassParentCheck_When_SpanAssertions_SpanUnderItsParentContext()
     {
-        Assert.HasParentContext(NativeSpan(), new SpanRecord(TestSpan.TraceId, Parent, "parent"));
+        SpanAssertions.HasParentContext(NativeSpan(), new SpanRecord(TestSpan.TraceId, Parent, "parent"));
     }
 
     [TestMethod]
-    [DataRow(ContextMismatch.Trace)]
-    [DataRow(ContextMismatch.Parent)]
-    [DataRow(ContextMismatch.ReusedIdentity)]
-    public void SpanAssertions_DisconnectedTraceWrongParentOrReusedIdentity_FailsParentCheck(ContextMismatch mismatch)
+    [DataRow(TestSpan.UnrelatedTraceId, Child, Parent)]
+    [DataRow(TestSpan.TraceId, Child, Child)]
+    [DataRow(TestSpan.TraceId, Parent, Parent)]
+    public void Should_FailParentCheck_When_SpanAssertions_DisconnectedTraceWrongParentOrReusedIdentity(
+        string traceId, string spanId, string parentSpanId)
     {
         var parent = new SpanRecord(TestSpan.TraceId, Parent, "parent");
-        var changed = new SpanRecord(mismatch == ContextMismatch.Trace ? TestSpan.UnrelatedTraceId : TestSpan.TraceId,
-            mismatch == ContextMismatch.ReusedIdentity ? Parent : Child, Operation)
+        var changed = new SpanRecord(traceId, spanId, Operation)
         {
-            ParentSpanId = mismatch == ContextMismatch.Parent ? Child : Parent
+            ParentSpanId = parentSpanId
         };
-        Assert.ThrowsExactly<AssertFailedException>(() => Assert.HasParentContext(changed, parent));
+        Assert.ThrowsExactly<AssertFailedException>(() => SpanAssertions.HasParentContext(changed, parent));
     }
 
     private static SpanRecord NativeSpan() => new(TestSpan.TraceId, Child, Operation)
@@ -60,6 +59,4 @@ public sealed class SpanAssertionTests
         Scope = new InstrumentationScopeRecord { Name = Source }
     };
 
-    public enum OwnershipMismatch { Source, Operation, Kind, Duplicate }
-    public enum ContextMismatch { Trace, Parent, ReusedIdentity }
 }

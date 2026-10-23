@@ -22,6 +22,10 @@ public sealed record RegistryReport(
     IReadOnlyList<string> CustomAttributes,
     IReadOnlyList<string> CustomMetrics)
 {
+    public Uri RegistrySchemaUrl { get; } = new(SchemaUrl.Qyl);
+    public Uri UpstreamSchemaUrl { get; } = new(SchemaUrl.Current);
+    public string RegistrySha256 { get; } = RegistrySnapshot.Sha256;
+
     public bool IsConformant => RecordsChecked > 0 && Issues.All(issue => issue.Level != RegistryIssueLevel.Violation);
 }
 

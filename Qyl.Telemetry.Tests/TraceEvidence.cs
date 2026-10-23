@@ -151,26 +151,35 @@ internal static class SpanConformance
                     $"Expected {definition.SpanKind}, observed {span.Kind}."));
             foreach (var (attribute, requirement) in attributes)
             {
-                var present = span.Attributes.TryGetValue(attribute.Name, out var value);
+                var values = span.Attributes.Where(pair => attribute.Type == "template"
+                    ? pair.Key.StartsWith(attribute.Name + ".", StringComparison.Ordinal)
+                      && pair.Key.Length > attribute.Name.Length + 1
+                    : pair.Key == attribute.Name).ToArray();
+                var present = values.Length != 0;
                 if (!present && requirement.Required)
                     issues.Add(new ConformanceIssue(span.SpanId, attribute.Name, "Required attribute is absent."));
                 if (!present && requirement.Conditional)
                     unevaluated.Add($"{span.SpanId}:{attribute.Name}: {attribute.Condition}");
                 if (!present) continue;
-                if (attribute.IsDeprecated)
-                    issues.Add(new ConformanceIssue(span.SpanId, attribute.Name,
-                        "The selected definition marks this attribute deprecated."));
-                if (!TypeMatches(attribute.Type, value))
-                    issues.Add(new ConformanceIssue(span.SpanId, attribute.Name, $"Expected {attribute.Type}."));
+                foreach (var (name, value) in values)
+                {
+                    if (attribute.IsDeprecated)
+                        issues.Add(new ConformanceIssue(span.SpanId, name,
+                            "The selected definition marks this attribute deprecated."));
+                    if (!TypeMatches(attribute.Type, name, value))
+                        issues.Add(new ConformanceIssue(span.SpanId, name, $"Expected {attribute.Type}."));
+                }
             }
         }
 
         return new ConformanceReport(definition.Id, selected.Length, issues.AsReadOnly(), unevaluated.AsReadOnly());
     }
 
-    private static bool TypeMatches(string type, object? value) => type == "enum"
-        ? value is string or long
-        : RegistryConformance.Matches(type switch
+    private static bool TypeMatches(string type, string name, object? value)
+    {
+        if (type is "enum" or "template" && RegistryCatalog.TryGetAttribute(name, out var registered))
+            return RegistryConformance.Matches(registered.ValueKind, value);
+        return type == "enum" ? value is string or long : RegistryConformance.Matches(type switch
         {
             "string" => RegistryAttributeValueKind.String,
             "int" => RegistryAttributeValueKind.Integer,
@@ -183,4 +192,5 @@ internal static class SpanConformance
             "any" or "template" => RegistryAttributeValueKind.Any,
             _ => RegistryAttributeValueKind.Unknown
         }, value);
+    }
 }

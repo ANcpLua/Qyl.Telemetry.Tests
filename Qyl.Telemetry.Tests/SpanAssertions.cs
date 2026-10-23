@@ -7,24 +7,21 @@ namespace Qyl.Telemetry.Tests;
 [JetBrains.Annotations.PublicAPI]
 public static class SpanAssertions
 {
-    extension(Assert)
+    public static SpanRecord HasSingleNativeSpan(IEnumerable<SpanRecord> spans,
+        string source, string operation, SpanKind kind)
     {
-        public static SpanRecord HasSingleNativeSpan(IEnumerable<SpanRecord> spans,
-            string source, string operation, SpanKind kind)
-        {
-            var span = Assert.ContainsSingle(spans, $"Expected one native '{source}' span for '{operation}'.");
-            Assert.AreEqual(source, span.Scope?.Name, "The native instrumentation source changed.");
-            Assert.AreEqual(operation, span.Name, "The native operation changed.");
-            Assert.AreEqual(kind, span.Kind, "The native span kind changed.");
-            return span;
-        }
-
-        public static void HasParentContext(SpanRecord child, SpanRecord parent) =>
-            RequireParent(child, parent.TraceId, parent.SpanId);
-
-        public static void HasParentContext(SpanRecord child, ActivityContext parent) =>
-            RequireParent(child, parent.TraceId.ToHexString(), parent.SpanId.ToHexString());
+        var span = Assert.ContainsSingle(spans, $"Expected one native '{source}' span for '{operation}'.");
+        Assert.AreEqual(source, span.Scope?.Name, "The native instrumentation source changed.");
+        Assert.AreEqual(operation, span.Name, "The native operation changed.");
+        Assert.AreEqual(kind, span.Kind, "The native span kind changed.");
+        return span;
     }
+
+    public static void HasParentContext(SpanRecord child, SpanRecord parent) =>
+        RequireParent(child, parent.TraceId, parent.SpanId);
+
+    public static void HasParentContext(SpanRecord child, ActivityContext parent) =>
+        RequireParent(child, parent.TraceId.ToHexString(), parent.SpanId.ToHexString());
 
     private static void RequireParent(SpanRecord child, string trace, string parent)
     {

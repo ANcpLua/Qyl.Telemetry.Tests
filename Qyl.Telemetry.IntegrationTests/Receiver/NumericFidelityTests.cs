@@ -18,7 +18,7 @@ public sealed class NumericFidelityTests
     public async Task OtlpReceiverMetrics_SignedIntegerPointsAndExemplars_KeepAll64Bits(long expected)
     {
         var point = new NumberDataPoint { AsInt = expected, Exemplars = { new Exemplar { AsInt = expected } } };
-        var metrics = await CaptureAsync(
+        var (_, _, metrics, receipts) = await CaptureAsync(
             new Metric { Name = "integer.gauge", Gauge = new Gauge { DataPoints = { point } } },
             new Metric
             {
@@ -26,19 +26,24 @@ public sealed class NumericFidelityTests
                 Sum = new Sum
                     { DataPoints = { point.Clone() }, AggregationTemporality = AggregationTemporality.Cumulative }
             });
+        var receipt = Assert.ContainsSingle(receipts);
+        Assert.AreEqual(0L, receipt.Rejected);
+        Assert.AreEqual(2L, receipt.Accepted);
         Assert.HasCount(2, metrics);
         Assert.AreEqual("integer.gauge", metrics[0].Name);
         Assert.AreEqual("integer.sum", metrics[1].Name);
         var gauge = Assert.ContainsSingle(Assert.IsInstanceOfType<GaugeData>(metrics[0].Data).Points);
         var sum = Assert.ContainsSingle(Assert.IsInstanceOfType<SumData>(metrics[1].Data).Points);
-        foreach (var captured in new[] { gauge, sum })
-        {
-            Assert.AreEqual(expected, Assert.IsInstanceOfType<long>(captured.Value));
-            Assert.AreEqual(expected, Assert.IsInstanceOfType<long>(Assert.ContainsSingle(captured.Exemplars).Value));
-            using var archive = JsonSerializer.SerializeToDocument(captured);
-            Assert.AreEqual(expected, archive.RootElement.GetProperty("Value").GetInt64());
-            Assert.AreEqual(expected, archive.RootElement.GetProperty("Exemplars")[0].GetProperty("Value").GetInt64());
-        }
+        Assert.AreEqual(expected, Assert.IsInstanceOfType<long>(gauge.Value));
+        Assert.AreEqual(expected, Assert.IsInstanceOfType<long>(Assert.ContainsSingle(gauge.Exemplars).Value));
+        Assert.AreEqual(expected, Assert.IsInstanceOfType<long>(sum.Value));
+        Assert.AreEqual(expected, Assert.IsInstanceOfType<long>(Assert.ContainsSingle(sum.Exemplars).Value));
+        using var gaugeArchive = JsonSerializer.SerializeToDocument(gauge);
+        Assert.AreEqual(expected, gaugeArchive.RootElement.GetProperty("Value").GetInt64());
+        Assert.AreEqual(expected, gaugeArchive.RootElement.GetProperty("Exemplars")[0].GetProperty("Value").GetInt64());
+        using var sumArchive = JsonSerializer.SerializeToDocument(sum);
+        Assert.AreEqual(expected, sumArchive.RootElement.GetProperty("Value").GetInt64());
+        Assert.AreEqual(expected, sumArchive.RootElement.GetProperty("Exemplars")[0].GetProperty("Value").GetInt64());
     }
 
     [TestMethod]
@@ -48,7 +53,7 @@ public sealed class NumericFidelityTests
     [DataRow("negative-zero", -0.0)]
     public async Task OtlpReceiverMetrics_NonFiniteAndSignedZeroDoubles_KeepTheirWireBits(string name, double expected)
     {
-        var metrics = await CaptureAsync(new Metric
+        var (_, _, metrics, receipts) = await CaptureAsync(new Metric
         {
             Name = name, Gauge = new Gauge
             {
@@ -58,6 +63,9 @@ public sealed class NumericFidelityTests
                 }
             }
         });
+        var receipt = Assert.ContainsSingle(receipts);
+        Assert.AreEqual(0L, receipt.Rejected);
+        Assert.AreEqual(1L, receipt.Accepted);
         var metric = Assert.ContainsSingle(metrics);
         Assert.AreEqual(name, metric.Name);
         var point = Assert.ContainsSingle(Assert.IsInstanceOfType<GaugeData>(metric.Data).Points);
@@ -70,7 +78,7 @@ public sealed class NumericFidelityTests
     [TestMethod]
     public async Task OtlpReceiverMetrics_CountsAndBucketCounts_PreserveUInt64Maximum()
     {
-        var metrics = await CaptureAsync(
+        var (_, _, metrics, receipts) = await CaptureAsync(
             new Metric
             {
                 Name = "histogram", Histogram = new Histogram
@@ -107,6 +115,9 @@ public sealed class NumericFidelityTests
                 Name = "summary",
                 Summary = new Summary { DataPoints = { new SummaryDataPoint { Count = ulong.MaxValue } } }
             });
+        var receipt = Assert.ContainsSingle(receipts);
+        Assert.AreEqual(0L, receipt.Rejected);
+        Assert.AreEqual(4L, receipt.Accepted);
         Assert.AreSequenceEqual(["histogram", "exponential-zero", "exponential-positive", "summary"],
             metrics.Select(m => m.Name));
         var histogram = Assert.ContainsSingle(Assert.IsInstanceOfType<HistogramData>(metrics[0].Data).Points);
@@ -123,16 +134,13 @@ public sealed class NumericFidelityTests
             Assert.ContainsSingle(Assert.IsInstanceOfType<SummaryData>(metrics[3].Data).Points).Count);
     }
 
-    private async Task<IReadOnlyList<MetricRecord>> CaptureAsync(params Metric[] metrics)
+    private async Task<TelemetrySnapshot> CaptureAsync(params Metric[] metrics)
     {
         await using var receiver = await OtlpReceiver.StartAsync(TestContext.CancellationToken);
         var request = OtlpEvidence.Metrics(null, metrics);
         using var response = await OtlpHttp.PostAsync(receiver.Endpoint, request.ToByteArray(),
             TestContext.CancellationToken, Signals.Metrics);
         response.EnsureSuccessStatusCode();
-        var receipt = Assert.ContainsSingle(receiver.Snapshot().Receipts);
-        Assert.AreEqual(0L, receipt.Rejected);
-        Assert.AreEqual(metrics.LongLength, receipt.Accepted);
-        return receiver.Snapshot().Metrics;
+        return receiver.Snapshot();
     }
 }

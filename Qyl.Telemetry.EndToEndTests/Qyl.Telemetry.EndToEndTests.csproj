@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="../Qyl.Telemetry.Tests/Qyl.Telemetry.Tests.csproj" />
     <ProjectReference Include="Applications/TelemetryProbe/TelemetryProbe.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="Applications/SemanticContractProbe/SemanticContractProbe.csproj" ReferenceOutputAssembly="false" />
     <TestFixtureProject Include="Applications/TelemetryProbe/TelemetryProbe.csproj" />
   </ItemGroup>
   <ItemGroup><Compile Remove="Applications/**/*.cs" /></ItemGroup>
@@ -15,6 +16,9 @@
     <WriteLinesToFile File="$(TargetDir)delivery-project.txt" Lines="@(TestFixtureProject->'%(FullPath)')"
                       Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(TargetDir)semantic-project.txt" Lines="@(SemanticContractProject->'%(FullPath)')"
+                      Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(TargetDir)local-mcp-entrypoint.txt"
+                      Lines="$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../services/qyl.mcp/src/main.ts'))"
                       Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>
 </Project>
